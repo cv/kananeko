@@ -1995,6 +1995,29 @@ const CAT: Record<string, Glyph> = {
     '........',
   ],
 
+  // Heart full (life remaining)
+  '\uE012': [
+    '........',
+    '.##.##..',
+    '#..#..#.',
+    '#.....#.',
+    '#.....#.',
+    '.#...#..',
+    '..#.#...',
+    '...#....',
+  ],
+  // Heart empty (life lost)
+  '\uE013': [
+    '........',
+    '.##.##..',
+    '#..#..#.',
+    '#.....#.',
+    '.#...#..',
+    '..#.#...',
+    '...#....',
+    '........',
+  ],
+
   // Bold inverted blank — solid block with ? cutout (kana game missing character)
   '\uE011': [
     '########',
@@ -2147,6 +2170,8 @@ export const CAT_TILES = {
   ROW2: ['\uE008', '\uE009', '\uE00A', '\uE00B'] as const,
   ICON: '\uE010',
   BLANK: '\uE011',
+  HEART_FULL: '\uE012',
+  HEART_EMPTY: '\uE013',
 } as const;
 
 // Scene icon tile pairs [left, right]

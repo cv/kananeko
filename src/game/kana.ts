@@ -48,6 +48,7 @@ import {
   jr_cc,
   jp,
   jp_cc,
+  call,
   ret,
   ret_cc,
 } from '../asm/ops';
@@ -93,6 +94,9 @@ function tilemapAddr(row: number, col: number): number {
 }
 
 const BLANK_TILE: TileIndex = requireTile(CAT_TILES.BLANK);
+const HEART_FULL: TileIndex = requireTile(CAT_TILES.HEART_FULL);
+const HEART_EMPTY: TileIndex = requireTile(CAT_TILES.HEART_EMPTY);
+const DIGIT_TILES: TileIndex[] = '0123456789'.split('').map((ch) => requireTile(ch));
 
 // ---------------------------------------------------------------------------
 // Data encoder
@@ -132,6 +136,119 @@ function buildDrawTileAt(row: number, col: number, tileExpr: 'from_a' | number):
   }
   ops.push(ldi_hl_a());
   return ops;
+}
+
+/**
+ * Build the HUD drawing subroutine (called with LCD off).
+ * Row 0: ♥♥♥ followed by 4-digit score display.
+ *
+ * Hearts: read KANA_LIVES, draw full/empty hearts at cols 1-3.
+ * Score: read KANA_SCORE_LO (low byte only, 0-255), convert to
+ * 3 decimal digits and draw at cols 15-18. Shows "000"-"255".
+ * For negative scores (death penalty), shows "000".
+ */
+function buildDrawHudOps(): Op[] {
+  // Digit tile lookup: DIGIT_TILES[0] through DIGIT_TILES[9]
+  // We need these as immediate values in assembly.
+  const d0 = DIGIT_TILES[0];
+  if (d0 === undefined) throw new Error('Missing digit 0 tile');
+
+  return [
+    label('kana_draw_hud'),
+
+    // === Draw 3 hearts at row 0, cols 1-3 ===
+    ld_a_nn(MEM.KANA_LIVES),
+
+    // Heart 1 (col 1): full if lives >= 1
+    cp_n(u8(1)),
+    jr_cc('c', ref('kana_h1_empty')),
+    ld_r_n('a', u8(HEART_FULL)),
+    jr(ref('kana_h1_draw')),
+    label('kana_h1_empty'),
+    ld_r_n('a', u8(HEART_EMPTY)),
+    label('kana_h1_draw'),
+    ...buildDrawTileAt(0, 1, 'from_a'),
+
+    // Heart 2 (col 2): full if lives >= 2
+    ld_a_nn(MEM.KANA_LIVES),
+    cp_n(u8(2)),
+    jr_cc('c', ref('kana_h2_empty')),
+    ld_r_n('a', u8(HEART_FULL)),
+    jr(ref('kana_h2_draw')),
+    label('kana_h2_empty'),
+    ld_r_n('a', u8(HEART_EMPTY)),
+    label('kana_h2_draw'),
+    ...buildDrawTileAt(0, 2, 'from_a'),
+
+    // Heart 3 (col 3): full if lives >= 3
+    ld_a_nn(MEM.KANA_LIVES),
+    cp_n(u8(3)),
+    jr_cc('c', ref('kana_h3_empty')),
+    ld_r_n('a', u8(HEART_FULL)),
+    jr(ref('kana_h3_draw')),
+    label('kana_h3_empty'),
+    ld_r_n('a', u8(HEART_EMPTY)),
+    label('kana_h3_draw'),
+    ...buildDrawTileAt(0, 3, 'from_a'),
+
+    // === Draw score at row 0, cols 15-17 (3 digits) ===
+    // Read score low byte. If high byte has bit 7 set (negative), show 000.
+    ld_a_nn(MEM.KANA_SCORE_HI),
+    // Check if negative (bit 7 set)
+    and_n(u8(0x80)),
+    jr_cc('z', ref('kana_score_positive')),
+    // Negative: draw "000"
+    ...buildDrawTileAt(0, 15, d0),
+    ...buildDrawTileAt(0, 16, d0),
+    ...buildDrawTileAt(0, 17, d0),
+    jr(ref('kana_hud_done')),
+
+    label('kana_score_positive'),
+    // Score is in SCORE_LO (0-255 range for positive scores within a scene)
+    // Convert to 3 decimal digits: hundreds, tens, ones
+    ld_a_nn(MEM.KANA_SCORE_LO),
+    ld_r_r('b', 'a'), // B = score
+
+    // Hundreds digit: subtract 100 repeatedly
+    ld_r_n('c', u8(0)), // C = hundreds count
+    label('kana_hundreds'),
+    ld_r_r('a', 'b'),
+    cp_n(u8(100)),
+    jr_cc('c', ref('kana_hundreds_done')),
+    sub_n(u8(100)),
+    ld_r_r('b', 'a'),
+    inc_r('c'),
+    jr(ref('kana_hundreds')),
+    label('kana_hundreds_done'),
+    // C = hundreds digit, B = remainder
+    // Draw hundreds: DIGIT_TILES[0] + C
+    ld_r_r('a', 'c'),
+    add_n(u8(d0)), // A = digit tile for hundreds
+    ...buildDrawTileAt(0, 15, 'from_a'),
+
+    // Tens digit: subtract 10 repeatedly
+    ld_r_n('c', u8(0)),
+    label('kana_tens'),
+    ld_r_r('a', 'b'),
+    cp_n(u8(10)),
+    jr_cc('c', ref('kana_tens_done')),
+    sub_n(u8(10)),
+    ld_r_r('b', 'a'),
+    inc_r('c'),
+    jr(ref('kana_tens')),
+    label('kana_tens_done'),
+    ld_r_r('a', 'c'),
+    add_n(u8(d0)),
+    ...buildDrawTileAt(0, 16, 'from_a'),
+
+    // Ones digit: remainder in B
+    ld_r_r('a', 'b'),
+    add_n(u8(d0)),
+    ...buildDrawTileAt(0, 17, 'from_a'),
+
+    label('kana_hud_done'),
+    ret(),
+  ];
 }
 
 // ---------------------------------------------------------------------------
@@ -184,6 +301,9 @@ export function buildKanaEngine(): Op[] {
     jr_cc('nz', ref('kana_clear')),
     dec_r('b'),
     jr_cc('nz', ref('kana_clear')),
+
+    // Draw HUD (hearts + score) on row 0
+    call(ref('kana_draw_hud')),
 
     // Load ROM pointer into DE
     ld_a_nn(MEM.DLG_STR_LO),
@@ -503,5 +623,10 @@ export function buildKanaEngine(): Op[] {
     xor_r('a'),
     ld_nn_a(MEM.KANA_STATE),
     ret(),
+
+    // =================================================================
+    // kana_draw_hud — Draw hearts + score on row 0 (LCD must be off).
+    // =================================================================
+    ...buildDrawHudOps(),
   ];
 }
