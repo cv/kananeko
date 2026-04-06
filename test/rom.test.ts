@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { assemble } from '@asm/assembler';
-import { buildProgram } from '@game/title';
+import { buildProgram } from '@game/main';
 import { buildTileData, CHAR_MAP, textToTiles } from '@game/font';
 import { JOY } from '@asm/hardware';
 import { buildDialogueData } from '@game/dialogue';
 import { buildKanaData, KANA_QUESTIONS } from '@game/kana';
+import { SCENES } from '@game/scene';
 
 // @ts-expect-error — serverboy has no type declarations
 import Gameboy from 'serverboy';
@@ -88,15 +89,19 @@ describe('assembler', () => {
   });
 
   it('resolves all expected labels', () => {
-    expect(symbols.has('waitVBlank')).toBe(true);
-    expect(symbols.has('copyTiles')).toBe(true);
-    expect(symbols.has('clearMap')).toBe(true);
-    expect(symbols.has('titleLoop')).toBe(true);
+    expect(symbols.has('init_vblank')).toBe(true);
+    expect(symbols.has('init_copy')).toBe(true);
+    expect(symbols.has('title_screen')).toBe(true);
+    expect(symbols.has('title_loop')).toBe(true);
     expect(symbols.has('tileData')).toBe(true);
     expect(symbols.has('joy_read')).toBe(true);
     expect(symbols.has('dlg_open')).toBe(true);
     expect(symbols.has('dlg_update')).toBe(true);
-    expect(symbols.has('dialogueData')).toBe(true);
+    expect(symbols.has('kana_start')).toBe(true);
+    expect(symbols.has('kana_update')).toBe(true);
+    expect(symbols.has('scene_load')).toBe(true);
+    expect(symbols.has('scene0_dlg')).toBe(true);
+    expect(symbols.has('scene0_kana')).toBe(true);
   });
 
   it('places tileData label in ROM', () => {
@@ -560,5 +565,115 @@ describe('kana', () => {
     expect(memory[0xc034]).toBe(1);
     // State should be awaiting input again (2)
     expect(memory[0xc030]).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Scene system tests
+// ---------------------------------------------------------------------------
+
+describe('scene system', () => {
+  it('has all 5 scenes defined', () => {
+    expect(SCENES).toHaveLength(5);
+    for (const scene of SCENES) {
+      expect(scene.name.length).toBeGreaterThan(0);
+      expect(scene.dialogues.length).toBeGreaterThan(0);
+      expect(scene.kanaQuestions.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('has scene data labels in ROM for all 5 scenes', () => {
+    for (let i = 0; i < 5; i++) {
+      expect(symbols.has(`scene${String(i)}_dlg`)).toBe(true);
+      expect(symbols.has(`scene${String(i)}_kana`)).toBe(true);
+    }
+  });
+
+  it('loads scene 0 after START press', () => {
+    const gb = new Gameboy();
+    gb.loadRom(Buffer.from(rom));
+
+    // Boot to title
+    for (let i = 0; i < 10; i++) gb.doFrame();
+
+    // Press START
+    gb.pressKey(Gameboy.KEYMAP.START);
+    gb.doFrame();
+
+    // Run frames for scene to load
+    for (let i = 0; i < 10; i++) gb.doFrame();
+
+    const memory = gb.getMemory();
+    // Scene ID at $C010 should be 0
+    expect(memory[0xc010]).toBe(0);
+    // Dialogue state should be active (non-zero)
+    expect(memory[0xc020]).toBeGreaterThan(0);
+  });
+
+  it('completes scene 0 and advances to scene 1', () => {
+    const gb = new Gameboy();
+    gb.loadRom(Buffer.from(rom));
+
+    // Boot to title
+    for (let i = 0; i < 10; i++) gb.doFrame();
+
+    // START to begin
+    gb.pressKey(Gameboy.KEYMAP.START);
+    gb.doFrame();
+
+    // Scene 0 dialogue: complete all dialogues
+    // Each dialogue: wait for text reveal, then press A to confirm choice
+    for (let d = 0; d < SCENES[0]!.dialogues.length; d++) {
+      // Wait for text to reveal and choices to appear
+      for (let i = 0; i < 60; i++) gb.doFrame();
+      // Select first choice
+      gb.pressKey(Gameboy.KEYMAP.A);
+      gb.doFrame();
+      // If there are more dialogues, the next one should auto-start
+      // (Actually in current implementation, dialogue ends after one entry)
+    }
+
+    // Should be in kana game now
+    for (let i = 0; i < 5; i++) gb.doFrame();
+    let memory = gb.getMemory();
+    expect(memory[0xc030]).toBe(2); // kana awaiting input
+
+    // Complete both kana questions for scene 0
+    const scene0 = SCENES[0]!;
+    for (const q of scene0.kanaQuestions) {
+      // Press correct direction
+      const keyMap: Record<string, number> = {
+        up: Gameboy.KEYMAP.UP,
+        down: Gameboy.KEYMAP.DOWN,
+        left: Gameboy.KEYMAP.LEFT,
+        right: Gameboy.KEYMAP.RIGHT,
+      };
+      gb.pressKey(keyMap[q.correctDir]);
+      gb.doFrame();
+      // Wait for feedback
+      for (let i = 0; i < 35; i++) gb.doFrame();
+    }
+
+    // After all kana done, should advance to scene 1
+    for (let i = 0; i < 10; i++) gb.doFrame();
+    memory = gb.getMemory();
+
+    // Scene ID should be 1
+    expect(memory[0xc010]).toBe(1);
+    // Scene 0 completion flag should be set (bit 0)
+    expect(memory[0xc011] & 0x01).toBe(0x01);
+  });
+
+  it('ROM fits within 32KB', () => {
+    // Find the last non-zero byte in the ROM
+    let lastNonZero = 0;
+    for (let i = rom.length - 1; i >= 0; i--) {
+      if ((rom[i] ?? 0) !== 0) {
+        lastNonZero = i;
+        break;
+      }
+    }
+    // Should be well under 32KB — verify at least 50% headroom
+    expect(lastNonZero).toBeLessThan(16384); // less than 16KB used
   });
 });

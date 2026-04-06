@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { assemble } from './asm/assembler';
-import { buildProgram } from './game/title';
+import { buildProgram } from './game/main';
 
 const outDir = path.join(__dirname, '..', 'build');
 fs.mkdirSync(outDir, { recursive: true });
