@@ -1925,13 +1925,13 @@ const CAT: Record<string, Glyph> = {
   // Bold inverted blank — solid block with ? cutout (kana game missing character)
   '\uE011': [
     '########',
-    '##.##.##',
-    '#.#..#.#',
+    '##....##',
+    '#.####.#',
     '#####..#',
-    '####..##',
     '###..###',
     '########',
     '###..###',
+    '########',
   ],
 };
 
