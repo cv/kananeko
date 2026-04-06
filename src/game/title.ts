@@ -2,7 +2,7 @@
  * Title screen ROM program.
  *
  * Displays "JRPGEN" with "はじめ" (hajime / begin) underneath.
- * Press START to open a test dialogue with response choices.
+ * Press START to open a test dialogue, then launches a kana mini-game.
  */
 
 import { type Op, ref, u8, u16 } from '../asm/types';
@@ -34,12 +34,13 @@ import { HW, JOY, LCDC, MEM } from '../asm/hardware';
 import { buildTileData, textToTiles } from './font';
 import { buildReadJoypad } from './joypad';
 import { buildDialogueData, buildDialogueEngine } from './dialogue';
+import { buildKanaData, buildKanaEngine, KANA_QUESTIONS } from './kana';
 
 // ---------------------------------------------------------------------------
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const TILEMAP_BASE = MEM.VRAM_MAP0; // $9800
+const TILEMAP_BASE = MEM.VRAM_MAP0;
 const SCREEN_COLS = 20;
 const MAP_COLS = 32;
 
@@ -64,7 +65,7 @@ const subRow = 10;
 const subCol = centerCol(SUBTITLE);
 
 // ---------------------------------------------------------------------------
-// Tile & dialogue data
+// Tile & dialogue & kana data
 // ---------------------------------------------------------------------------
 
 const tileData = buildTileData();
@@ -76,6 +77,8 @@ const { data: dialogueData } = buildDialogueData([
     choices: ['はい', 'いいえ'],
   },
 ]);
+
+const kanaData = buildKanaData(KANA_QUESTIONS);
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -113,14 +116,13 @@ export function buildProgram(): Op[] {
     di(),
     ld_rr_nn('sp', u16(0xfffe)),
 
-    // Clear joypad WRAM
+    // Clear WRAM state
     xor_r('a'),
     ld_nn_a(MEM.JOYPAD_CUR),
     ld_nn_a(MEM.JOYPAD_PREV),
     ld_nn_a(MEM.JOYPAD_NEW),
-
-    // Clear dialogue state
     ld_nn_a(MEM.DLG_STATE),
+    ld_nn_a(MEM.KANA_STATE),
 
     // Wait for VBlank
     label('waitVBlank'),
@@ -192,17 +194,56 @@ export function buildProgram(): Op[] {
     call(ref('joy_read')),
     call(ref('dlg_update')),
 
-    // Check if dialogue is done (state == 0)
     ld_a_nn(MEM.DLG_STATE),
     cp_n(u8(0)),
     jr_cc('nz', ref('dialogueLoop')),
 
-    // Dialogue done — loop back to title for now
+    // Dialogue done — launch kana mini-game
+    ld_rr_nn('de', ref('kanaData')),
+    call(ref('kana_start')),
+
+    // ---- Kana game loop ----
+    label('kanaLoop'),
+    halt(),
+    nop(),
+    call(ref('joy_read')),
+    call(ref('kana_update')),
+
+    ld_a_nn(MEM.KANA_STATE),
+    cp_n(u8(0)),
+    jr_cc('nz', ref('kanaLoop')),
+
+    // Kana done — back to title
+    // Redraw title screen (LCD off, clear, redraw, LCD on)
+    label('redrawTitle'),
+    ldh_a_n(HW.LY),
+    cp_n(u8(144)),
+    jr_cc('nz', ref('redrawTitle')),
+    xor_r('a'),
+    ldh_n_a(HW.LCDC),
+
+    ld_rr_nn('hl', MEM.VRAM_MAP0),
+    xor_r('a'),
+    ld_r_n('b', u8(4)),
+    ld_r_n('c', u8(0)),
+    label('clearMap2'),
+    ldi_hl_a(),
+    dec_r('c'),
+    jr_cc('nz', ref('clearMap2')),
+    dec_r('b'),
+    jr_cc('nz', ref('clearMap2')),
+
+    ...buildTextWriteOps(textWrites),
+
+    ld_r_n('a', u8(LCDC.LCD_ON | LCDC.TILE_DATA_8000 | LCDC.BG_ON)),
+    ldh_n_a(HW.LCDC),
+
     jr(ref('titleLoop')),
 
     // ---- Subroutines ----
     ...buildReadJoypad(),
     ...buildDialogueEngine(),
+    ...buildKanaEngine(),
 
     // ---- Data ----
     label('tileData'),
@@ -210,5 +251,8 @@ export function buildProgram(): Op[] {
 
     label('dialogueData'),
     db(dialogueData),
+
+    label('kanaData'),
+    db(kanaData),
   ];
 }

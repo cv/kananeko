@@ -66,6 +66,13 @@ export const MEM = {
   DLG_VRAM_LO: u16(0xc027), // Current VRAM write position (lo byte)
   DLG_VRAM_HI: u16(0xc028), // Current VRAM write position (hi byte)
   DLG_RESULT: u16(0xc029), // Chosen response index after selection
+
+  // WRAM — kana mini-game
+  KANA_STATE: u16(0xc030), // 0=idle, 1=showing, 2=awaiting, 3=feedback
+  KANA_CORRECT: u16(0xc031), // Correct direction (0=up,1=down,2=left,3=right)
+  KANA_ANSWER: u16(0xc032), // Player's answer direction
+  KANA_SCORE: u16(0xc033), // Confidence meter (0-255)
+  KANA_Q_IDX: u16(0xc034), // Current question index
 } as const satisfies Record<string, U16>;
 
 // Joypad bit flags (active-high after our read routine)

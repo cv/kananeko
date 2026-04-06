@@ -4,6 +4,7 @@ import { buildProgram } from '@game/title';
 import { buildTileData, CHAR_MAP, textToTiles } from '@game/font';
 import { JOY } from '@asm/hardware';
 import { buildDialogueData } from '@game/dialogue';
+import { buildKanaData, KANA_QUESTIONS } from '@game/kana';
 
 // @ts-expect-error — serverboy has no type declarations
 import Gameboy from 'serverboy';
@@ -462,5 +463,102 @@ describe('dialogue', () => {
     const memory = gb.getMemory();
     expect(memory[0xc020]).toBe(0); // idle
     expect(memory[0xc029]).toBe(1); // second choice
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Kana mini-game tests
+// ---------------------------------------------------------------------------
+
+describe('kana', () => {
+  it('encodes kana question data correctly', () => {
+    const data = buildKanaData(KANA_QUESTIONS);
+    expect(data.length).toBeGreaterThan(0);
+    // First byte is word_length of first question
+    const firstWordLen = data[0];
+    expect(firstWordLen).toBe(textToTiles(KANA_QUESTIONS[0]!.word).length);
+    // Last byte should be 0x00 sentinel
+    expect(data[data.length - 1]).toBe(0);
+  });
+
+  /** Helper: advance through title → dialogue → kana */
+  function enterKanaGame(gb: InstanceType<typeof Gameboy>): void {
+    // Boot and get to title
+    for (let i = 0; i < 10; i++) gb.doFrame();
+
+    // Press START to open dialogue
+    gb.pressKey(Gameboy.KEYMAP.START);
+    gb.doFrame();
+
+    // Wait for dialogue to reach choices
+    for (let i = 0; i < 60; i++) gb.doFrame();
+
+    // Confirm first choice with A
+    gb.pressKey(Gameboy.KEYMAP.A);
+    gb.doFrame();
+
+    // Run a few frames to let kana game start
+    for (let i = 0; i < 5; i++) gb.doFrame();
+  }
+
+  it('enters kana game after dialogue closes', () => {
+    const gb = new Gameboy();
+    gb.loadRom(Buffer.from(rom));
+    enterKanaGame(gb);
+
+    const memory = gb.getMemory();
+    // kana_state at $C030 should be 2 (awaiting input)
+    expect(memory[0xc030]).toBe(2);
+  });
+
+  it('awards score for correct answer', () => {
+    const gb = new Gameboy();
+    gb.loadRom(Buffer.from(rom));
+    enterKanaGame(gb);
+
+    // First question correct direction is 'up' (dir=0)
+    gb.pressKey(Gameboy.KEYMAP.UP);
+    gb.doFrame();
+
+    const memory = gb.getMemory();
+    // Score at $C033 should be 4 (SCORE_PER_CORRECT)
+    expect(memory[0xc033]).toBe(4);
+    // State should be feedback (3)
+    expect(memory[0xc030]).toBe(3);
+  });
+
+  it('does not award score for wrong answer', () => {
+    const gb = new Gameboy();
+    gb.loadRom(Buffer.from(rom));
+    enterKanaGame(gb);
+
+    // First question correct is UP, press DOWN instead
+    gb.pressKey(Gameboy.KEYMAP.DOWN);
+    gb.doFrame();
+
+    const memory = gb.getMemory();
+    // Score should remain 0
+    expect(memory[0xc033]).toBe(0);
+    // But state should still transition to feedback
+    expect(memory[0xc030]).toBe(3);
+  });
+
+  it('advances to next question after feedback', () => {
+    const gb = new Gameboy();
+    gb.loadRom(Buffer.from(rom));
+    enterKanaGame(gb);
+
+    // Answer correctly
+    gb.pressKey(Gameboy.KEYMAP.UP);
+    gb.doFrame();
+
+    // Wait for feedback (30 frames)
+    for (let i = 0; i < 35; i++) gb.doFrame();
+
+    const memory = gb.getMemory();
+    // Question index at $C034 should be 1 (moved to second question)
+    expect(memory[0xc034]).toBe(1);
+    // State should be awaiting input again (2)
+    expect(memory[0xc030]).toBe(2);
   });
 });
