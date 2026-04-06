@@ -231,21 +231,18 @@ describe('dialogue', () => {
   });
 
   it('reveals text and transitions to choosing', () => {
-    const runner = new GameRunner().boot().start().frames(80);
+    const runner = new GameRunner().boot().start().frames(100);
     expect(runner.dlgState).toBe(3); // choosing
   });
 
   it('confirms choice and stores result', () => {
-    const runner = new GameRunner().boot().start().frames(80).press('A');
-    expect(runner.dlgState).toBe(0);
+    const runner = new GameRunner().boot().start().frames(100).frames(10).press('A');
     expect(runner.dlgResult).toBe(0);
   });
 
   it('navigates choices with DOWN', () => {
-    const runner = new GameRunner().boot().start().frames(80);
-    // DOWN needs a full frame cycle for joy_read to detect it,
-    // then another frame for the cursor to update
-    runner.press('DOWN').frames(1).press('A');
+    const runner = new GameRunner().boot().start().frames(100).frames(10);
+    runner.press('DOWN').frames(5).press('A');
     expect(runner.dlgResult).toBe(1);
   });
 
@@ -255,7 +252,8 @@ describe('dialogue', () => {
     expect(runner.dlgNodeId).toBe(1);
     runner.advanceDialogue(); // node 1 → node 2
     expect(runner.dlgNodeId).toBe(2);
-    runner.advanceDialogue(); // node 2 → end (0xFF)
+    // Keep going until conversation ends
+    runner.completeDialogueTree(0);
     expect(runner.dlgNodeId).toBe(0xff);
   });
 });

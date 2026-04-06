@@ -92,7 +92,8 @@ export interface DialogueNode {
 
 export type DialogueTree = DialogueNode[];
 
-const END_MARKER = 0xff;
+const END_MARKER = 0xff; // end of conversation marker (node next = null)
+const TEXT_END = 0xfe; // text string terminator (avoids collision with tile 0 = space)
 
 /**
  * Pack a dialogue tree into ROM data with an offset table for random access.
@@ -116,7 +117,7 @@ export function buildDialogueTree(tree: DialogueTree): Uint8Array {
     for (const tile of textToTiles(node.text)) {
       chunk.push(tile);
     }
-    chunk.push(0x00);
+    chunk.push(TEXT_END);
 
     // Choice count
     chunk.push(node.choices.length);
@@ -131,7 +132,7 @@ export function buildDialogueTree(tree: DialogueTree): Uint8Array {
       for (const tile of textToTiles(choice.text)) {
         chunk.push(tile);
       }
-      chunk.push(0x00);
+      chunk.push(TEXT_END);
     }
 
     nodeChunks.push(chunk);
@@ -314,8 +315,8 @@ export function buildDialogueEngine(): Op[] {
     ld_nn_a(MEM.DLG_STR_HI),
     ld_r_r('a', 'b'), // restore tile
 
-    // Check for null terminator
-    cp_n(u8(0)),
+    // Check for text terminator (0xFE — not 0x00, because tile 0 = space)
+    cp_n(u8(0xfe)),
     jr_cc('z', ref('dlg_text_done')),
 
     // Write tile to VRAM position
@@ -428,8 +429,8 @@ export function buildDialogueEngine(): Op[] {
     label('dlg_choice_char'),
     ld_a_de(), // A = [DE] (tile index from ROM)
     inc_rr('de'), // advance source
-    cp_n(u8(0)),
-    jr_cc('z', ref('dlg_choice_str_done')), // null = end of this choice
+    cp_n(u8(0xfe)),
+    jr_cc('z', ref('dlg_choice_str_done')), // 0xFE = end of this choice text
     ldi_hl_a(), // write tile to VRAM, advance dest
     jr(ref('dlg_choice_char')),
 

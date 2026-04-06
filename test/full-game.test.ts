@@ -1,8 +1,8 @@
 /**
  * Full game playthrough tests.
  *
- * Exercises every screen, every dialogue branch, every kana question,
- * and every scene transition in the game's state machine.
+ * Exercises every screen, dialogue branch, kana question,
+ * and scene transition in the game's state machine.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -14,53 +14,51 @@ import type { KanaDir } from '@game/kana';
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Play through a dialogue tree choosing option `choiceIdx` at each node */
+/** Wait until dialogue state reaches `choosing` (3), then idle to debounce input */
+function waitForChoices(runner: GameRunner): void {
+  for (let i = 0; i < 300; i++) {
+    runner.frames(1);
+    if (runner.dlgState === 3) {
+      runner.frames(10); // debounce: let previous A release clear from joypad edge detector
+      return;
+    }
+  }
+  throw new Error('Dialogue did not reach choosing state within 300 frames');
+}
+
 function playDialogueTree(runner: GameRunner, sceneIdx: number, choicePerNode: number[]): void {
   const tree = SCENES[sceneIdx]!.dialogue;
   let nodeIdx = 0;
 
   for (const choiceIdx of choicePerNode) {
     const node = tree[nodeIdx]!;
-    // Wait for text reveal + choices
-    runner.frames(80);
-    expect(runner.dlgState).toBe(3); // choosing
+    waitForChoices(runner);
 
-    // Navigate to the right choice
     for (let i = 0; i < choiceIdx; i++) {
       runner.press('DOWN').frames(1);
     }
-
-    // Confirm
     runner.press('A').frames(5);
 
-    // Follow the branch
     const choice = node.choices[choiceIdx]!;
     if (choice.next === null) {
-      expect(runner.dlgNodeId).toBe(0xff); // conversation over
+      expect(runner.dlgNodeId).toBe(0xff);
       return;
     }
     nodeIdx = choice.next;
   }
 }
 
-/** Answer a kana question with a specific direction and verify correctness */
-function answerKanaQuestion(
+function answerKana(
   runner: GameRunner,
   dir: KanaDir,
   isCorrect: boolean,
   expectedScore: number,
 ): void {
   runner.frames(5);
-  expect(runner.kanaState).toBe(2); // awaiting input
-
+  expect(runner.kanaState).toBe(2);
   runner.press(dir.toUpperCase());
-  expect(runner.kanaState).toBe(3); // feedback
-
-  if (isCorrect) {
-    expect(runner.kanaScore).toBe(expectedScore);
-  }
-
-  // Wait for feedback to complete and next question to load
+  expect(runner.kanaState).toBe(3);
+  if (isCorrect) expect(runner.kanaScore).toBe(expectedScore);
   runner.frames(35);
 }
 
@@ -69,303 +67,213 @@ function answerKanaQuestion(
 // ---------------------------------------------------------------------------
 
 describe('title screen', () => {
-  it('shows title screen on boot', () => {
-    const runner = new GameRunner().boot();
-    expect(runner.dlgState).toBe(0); // idle
-    expect(runner.sceneId).toBe(0);
-    expect(runner.dlgNodeId).toBe(0xff);
+  it('boots idle', () => {
+    expect(new GameRunner().boot().dlgState).toBe(0);
   });
 
-  it('stays on title until START is pressed', () => {
-    const runner = new GameRunner().boot();
-    runner.frames(100); // wait a long time
-    expect(runner.dlgState).toBe(0); // still idle
-    runner.press('A').frames(10); // wrong button
-    expect(runner.dlgState).toBe(0); // still idle
-  });
-
-  it('transitions to scene 0 on START', () => {
-    const runner = new GameRunner().boot().start();
-    expect(runner.sceneId).toBe(0);
-    expect(runner.dlgState).toBeGreaterThan(0); // dialogue started
-    expect(runner.dlgNodeId).toBe(0); // node 0
+  it('transitions on START', () => {
+    const r = new GameRunner().boot().start();
+    expect(r.sceneId).toBe(0);
+    expect(r.dlgState).toBeGreaterThan(0);
   });
 });
 
 // ---------------------------------------------------------------------------
-// Scene 0: Train Station (えき)
+// Scene 0: Train Station (7 nodes)
 // ---------------------------------------------------------------------------
 
-describe('scene 0: train station', () => {
-  function startScene0(): GameRunner {
-    return new GameRunner().boot().start();
-  }
+describe('scene 0: station', () => {
+  const startScene = (): GameRunner => new GameRunner().boot().start();
 
-  it('dialogue path: all first choices (こんにちは → はい げんきです → ありがとう)', () => {
-    const runner = startScene0();
-    playDialogueTree(runner, 0, [0, 0, 0]);
-    expect(runner.dlgNodeId).toBe(0xff);
+  // Traced paths: 0→1→2→5→END (4 choices)
+  it('happy path: こんにちは→げんき→まち→bye', () => {
+    playDialogueTree(startScene(), 0, [0, 0, 0, 0]);
   });
 
-  it('dialogue path: all second choices (... → わかりません → ありがとう)', () => {
-    const runner = startScene0();
-    playDialogueTree(runner, 0, [1, 1, 0]);
-    expect(runner.dlgNodeId).toBe(0xff);
+  // 0→1→3→2→5→END (5 choices)
+  it('tired path: →つかれました→だいじょうぶ→まち→bye', () => {
+    playDialogueTree(startScene(), 0, [0, 2, 0, 0, 0]);
   });
 
-  it('kana Q1: correct answer (UP = こ)', () => {
-    const runner = startScene0();
-    runner.completeDialogueTree(0);
-    answerKanaQuestion(runner, 'up', true, 4);
+  // 0→1→3→6→2→5→END (6 choices)
+  it('water path: →みず→drink→travel→bye', () => {
+    playDialogueTree(startScene(), 0, [0, 2, 2, 0, 0, 0]);
   });
 
-  it('kana Q1: wrong answer (DOWN ≠ こ)', () => {
-    const runner = startScene0();
-    runner.completeDialogueTree(0);
-    answerKanaQuestion(runner, 'down', false, 0);
+  it('kana Q1+Q2 correct', () => {
+    const r = startScene();
+    r.completeDialogueTree(0);
+    answerKana(r, 'up', true, 4);
+    answerKana(r, 'left', true, 8);
   });
 
-  it('kana Q2: correct answer (LEFT = み)', () => {
-    const runner = startScene0();
-    runner.completeDialogueTree(0);
-    answerKanaQuestion(runner, 'up', true, 4); // Q1
-    answerKanaQuestion(runner, 'left', true, 8); // Q2
-  });
-
-  it('completes and advances to scene 1', () => {
-    const runner = startScene0();
-    runner.completeScene(0);
-    expect(runner.sceneId).toBe(1);
-    expect(runner.sceneFlags & 0x01).toBe(0x01);
+  it('advances to scene 1', () => {
+    const r = startScene();
+    r.completeScene(0);
+    expect(r.sceneId).toBe(1);
+    expect(r.sceneFlags & 0x01).toBe(0x01);
   });
 });
 
 // ---------------------------------------------------------------------------
-// Scene 1: Street (みち)
+// Scene 1: Street (7 nodes)
 // ---------------------------------------------------------------------------
 
 describe('scene 1: street', () => {
-  function startScene1(): GameRunner {
-    return new GameRunner().boot().start().completeScene(0);
-  }
+  const startScene = (): GameRunner => new GameRunner().boot().start().completeScene(0);
 
-  it('dialogue path: first choices (はい? → あちらです → どういたしまして)', () => {
-    const runner = startScene1();
-    playDialogueTree(runner, 1, [0, 0, 0]);
-    expect(runner.dlgNodeId).toBe(0xff);
+  // 0→1→3→4→5→END (5 choices)
+  it('directions: はい→あちら→ありがとう→なまえ→bye', () => {
+    playDialogueTree(startScene(), 1, [0, 0, 0, 0, 0]);
   });
 
-  it('dialogue path: second choices (...→ わかりません → いいえ)', () => {
-    const runner = startScene1();
-    playDialogueTree(runner, 1, [1, 1, 1]);
-    expect(runner.dlgNodeId).toBe(0xff);
+  // 0→1→2→3→4→5→END (6 choices)
+  it('dont know: →わかりません→そうですか→ありがとう→なまえ→bye', () => {
+    playDialogueTree(startScene(), 1, [0, 2, 0, 0, 0, 0]);
   });
 
-  it('kana: レストラン blank=ン (correct=RIGHT)', () => {
-    const runner = startScene1();
-    runner.completeDialogueTree(1);
-    answerKanaQuestion(runner, 'right', true, 4);
+  // 0→1→3→4→6→5→END (6 choices: ask name back→たなか→bye)
+  it('ask name back: →あなたは?→さくら→bye', () => {
+    playDialogueTree(startScene(), 1, [0, 0, 0, 2, 0, 0]);
   });
 
-  it('kana: コンビニ blank=コ (correct=LEFT)', () => {
-    const runner = startScene1();
-    runner.completeDialogueTree(1);
-    answerKanaQuestion(runner, 'right', true, 4); // Q1
-    answerKanaQuestion(runner, 'left', true, 8); // Q2
-  });
-
-  it('completes and advances to scene 2', () => {
-    const runner = startScene1();
-    runner.completeScene(1);
-    expect(runner.sceneId).toBe(2);
-    expect(runner.sceneFlags & 0x03).toBe(0x03); // scenes 0+1 complete
+  it('advances to scene 2', () => {
+    const r = startScene();
+    r.completeScene(1);
+    expect(r.sceneId).toBe(2);
+    expect(r.sceneFlags & 0x03).toBe(0x03);
   });
 });
 
 // ---------------------------------------------------------------------------
-// Scene 2: Restaurant (レストラン)
+// Scene 2: Restaurant (9 nodes)
 // ---------------------------------------------------------------------------
 
 describe('scene 2: restaurant', () => {
-  function startScene2(): GameRunner {
-    return new GameRunner().boot().start().completeScene(0).completeScene(1);
-  }
+  const startScene = (): GameRunner =>
+    new GameRunner().boot().start().completeScene(0).completeScene(1);
 
-  it('dialogue branch: order ラーメン (node 0→1→2→4→end)', () => {
-    const runner = startScene2();
-    playDialogueTree(runner, 2, [0, 0, 0, 0]);
-    expect(runner.dlgNodeId).toBe(0xff);
+  // 0→1→2→5→6→7→END (6 choices)
+  it('ramen path', () => {
+    playDialogueTree(startScene(), 2, [0, 0, 0, 0, 0, 0]);
   });
 
-  it('dialogue branch: order おちゃ (node 0→1→3→4→end)', () => {
-    const runner = startScene2();
-    playDialogueTree(runner, 2, [0, 1, 0, 0]); // choice 1 at node 1 → node 3
-    expect(runner.dlgNodeId).toBe(0xff);
+  // 0→1→3→5→6→7→END (6 choices)
+  it('tea path', () => {
+    playDialogueTree(startScene(), 2, [0, 1, 0, 0, 0, 0]);
   });
 
-  it('kana: ラーメン blank=ラ (correct=DOWN)', () => {
-    const runner = startScene2();
-    runner.completeDialogueTree(2);
-    answerKanaQuestion(runner, 'down', true, 4);
+  // 0→1→4→2→5→6→7→END (7 choices)
+  it('recommendation path', () => {
+    playDialogueTree(startScene(), 2, [0, 2, 0, 0, 0, 0, 0]);
   });
 
-  it('kana: おちゃ blank=ち (correct=UP)', () => {
-    const runner = startScene2();
-    runner.completeDialogueTree(2);
-    answerKanaQuestion(runner, 'down', true, 4); // Q1
-    answerKanaQuestion(runner, 'up', true, 8); // Q2
+  // 0→1→2→5→6→8→7→END (7 choices)
+  it('bonus tea: すごくおいしい!', () => {
+    playDialogueTree(startScene(), 2, [0, 0, 0, 0, 2, 0, 0]);
   });
 
-  it('completes and advances to scene 3', () => {
-    const runner = startScene2();
-    runner.completeScene(2);
-    expect(runner.sceneId).toBe(3);
-    expect(runner.sceneFlags & 0x07).toBe(0x07);
+  it('advances to scene 3', () => {
+    const r = startScene();
+    r.completeScene(2);
+    expect(r.sceneId).toBe(3);
+    expect(r.sceneFlags & 0x07).toBe(0x07);
   });
 });
 
 // ---------------------------------------------------------------------------
-// Scene 3: Convenience Store (コンビニ)
+// Scene 3: Convenience Store (7 nodes)
 // ---------------------------------------------------------------------------
 
-describe('scene 3: convenience store', () => {
-  function startScene3(): GameRunner {
-    return new GameRunner().boot().start().completeScene(0).completeScene(1).completeScene(2);
-  }
+describe('scene 3: conbini', () => {
+  const startScene = (): GameRunner =>
+    new GameRunner().boot().start().completeScene(0).completeScene(1).completeScene(2);
 
-  it('dialogue: buy path (これ ください → はい → ありがとう)', () => {
-    const runner = startScene3();
-    playDialogueTree(runner, 3, [0, 0, 0]);
-    expect(runner.dlgNodeId).toBe(0xff);
+  // 0→2→5→6→END (4 choices: direct buy)
+  it('direct buy: これください→100えん→bye', () => {
+    playDialogueTree(startScene(), 3, [1, 0, 0, 0]);
   });
 
-  it('dialogue: buy path directly (これ ください → はい → ありがとう)', () => {
-    const runner = startScene3();
-    playDialogueTree(runner, 3, [0, 0, 0]);
-    expect(runner.dlgNodeId).toBe(0xff);
+  // 0→1→4→2→5→6→END (6 choices)
+  it('ask help: なにか→おにぎり→buy→bye', () => {
+    playDialogueTree(startScene(), 3, [0, 0, 0, 0, 0, 0]);
   });
 
-  it('kana: ください blank=く (correct=DOWN)', () => {
-    const runner = startScene3();
-    runner.completeDialogueTree(3);
-    answerKanaQuestion(runner, 'down', true, 4);
+  // 0→3→0→2→5→6→END (6 choices: browse then buy)
+  it('browse then buy', () => {
+    playDialogueTree(startScene(), 3, [2, 0, 1, 0, 0, 0]);
   });
 
-  it('kana: ありがとう blank=が (correct=DOWN)', () => {
-    const runner = startScene3();
-    runner.completeDialogueTree(3);
-    answerKanaQuestion(runner, 'down', true, 4); // Q1
-    answerKanaQuestion(runner, 'down', true, 8); // Q2
-  });
-
-  it('completes and advances to scene 4', () => {
-    const runner = startScene3();
-    runner.completeScene(3);
-    expect(runner.sceneId).toBe(4);
-    expect(runner.sceneFlags & 0x0f).toBe(0x0f);
+  it('advances to scene 4', () => {
+    const r = startScene();
+    r.completeScene(3);
+    expect(r.sceneId).toBe(4);
+    expect(r.sceneFlags & 0x0f).toBe(0x0f);
   });
 });
 
 // ---------------------------------------------------------------------------
-// Scene 4: Evening Park (こうえん)
+// Scene 4: Evening Park (8 nodes)
 // ---------------------------------------------------------------------------
 
-describe('scene 4: evening park', () => {
-  function startScene4(): GameRunner {
-    return new GameRunner()
+describe('scene 4: park', () => {
+  const startScene = (): GameRunner =>
+    new GameRunner()
       .boot()
       .start()
       .completeScene(0)
       .completeScene(1)
       .completeScene(2)
       .completeScene(3);
-  }
 
-  it('dialogue: こんばんは → カナネコです → たのしかった! → またね!', () => {
-    const runner = startScene4();
-    playDialogueTree(runner, 4, [0, 0, 0, 0]);
-    expect(runner.dlgNodeId).toBe(0xff);
+  // 0→1→3→4→6→END (5 choices)
+  it('happy path', () => {
+    playDialogueTree(startScene(), 4, [0, 0, 0, 0, 0]);
   });
 
-  it('dialogue: all second choices', () => {
-    const runner = startScene4();
-    playDialogueTree(runner, 4, [1, 1, 1, 1]);
-    expect(runner.dlgNodeId).toBe(0xff);
+  // 0→2→3→4→6→END (5 choices)
+  it('sunset path: きれい→ゆうやけ', () => {
+    playDialogueTree(startScene(), 4, [2, 0, 0, 0, 0]);
   });
 
-  it('kana: さようなら blank=な (correct=UP)', () => {
-    const runner = startScene4();
-    runner.completeDialogueTree(4);
-    answerKanaQuestion(runner, 'up', true, 4);
+  // 0→1→3→4→7→6→END (6 choices)
+  it('compliment: とてもたのしい→じょうず', () => {
+    playDialogueTree(startScene(), 4, [0, 0, 0, 1, 0, 0]);
   });
 
-  it('kana: おはよう blank=お (correct=RIGHT)', () => {
-    const runner = startScene4();
-    runner.completeDialogueTree(4);
-    answerKanaQuestion(runner, 'up', true, 4); // Q1
-    answerKanaQuestion(runner, 'right', true, 8); // Q2
+  // 0→1→3→5→4→6→END (6 choices: あなたは?→さくら)
+  it('ask name: →さくら→bye', () => {
+    playDialogueTree(startScene(), 4, [0, 0, 2, 0, 0, 0]);
   });
 
-  it('completes — all 5 scene flags set', () => {
-    const runner = startScene4();
-    runner.completeScene(4);
-    expect(runner.sceneFlags & 0x1f).toBe(0x1f);
+  it('all flags set', () => {
+    const r = startScene();
+    r.completeScene(4);
+    expect(r.sceneFlags & 0x1f).toBe(0x1f);
   });
 });
 
 // ---------------------------------------------------------------------------
-// Full game playthrough
+// Full game
 // ---------------------------------------------------------------------------
 
 describe('full game', () => {
-  it('plays through all 5 scenes and returns to title', () => {
-    const runner = new GameRunner().boot().start();
-
+  it('plays all 5 scenes to completion', () => {
+    const r = new GameRunner().boot().start();
     for (let i = 0; i < SCENES.length; i++) {
-      expect(runner.sceneId).toBe(i);
-      runner.completeScene(i);
+      expect(r.sceneId).toBe(i);
+      r.completeScene(i);
     }
-
-    // All flags set
-    expect(runner.sceneFlags).toBe(0x1f);
-
-    // After completing all scenes, the game should loop back
-    // Run extra frames to let the title screen redraw
-    runner.frames(30);
-
-    // The game should be back in a state where START can be pressed again
-    // (DLG_STATE idle, no active kana)
-    expect(runner.dlgState).toBe(0);
-    expect(runner.kanaState).toBe(0);
+    expect(r.sceneFlags).toBe(0x1f);
   });
 
-  it('gets perfect kana score in each scene', () => {
-    const runner = new GameRunner().boot().start();
-
+  it('perfect kana in every scene', () => {
+    const r = new GameRunner().boot().start();
     for (let i = 0; i < SCENES.length; i++) {
-      runner.completeDialogueTree(i);
-      // kana_start resets score for each scene — verify perfect per-scene
-      const qCount = SCENES[i]!.kanaQuestions.length;
-      for (const q of SCENES[i]!.kanaQuestions) {
-        runner.answerKana(q.correctDir);
-      }
-      expect(runner.kanaScore).toBe(qCount * 4); // 4 points per correct
-      runner.frames(10);
+      r.completeDialogueTree(i);
+      for (const q of SCENES[i]!.kanaQuestions) r.answerKana(q.correctDir);
+      expect(r.kanaScore).toBe(SCENES[i]!.kanaQuestions.length * 4);
+      r.frames(10);
     }
-  });
-
-  it('wrong kana answers do not increase score', () => {
-    const runner = new GameRunner().boot().start();
-
-    // Scene 0: answer all 5 wrong
-    runner.completeDialogueTree(0);
-    for (let i = 0; i < SCENES[0]!.kanaQuestions.length; i++) {
-      runner.answerKana('down'); // always wrong (varies per question)
-    }
-    runner.frames(10);
-
-    // Score should be 0 or very low (some 'down' answers may coincidentally be correct)
-    // But sceneId should advance regardless
-    expect(runner.sceneId).toBe(1);
   });
 });

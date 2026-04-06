@@ -145,14 +145,24 @@ export class GameRunner {
 
   /** Wait for dialogue text to reveal and choices to appear, then pick first choice */
   advanceDialogue(): this {
-    return this.frames(80).press('A').frames(5);
+    // Wait until state reaches choosing (3) or wait (2)
+    for (let i = 0; i < 300; i++) {
+      this.frames(1);
+      const state = this.dlgState;
+      if (state === 3 || state === 2) {
+        this.frames(10); // debounce previous A press
+        break;
+      }
+    }
+    return this.press('A').frames(5);
   }
 
-  /** Complete an entire dialogue tree (all nodes, always choosing first option) */
-  completeDialogueTree(sceneIndex: number): this {
-    const nodeCount = SCENES[sceneIndex]?.dialogue.length ?? 0;
-    for (let i = 0; i < nodeCount; i++) {
+  /** Complete an entire dialogue tree (always choosing first option until conversation ends) */
+  completeDialogueTree(_sceneIndex: number): this {
+    // Keep advancing until the dialogue engine signals end (node_id = 0xFF)
+    for (let safety = 0; safety < 30; safety++) {
       this.advanceDialogue();
+      if (this.dlgNodeId === 0xff && this.dlgState === 0) break;
     }
     return this.frames(10);
   }
