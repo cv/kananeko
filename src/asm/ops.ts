@@ -310,6 +310,14 @@ export function di(): Op {
 export function ei(): Op {
   return inst([0xfb]);
 }
+export function cpl(): Op {
+  return inst([0x2f]);
+}
+
+/** ADD HL, r16 */
+export function add_hl_rr(rr: R16Name): Op {
+  return inst([0x09 + R16[rr] * 16]);
+}
 export function rst(vec: 0x00 | 0x08 | 0x10 | 0x18 | 0x20 | 0x28 | 0x30 | 0x38): Op {
   return inst([0xc7 + vec]);
 }

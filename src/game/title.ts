@@ -1,8 +1,8 @@
 /**
  * Title screen ROM program.
  *
- * Displays "JRPGEN" with "はじめ" (hajime / begin) underneath,
- * then loops forever.
+ * Displays "JRPGEN" with "はじめ" (hajime / begin) underneath.
+ * Waits for START press, then loops (will later trigger scene transition).
  */
 
 import { type Op, ref, u8, u16 } from '../asm/types';
@@ -25,9 +25,14 @@ import {
   dec_r,
   inc_rr,
   ld_a_de,
+  ld_a_nn,
+  ld_nn_a,
+  and_n,
+  call,
 } from '../asm/ops';
-import { HW, LCDC, MEM } from '../asm/hardware';
+import { HW, JOY, LCDC, MEM } from '../asm/hardware';
 import { buildTileData, textToTiles } from './font';
+import { buildReadJoypad } from './joypad';
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -102,6 +107,12 @@ export function buildProgram(): Op[] {
     di(),
     ld_rr_nn('sp', u16(0xfffe)),
 
+    // Clear joypad WRAM
+    xor_r('a'),
+    ld_nn_a(MEM.JOYPAD_CUR),
+    ld_nn_a(MEM.JOYPAD_PREV),
+    ld_nn_a(MEM.JOYPAD_NEW),
+
     // Wait for VBlank so we can safely disable the LCD
     label('waitVBlank'),
     ldh_a_n(HW.LY),
@@ -153,11 +164,24 @@ export function buildProgram(): Op[] {
 
     ei(),
 
-    // ---- Main loop ----
+    // ---- Main loop: read input, check for START ----
     label('mainLoop'),
     halt(),
     nop(), // NOP after HALT (DMG hardware bug workaround)
+
+    call(ref('joy_read')),
+
+    // Check if START was newly pressed
+    ld_a_nn(MEM.JOYPAD_NEW),
+    and_n(u8(JOY.START)),
+    jr_cc('z', ref('mainLoop')), // not pressed → keep looping
+
+    // START was pressed — for now, loop back (scene transition will go here)
+    label('startPressed'),
     jr(ref('mainLoop')),
+
+    // ---- Subroutines ----
+    ...buildReadJoypad(),
 
     // ---- Tile data ----
     label('tileData'),

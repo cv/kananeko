@@ -48,4 +48,23 @@ export const MEM = {
   VRAM_MAP1: u16(0x9c00), // BG tilemap 1
   OAM: u16(0xfe00),
   HRAM: u16(0xff80),
+  IE: u16(0xffff), // Interrupt enable register
+
+  // WRAM — game state variables
+  JOYPAD_CUR: u16(0xc000), // Current frame button state
+  JOYPAD_PREV: u16(0xc001), // Previous frame button state
+  JOYPAD_NEW: u16(0xc002), // Newly pressed this frame (edge-detected)
 } as const satisfies Record<string, U16>;
+
+// Joypad bit flags (active-high after our read routine)
+// High nibble = d-pad, low nibble = buttons
+export const JOY = {
+  A: 0x01,
+  B: 0x02,
+  SELECT: 0x04,
+  START: 0x08,
+  RIGHT: 0x10,
+  LEFT: 0x20,
+  UP: 0x40,
+  DOWN: 0x80,
+} as const;

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { assemble } from '@asm/assembler';
 import { buildProgram } from '@game/title';
 import { buildTileData, CHAR_MAP, textToTiles } from '@game/font';
+import { JOY } from '@asm/hardware';
 
 // @ts-expect-error — serverboy has no type declarations
 import Gameboy from 'serverboy';
@@ -256,5 +257,78 @@ describe('emulator', () => {
       }
     }
     expect(hasDifference).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Joypad input tests
+// ---------------------------------------------------------------------------
+
+describe('joypad', () => {
+  it('detects START press in WRAM', () => {
+    const gb = new Gameboy();
+    gb.loadRom(Buffer.from(rom));
+
+    // Run a few frames to get past init
+    for (let i = 0; i < 10; i++) gb.doFrame();
+
+    // Press START
+    gb.pressKey(Gameboy.KEYMAP.START);
+    gb.doFrame();
+
+    const memory = gb.getMemory();
+    // Joypad current at $C000 should have START bit set
+    expect(memory[0xc000] & JOY.START).toBe(JOY.START);
+    // Newly pressed at $C002 should also have it
+    expect(memory[0xc002] & JOY.START).toBe(JOY.START);
+  });
+
+  it('edge-detects: newly pressed clears on sustained hold', () => {
+    const gb = new Gameboy();
+    gb.loadRom(Buffer.from(rom));
+
+    for (let i = 0; i < 10; i++) gb.doFrame();
+
+    // Press A for one frame
+    gb.pressKey(Gameboy.KEYMAP.A);
+    gb.doFrame();
+
+    let memory = gb.getMemory();
+    expect(memory[0xc002] & JOY.A).toBe(JOY.A); // newly pressed
+
+    // Hold A for another frame
+    gb.pressKey(Gameboy.KEYMAP.A);
+    gb.doFrame();
+
+    memory = gb.getMemory();
+    expect(memory[0xc000] & JOY.A).toBe(JOY.A); // still held
+    expect(memory[0xc002] & JOY.A).toBe(0); // NOT newly pressed
+  });
+
+  it('detects d-pad UP', () => {
+    const gb = new Gameboy();
+    gb.loadRom(Buffer.from(rom));
+
+    for (let i = 0; i < 10; i++) gb.doFrame();
+
+    gb.pressKey(Gameboy.KEYMAP.UP);
+    gb.doFrame();
+
+    const memory = gb.getMemory();
+    expect(memory[0xc000] & JOY.UP).toBe(JOY.UP);
+  });
+
+  it('detects simultaneous d-pad and button press', () => {
+    const gb = new Gameboy();
+    gb.loadRom(Buffer.from(rom));
+
+    for (let i = 0; i < 10; i++) gb.doFrame();
+
+    gb.pressKeys([Gameboy.KEYMAP.RIGHT, Gameboy.KEYMAP.A]);
+    gb.doFrame();
+
+    const memory = gb.getMemory();
+    expect(memory[0xc000] & JOY.RIGHT).toBe(JOY.RIGHT);
+    expect(memory[0xc000] & JOY.A).toBe(JOY.A);
   });
 });
