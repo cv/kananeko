@@ -64,7 +64,7 @@ function at<T>(arr: readonly T[], i: number): T {
 }
 
 // Title screen text
-const TITLE = 'JRPGEN';
+const TITLE = 'カナネコ';
 const SUBTITLE = 'はじめ';
 
 // ---------------------------------------------------------------------------

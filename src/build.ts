@@ -8,11 +8,11 @@ fs.mkdirSync(outDir, { recursive: true });
 
 const program = buildProgram();
 const { rom, symbols } = assemble(program, {
-  title: 'JRPGEN',
+  title: 'KANANEKO',
   destinationCode: 0x00, // Japan
 });
 
-const romPath = path.join(outDir, 'jrpgen.gb');
+const romPath = path.join(outDir, 'kananeko.gb');
 fs.writeFileSync(romPath, rom);
 
 // Write symbol file for emulator debuggers
@@ -23,7 +23,7 @@ const symLines = [...symbols.entries()]
       `${(addr >> 8).toString(16).padStart(2, '0')}:${(addr & 0xff).toString(16).padStart(4, '0')} ${name}`,
   );
 
-fs.writeFileSync(path.join(outDir, 'jrpgen.sym'), symLines.join('\n') + '\n');
+fs.writeFileSync(path.join(outDir, 'kananeko.sym'), symLines.join('\n') + '\n');
 
 console.log(`ROM written to ${romPath} (${String(rom.length)} bytes)`);
 console.log(`Symbols: ${String(symbols.size)}`);

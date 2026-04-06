@@ -19,7 +19,7 @@ let symbols: Map<string, number>;
 
 beforeAll(() => {
   const result = assemble(buildProgram(), {
-    title: 'JRPGEN',
+    title: 'KANANEKO',
     destinationCode: 0x00,
   });
   rom = result.rom;
@@ -54,9 +54,9 @@ describe('ROM structure', () => {
     }
   });
 
-  it('has the title "JRPGEN" in the header', () => {
-    const title = new TextDecoder().decode(rom.slice(0x0134, 0x0134 + 6));
-    expect(title).toBe('JRPGEN');
+  it('has the title "KANANEKO" in the header', () => {
+    const title = new TextDecoder().decode(rom.slice(0x0134, 0x0134 + 8));
+    expect(title).toBe('KANANEKO');
   });
 
   it('has a valid header checksum', () => {
@@ -152,12 +152,12 @@ describe('font', () => {
   });
 
   it('converts text to tile indices', () => {
-    const jrpgen = textToTiles('JRPGEN');
-    expect(jrpgen).toHaveLength(6);
+    const kananeko = textToTiles('カナネコ');
+    expect(kananeko).toHaveLength(4);
     // Each character maps to a unique tile
-    expect(new Set(jrpgen).size).toBe(6);
+    expect(new Set(kananeko).size).toBe(4);
     // All non-zero
-    expect(jrpgen.every((t) => t > 0)).toBe(true);
+    expect(kananeko.every((t) => t > 0)).toBe(true);
 
     const hajime = textToTiles('はじめ');
     expect(hajime).toEqual([CHAR_MAP['は'], CHAR_MAP['じ'], CHAR_MAP['め']]);
@@ -216,11 +216,11 @@ describe('emulator', () => {
     expect(hasData).toBe(true);
   });
 
-  it('has instructions to write "JRPGEN" to the tilemap at row 6', () => {
-    // Verify the ROM contains LD HL, $98C7 followed by tile writes
+  it('has instructions to write "カナネコ" to the tilemap at row 6', () => {
+    // Verify the ROM contains LD HL followed by tile writes
     // serverboy doesn't expose tilemap via getMemory(), so we verify the ROM bytes
-    const titleAddr = 0x9800 + 6 * 32 + 7; // $98C7
-    const expectedTiles = textToTiles('JRPGEN');
+    const titleAddr = 0x9800 + 6 * 32 + Math.floor((20 - 4) / 2); // centered 4-char title
+    const expectedTiles = textToTiles('カナネコ');
 
     // Find LD HL, $98C7 in ROM (0x21 0xC7 0x98)
     let found = -1;
