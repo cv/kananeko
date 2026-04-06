@@ -67,25 +67,25 @@ describe('title screen', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Scene 0: Train Station (7 nodes)
+// Scene 0: Train Station (10 nodes)
 // ---------------------------------------------------------------------------
 
 describe('scene 0: station', () => {
   const startScene = (): GameRunner => new GameRunner().boot().start();
 
-  // Traced paths: 0→1→2→5→END (4 choices)
+  // 0→1→2→4→5→6→7→9→END (8 choices, げんき path)
   it('happy path: こんにちは→げんき→まち→bye', () => {
-    playDialogueTree(startScene(), 0, [0, 0, 0, 0]);
+    playDialogueTree(startScene(), 0, [0, 0, 0, 0, 0, 0, 0, 0]);
   });
 
-  // 0→1→3→2→5→END (5 choices)
+  // 0→1→3→4→5→6→7→9→END (8 choices, つかれた path)
   it('tired path: →つかれました→だいじょうぶ→まち→bye', () => {
-    playDialogueTree(startScene(), 0, [0, 2, 0, 0, 0]);
+    playDialogueTree(startScene(), 0, [0, 2, 0, 0, 0, 0, 0, 0]);
   });
 
-  // 0→1→3→6→2→5→END (6 choices)
-  it('water path: →みず→drink→travel→bye', () => {
-    playDialogueTree(startScene(), 0, [0, 2, 2, 0, 0, 0]);
+  // 0→1→2→4→5→6→8→7→9→END (9 choices, あなたは? path)
+  it('name detour: →あなたは?→たなか→bye', () => {
+    playDialogueTree(startScene(), 0, [0, 0, 0, 0, 0, 2, 0, 0, 0]);
   });
 
   it('kana Q1+Q2 correct', () => {
@@ -104,25 +104,25 @@ describe('scene 0: station', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Scene 1: Street (7 nodes)
+// Scene 1: Street (10 nodes)
 // ---------------------------------------------------------------------------
 
 describe('scene 1: street', () => {
   const startScene = (): GameRunner => new GameRunner().boot().start().completeScene(0);
 
-  // 0→1→3→4→5→END (5 choices)
-  it('directions: はい→あちら→ありがとう→なまえ→bye', () => {
-    playDialogueTree(startScene(), 1, [0, 0, 0, 0, 0]);
+  // 0→1→2→4→5→6→8→9→END (8 choices, みちをしる path)
+  it('directions: はい→あちら→まっすぐ→ありがとう→なまえ→bye', () => {
+    playDialogueTree(startScene(), 1, [0, 0, 0, 0, 0, 0, 0, 0]);
   });
 
-  // 0→1→2→3→4→5→END (6 choices)
-  it('dont know: →わかりません→そうですか→ありがとう→なまえ→bye', () => {
-    playDialogueTree(startScene(), 1, [0, 2, 0, 0, 0, 0]);
+  // 0→1→3→4→5→6→8→9→END (8 choices, わからない path)
+  it('dont know: →わかりません→すみません→ありがとう→なまえ→bye', () => {
+    playDialogueTree(startScene(), 1, [0, 2, 0, 0, 0, 0, 0, 0]);
   });
 
-  // 0→1→3→4→6→5→END (6 choices: ask name back→たなか→bye)
+  // 0→1→2→4→5→7→6→8→9→END (9 choices, あなたは? path)
   it('ask name back: →あなたは?→さくら→bye', () => {
-    playDialogueTree(startScene(), 1, [0, 0, 0, 2, 0, 0]);
+    playDialogueTree(startScene(), 1, [0, 0, 0, 0, 2, 0, 0, 0, 0]);
   });
 
   it('advances to scene 2', () => {
@@ -134,31 +134,26 @@ describe('scene 1: street', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Scene 2: Restaurant (9 nodes)
+// Scene 2: Restaurant (12 nodes)
 // ---------------------------------------------------------------------------
 
 describe('scene 2: restaurant', () => {
   const startScene = (): GameRunner =>
     new GameRunner().boot().start().completeScene(0).completeScene(1);
 
-  // 0→1→2→5→6→7→END (6 choices)
+  // 0→1→2→4→5→6→7→9→10→11→END (10 choices, ラーメン+あつい path)
   it('ramen path', () => {
-    playDialogueTree(startScene(), 2, [0, 0, 0, 0, 0, 0]);
+    playDialogueTree(startScene(), 2, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
   });
 
-  // 0→1→3→5→6→7→END (6 choices)
+  // 0→1→3→4→5→6→7→9→10→11→END (10 choices, おちゃ path)
   it('tea path', () => {
-    playDialogueTree(startScene(), 2, [0, 1, 0, 0, 0, 0]);
+    playDialogueTree(startScene(), 2, [0, 1, 0, 0, 0, 0, 0, 0, 0, 0]);
   });
 
-  // 0→1→4→2→5→6→7→END (7 choices)
-  it('recommendation path', () => {
-    playDialogueTree(startScene(), 2, [0, 2, 0, 0, 0, 0, 0]);
-  });
-
-  // 0→1→2→5→6→8→7→END (7 choices)
-  it('bonus tea: すごくおいしい!', () => {
-    playDialogueTree(startScene(), 2, [0, 0, 0, 0, 2, 0, 0]);
+  // 0→1→2→4→5→6→8→9→10→11→END (10 choices, つめたい/あまい path)
+  it('sweet path: つめたくてあまい', () => {
+    playDialogueTree(startScene(), 2, [0, 0, 0, 0, 0, 1, 0, 0, 0, 0]);
   });
 
   it('advances to scene 3', () => {
@@ -170,26 +165,21 @@ describe('scene 2: restaurant', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Scene 3: Convenience Store (7 nodes)
+// Scene 3: Convenience Store (10 nodes)
 // ---------------------------------------------------------------------------
 
 describe('scene 3: conbini', () => {
   const startScene = (): GameRunner =>
     new GameRunner().boot().start().completeScene(0).completeScene(1).completeScene(2);
 
-  // 0→2→5→6→END (4 choices: direct buy)
-  it('direct buy: これください→100えん→bye', () => {
-    playDialogueTree(startScene(), 3, [1, 0, 0, 0]);
+  // 0→1→2→4→5→6→7→8→9→END (9 choices, かいもの path)
+  it('buy path: おにぎり→ひゃくえん→bye', () => {
+    playDialogueTree(startScene(), 3, [0, 0, 0, 0, 0, 0, 0, 0, 0]);
   });
 
-  // 0→1→4→2→5→6→END (6 choices)
-  it('ask help: なにか→おにぎり→buy→bye', () => {
-    playDialogueTree(startScene(), 3, [0, 0, 0, 0, 0, 0]);
-  });
-
-  // 0→3→0→2→5→6→END (6 choices: browse then buy)
-  it('browse then buy', () => {
-    playDialogueTree(startScene(), 3, [2, 0, 1, 0, 0, 0]);
+  // 0→1→3→4→5→6→7→8→9→END (9 choices, みるだけ path)
+  it('browse path: みるだけ→ゆっくり→buy→bye', () => {
+    playDialogueTree(startScene(), 3, [0, 2, 0, 0, 0, 0, 0, 0, 0]);
   });
 
   it('advances to scene 4', () => {
@@ -201,7 +191,7 @@ describe('scene 3: conbini', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Scene 4: Evening Park (8 nodes)
+// Scene 4: Evening Park (12 nodes)
 // ---------------------------------------------------------------------------
 
 describe('scene 4: park', () => {
@@ -214,24 +204,19 @@ describe('scene 4: park', () => {
       .completeScene(2)
       .completeScene(3);
 
-  // 0→1→3→4→6→END (5 choices)
-  it('happy path', () => {
-    playDialogueTree(startScene(), 4, [0, 0, 0, 0, 0]);
+  // 0→1→2→3→5→6→7→8→10→11→END (10 choices, きょうのこと+たのしい path)
+  it('happy path: きょうのこと→たのしい→ともだち', () => {
+    playDialogueTree(startScene(), 4, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
   });
 
-  // 0→2→3→4→6→END (5 choices)
-  it('sunset path: きれい→ゆうやけ', () => {
-    playDialogueTree(startScene(), 4, [2, 0, 0, 0, 0]);
+  // 0→1→2→4→5→6→7→8→10→11→END (10 choices, てんき path)
+  it('weather path: おてんき→あたたかい→ともだち', () => {
+    playDialogueTree(startScene(), 4, [0, 0, 1, 0, 0, 0, 0, 0, 0, 0]);
   });
 
-  // 0→1→3→4→7→6→END (6 choices)
-  it('compliment: とてもたのしい→じょうず', () => {
-    playDialogueTree(startScene(), 4, [0, 0, 0, 1, 0, 0]);
-  });
-
-  // 0→1→3→5→4→6→END (6 choices: あなたは?→さくら)
-  it('ask name: →さくら→bye', () => {
-    playDialogueTree(startScene(), 4, [0, 0, 2, 0, 0, 0]);
+  // 0→1→2→3→5→6→7→9→10→11→END (10 choices, さびしい path)
+  it('lonely path: さびしい→ともだちがほしい', () => {
+    playDialogueTree(startScene(), 4, [0, 0, 0, 0, 0, 0, 1, 0, 0, 0]);
   });
 
   it('all flags set', () => {
