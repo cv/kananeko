@@ -2,7 +2,7 @@
  * Title screen ROM program.
  *
  * Displays "JRPGEN" with "はじめ" (hajime / begin) underneath.
- * Waits for START press, then loops (will later trigger scene transition).
+ * Press START to open a test dialogue with response choices.
  */
 
 import { type Op, ref, u8, u16 } from '../asm/types';
@@ -33,6 +33,7 @@ import {
 import { HW, JOY, LCDC, MEM } from '../asm/hardware';
 import { buildTileData, textToTiles } from './font';
 import { buildReadJoypad } from './joypad';
+import { buildDialogueData, buildDialogueEngine } from './dialogue';
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -42,12 +43,10 @@ const TILEMAP_BASE = MEM.VRAM_MAP0; // $9800
 const SCREEN_COLS = 20;
 const MAP_COLS = 32;
 
-/** Tilemap address for a screen row/col */
 function mapAddr(row: number, col: number): number {
   return TILEMAP_BASE + row * MAP_COLS + col;
 }
 
-/** Center text on screen, returning the starting column */
 function centerCol(text: string): number {
   return Math.floor((SCREEN_COLS - Array.from(text).length) / 2);
 }
@@ -65,14 +64,21 @@ const subRow = 10;
 const subCol = centerCol(SUBTITLE);
 
 // ---------------------------------------------------------------------------
-// Build tile data
+// Tile & dialogue data
 // ---------------------------------------------------------------------------
 
 const tileData = buildTileData();
 const tileDataSize = tileData.length;
 
+const { data: dialogueData } = buildDialogueData([
+  {
+    text: 'こんにちは!',
+    choices: ['はい', 'いいえ'],
+  },
+]);
+
 // ---------------------------------------------------------------------------
-// Build tilemap writes as a sequence of (addr, tileIndex) pairs
+// Helpers
 // ---------------------------------------------------------------------------
 
 interface TextWrite {
@@ -84,10 +90,6 @@ const textWrites: TextWrite[] = [
   { addr: mapAddr(titleRow, titleCol), tiles: textToTiles(TITLE) },
   { addr: mapAddr(subRow, subCol), tiles: textToTiles(SUBTITLE) },
 ];
-
-// ---------------------------------------------------------------------------
-// Assemble the program
-// ---------------------------------------------------------------------------
 
 function buildTextWriteOps(writes: TextWrite[]): Op[] {
   const ops: Op[] = [];
@@ -101,6 +103,10 @@ function buildTextWriteOps(writes: TextWrite[]): Op[] {
   return ops;
 }
 
+// ---------------------------------------------------------------------------
+// Program
+// ---------------------------------------------------------------------------
+
 export function buildProgram(): Op[] {
   return [
     // ---- Init ----
@@ -113,7 +119,10 @@ export function buildProgram(): Op[] {
     ld_nn_a(MEM.JOYPAD_PREV),
     ld_nn_a(MEM.JOYPAD_NEW),
 
-    // Wait for VBlank so we can safely disable the LCD
+    // Clear dialogue state
+    ld_nn_a(MEM.DLG_STATE),
+
+    // Wait for VBlank
     label('waitVBlank'),
     ldh_a_n(HW.LY),
     cp_n(u8(144)),
@@ -123,7 +132,7 @@ export function buildProgram(): Op[] {
     xor_r('a'),
     ldh_n_a(HW.LCDC),
 
-    // ---- Copy tile data to VRAM ($8000) ----
+    // Copy tile data to VRAM
     ld_rr_nn('hl', MEM.VRAM_TILES),
     ld_rr_nn('de', ref('tileData')),
     ld_r_n('b', u8(Math.ceil(tileDataSize / 256))),
@@ -138,10 +147,10 @@ export function buildProgram(): Op[] {
     dec_r('b'),
     jr_cc('nz', ref('copyTiles')),
 
-    // ---- Clear tilemap ----
+    // Clear tilemap
     ld_rr_nn('hl', MEM.VRAM_MAP0),
     xor_r('a'),
-    ld_r_n('b', u8(4)), // 4 * 256 = 1024
+    ld_r_n('b', u8(4)),
     ld_r_n('c', u8(0)),
 
     label('clearMap'),
@@ -151,40 +160,55 @@ export function buildProgram(): Op[] {
     dec_r('b'),
     jr_cc('nz', ref('clearMap')),
 
-    // ---- Write text to tilemap ----
+    // Write title text
     ...buildTextWriteOps(textWrites),
 
-    // ---- Set BG palette (darkest to lightest: 11 10 01 00) ----
+    // Set palette & turn on LCD
     ld_r_n('a', u8(0xe4)),
     ldh_n_a(HW.BGP),
-
-    // ---- Turn on LCD: BG on, tile data at $8000 ----
     ld_r_n('a', u8(LCDC.LCD_ON | LCDC.TILE_DATA_8000 | LCDC.BG_ON)),
     ldh_n_a(HW.LCDC),
 
     ei(),
 
-    // ---- Main loop: read input, check for START ----
-    label('mainLoop'),
+    // ---- Title screen loop: wait for START ----
+    label('titleLoop'),
     halt(),
-    nop(), // NOP after HALT (DMG hardware bug workaround)
-
+    nop(),
     call(ref('joy_read')),
 
-    // Check if START was newly pressed
     ld_a_nn(MEM.JOYPAD_NEW),
     and_n(u8(JOY.START)),
-    jr_cc('z', ref('mainLoop')), // not pressed → keep looping
+    jr_cc('z', ref('titleLoop')),
 
-    // START was pressed — for now, loop back (scene transition will go here)
-    label('startPressed'),
-    jr(ref('mainLoop')),
+    // START pressed — open the test dialogue
+    ld_rr_nn('de', ref('dialogueData')),
+    call(ref('dlg_open')),
+
+    // ---- Dialogue loop ----
+    label('dialogueLoop'),
+    halt(),
+    nop(),
+    call(ref('joy_read')),
+    call(ref('dlg_update')),
+
+    // Check if dialogue is done (state == 0)
+    ld_a_nn(MEM.DLG_STATE),
+    cp_n(u8(0)),
+    jr_cc('nz', ref('dialogueLoop')),
+
+    // Dialogue done — loop back to title for now
+    jr(ref('titleLoop')),
 
     // ---- Subroutines ----
     ...buildReadJoypad(),
+    ...buildDialogueEngine(),
 
-    // ---- Tile data ----
+    // ---- Data ----
     label('tileData'),
     db(tileData),
+
+    label('dialogueData'),
+    db(dialogueData),
   ];
 }

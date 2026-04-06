@@ -50,10 +50,22 @@ export const MEM = {
   HRAM: u16(0xff80),
   IE: u16(0xffff), // Interrupt enable register
 
-  // WRAM — game state variables
+  // WRAM — joypad state
   JOYPAD_CUR: u16(0xc000), // Current frame button state
   JOYPAD_PREV: u16(0xc001), // Previous frame button state
   JOYPAD_NEW: u16(0xc002), // Newly pressed this frame (edge-detected)
+
+  // WRAM — dialogue engine
+  DLG_STATE: u16(0xc020), // 0=idle, 1=printing, 2=wait-for-input, 3=choosing
+  DLG_CHAR_IDX: u16(0xc021), // Index into current string being revealed
+  DLG_DELAY: u16(0xc022), // Frame counter for character reveal delay
+  DLG_CHOICE_CNT: u16(0xc023), // Number of response choices (0-3)
+  DLG_CURSOR: u16(0xc024), // Currently highlighted choice index
+  DLG_STR_LO: u16(0xc025), // Pointer to current dialogue string (lo byte)
+  DLG_STR_HI: u16(0xc026), // Pointer to current dialogue string (hi byte)
+  DLG_VRAM_LO: u16(0xc027), // Current VRAM write position (lo byte)
+  DLG_VRAM_HI: u16(0xc028), // Current VRAM write position (hi byte)
+  DLG_RESULT: u16(0xc029), // Chosen response index after selection
 } as const satisfies Record<string, U16>;
 
 // Joypad bit flags (active-high after our read routine)

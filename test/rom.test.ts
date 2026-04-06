@@ -3,6 +3,7 @@ import { assemble } from '@asm/assembler';
 import { buildProgram } from '@game/title';
 import { buildTileData, CHAR_MAP, textToTiles } from '@game/font';
 import { JOY } from '@asm/hardware';
+import { buildDialogueData } from '@game/dialogue';
 
 // @ts-expect-error — serverboy has no type declarations
 import Gameboy from 'serverboy';
@@ -89,8 +90,12 @@ describe('assembler', () => {
     expect(symbols.has('waitVBlank')).toBe(true);
     expect(symbols.has('copyTiles')).toBe(true);
     expect(symbols.has('clearMap')).toBe(true);
-    expect(symbols.has('mainLoop')).toBe(true);
+    expect(symbols.has('titleLoop')).toBe(true);
     expect(symbols.has('tileData')).toBe(true);
+    expect(symbols.has('joy_read')).toBe(true);
+    expect(symbols.has('dlg_open')).toBe(true);
+    expect(symbols.has('dlg_update')).toBe(true);
+    expect(symbols.has('dialogueData')).toBe(true);
   });
 
   it('places tileData label in ROM', () => {
@@ -120,20 +125,36 @@ describe('assembler', () => {
 describe('font', () => {
   it('maps all expected characters', () => {
     expect(CHAR_MAP[' ']).toBe(0);
-    expect(CHAR_MAP['J']).toBe(1);
-    expect(CHAR_MAP['R']).toBe(2);
-    expect(CHAR_MAP['P']).toBe(3);
-    expect(CHAR_MAP['G']).toBe(4);
-    expect(CHAR_MAP['E']).toBe(5);
-    expect(CHAR_MAP['N']).toBe(6);
-    expect(CHAR_MAP['は']).toBeDefined();
-    expect(CHAR_MAP['じ']).toBeDefined();
-    expect(CHAR_MAP['め']).toBeDefined();
+    // Characters now sorted by Object.keys order from font-data.ts
+    // Just verify they exist and are unique non-zero indices
+    for (const ch of ['A', 'J', 'R', 'P', 'G', 'E', 'N', 'S', 'T']) {
+      expect(CHAR_MAP[ch]).toBeDefined();
+      expect(CHAR_MAP[ch]).toBeGreaterThan(0);
+    }
+    for (const ch of ['は', 'じ', 'め', 'こ', 'ん', 'に', 'ち']) {
+      expect(CHAR_MAP[ch]).toBeDefined();
+      expect(CHAR_MAP[ch]).toBeGreaterThan(0);
+    }
+    // Katakana
+    for (const ch of ['ラ', 'メ', 'ン']) {
+      expect(CHAR_MAP[ch]).toBeDefined();
+      expect(CHAR_MAP[ch]).toBeGreaterThan(0);
+    }
+    // Border tiles
+    expect(CHAR_MAP['┌']).toBeDefined();
+    expect(CHAR_MAP['▶']).toBeDefined();
   });
 
   it('converts text to tile indices', () => {
-    expect(textToTiles('JRPGEN')).toEqual([1, 2, 3, 4, 5, 6]);
-    expect(textToTiles('はじめ')).toEqual([CHAR_MAP['は'], CHAR_MAP['じ'], CHAR_MAP['め']]);
+    const jrpgen = textToTiles('JRPGEN');
+    expect(jrpgen).toHaveLength(6);
+    // Each character maps to a unique tile
+    expect(new Set(jrpgen).size).toBe(6);
+    // All non-zero
+    expect(jrpgen.every((t) => t > 0)).toBe(true);
+
+    const hajime = textToTiles('はじめ');
+    expect(hajime).toEqual([CHAR_MAP['は'], CHAR_MAP['じ'], CHAR_MAP['め']]);
   });
 
   it('generates non-empty tile data for each character', () => {
@@ -330,5 +351,116 @@ describe('joypad', () => {
     const memory = gb.getMemory();
     expect(memory[0xc000] & JOY.RIGHT).toBe(JOY.RIGHT);
     expect(memory[0xc000] & JOY.A).toBe(JOY.A);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Dialogue engine tests
+// ---------------------------------------------------------------------------
+
+describe('dialogue', () => {
+  it('encodes dialogue data correctly', () => {
+    const { data, offsets } = buildDialogueData([
+      { text: 'こんにちは', choices: ['はい', 'いいえ'] },
+    ]);
+    expect(offsets).toHaveLength(1);
+    expect(offsets[0]).toBe(0);
+    // Data should contain tile indices for the text, null, choice count, then choices
+    expect(data.length).toBeGreaterThan(0);
+    // Find the null terminator after the text
+    const tiles = textToTiles('こんにちは');
+    for (let i = 0; i < tiles.length; i++) {
+      expect(data[i]).toBe(tiles[i]);
+    }
+    expect(data[tiles.length]).toBe(0); // null terminator
+    expect(data[tiles.length + 1]).toBe(2); // 2 choices
+  });
+
+  it('opens dialogue after START press (dlg_state becomes 1)', () => {
+    const gb = new Gameboy();
+    gb.loadRom(Buffer.from(rom));
+
+    // Get past init to title screen
+    for (let i = 0; i < 10; i++) gb.doFrame();
+
+    // Press START to open dialogue
+    gb.pressKey(Gameboy.KEYMAP.START);
+    gb.doFrame();
+
+    // Run a few more frames for dlg_open to complete
+    for (let i = 0; i < 5; i++) gb.doFrame();
+
+    const memory = gb.getMemory();
+    // dlg_state at $C020 should be non-zero (printing or later)
+    expect(memory[0xc020]).toBeGreaterThan(0);
+  });
+
+  it('reveals text and transitions to choosing state', () => {
+    const gb = new Gameboy();
+    gb.loadRom(Buffer.from(rom));
+
+    for (let i = 0; i < 10; i++) gb.doFrame();
+
+    // Open dialogue
+    gb.pressKey(Gameboy.KEYMAP.START);
+    gb.doFrame();
+
+    // Run enough frames for text to fully reveal
+    // "こんにちは!" = 6 chars, REVEAL_DELAY=3, so ~18 frames + overhead
+    for (let i = 0; i < 60; i++) gb.doFrame();
+
+    const memory = gb.getMemory();
+    // Should be in choosing state (3) since the dialogue has 2 choices
+    expect(memory[0xc020]).toBe(3);
+  });
+
+  it('confirms choice with A button and returns to idle', () => {
+    const gb = new Gameboy();
+    gb.loadRom(Buffer.from(rom));
+
+    for (let i = 0; i < 10; i++) gb.doFrame();
+
+    // Open dialogue
+    gb.pressKey(Gameboy.KEYMAP.START);
+    gb.doFrame();
+
+    // Wait for choices
+    for (let i = 0; i < 60; i++) gb.doFrame();
+
+    // Press A to confirm first choice
+    gb.pressKey(Gameboy.KEYMAP.A);
+    gb.doFrame();
+
+    const memory = gb.getMemory();
+    // dlg_state should be 0 (idle)
+    expect(memory[0xc020]).toBe(0);
+    // dlg_result should be 0 (first choice)
+    expect(memory[0xc029]).toBe(0);
+  });
+
+  it('navigates choices with DOWN and selects second option', () => {
+    const gb = new Gameboy();
+    gb.loadRom(Buffer.from(rom));
+
+    for (let i = 0; i < 10; i++) gb.doFrame();
+
+    // Open dialogue
+    gb.pressKey(Gameboy.KEYMAP.START);
+    gb.doFrame();
+
+    // Wait for choices
+    for (let i = 0; i < 60; i++) gb.doFrame();
+
+    // Press DOWN to move to second choice
+    gb.pressKey(Gameboy.KEYMAP.DOWN);
+    gb.doFrame();
+
+    // Confirm with A
+    gb.pressKey(Gameboy.KEYMAP.A);
+    gb.doFrame();
+
+    const memory = gb.getMemory();
+    expect(memory[0xc020]).toBe(0); // idle
+    expect(memory[0xc029]).toBe(1); // second choice
   });
 });

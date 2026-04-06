@@ -1,11 +1,10 @@
 /**
  * 8x8 monochrome font for the Game Boy.
- * Each character is defined as 8 rows of 8 pixels using '#' and '.'.
- * Converted to 2bpp GB tile format (color 3 = black on color 0 = white).
+ * Glyph pixel art is defined in font-data.ts.
+ * This module handles tile encoding, character mapping, and data building.
  */
 
-type PixelRow = string;
-type Glyph = [PixelRow, PixelRow, PixelRow, PixelRow, PixelRow, PixelRow, PixelRow, PixelRow];
+import { ALL_GLYPHS, type Glyph } from './font-data';
 
 function glyphToTile(glyph: Glyph): Uint8Array {
   const tile = new Uint8Array(16);
@@ -24,152 +23,31 @@ function glyphToTile(glyph: Glyph): Uint8Array {
   return tile;
 }
 
-// ---------------------------------------------------------------------------
-// Character definitions — tile index 0 is always blank
-// ---------------------------------------------------------------------------
+// Build CHAR_ORDER from all defined glyphs (deterministic order)
+const CHAR_ORDER = Object.keys(ALL_GLYPHS);
 
-const GLYPHS = {
-  A: [
-    '..##....',
-    '.#..#...',
-    '#....#..',
-    '#....#..',
-    '######..',
-    '#....#..',
-    '#....#..',
-    '........',
-  ],
-  E: [
-    '#####...',
-    '#.......',
-    '#.......',
-    '####....',
-    '#.......',
-    '#.......',
-    '#####...',
-    '........',
-  ],
-  G: [
-    '.####...',
-    '#....#..',
-    '#.......',
-    '#..###..',
-    '#....#..',
-    '#....#..',
-    '.####...',
-    '........',
-  ],
-  J: [
-    '..####..',
-    '....#...',
-    '....#...',
-    '....#...',
-    '....#...',
-    '#...#...',
-    '.###....',
-    '........',
-  ],
-  N: [
-    '#....#..',
-    '##...#..',
-    '#.#..#..',
-    '#..#.#..',
-    '#...##..',
-    '#....#..',
-    '#....#..',
-    '........',
-  ],
-  P: [
-    '#####...',
-    '#....#..',
-    '#....#..',
-    '#####...',
-    '#.......',
-    '#.......',
-    '#.......',
-    '........',
-  ],
-  R: [
-    '#####...',
-    '#....#..',
-    '#....#..',
-    '#####...',
-    '#..#....',
-    '#...#...',
-    '#....#..',
-    '........',
-  ],
-  S: [
-    '.####...',
-    '#....#..',
-    '#.......',
-    '.####...',
-    '.....#..',
-    '#....#..',
-    '.####...',
-    '........',
-  ],
-  T: [
-    '#####...',
-    '..#.....',
-    '..#.....',
-    '..#.....',
-    '..#.....',
-    '..#.....',
-    '..#.....',
-    '........',
-  ],
-  // Hiragana
-  は: [
-    '.#...#..',
-    '.#..#.#.',
-    '.#..#.#.',
-    '.##.#.#.',
-    '.#..#.#.',
-    '.#...#..',
-    '.#....#.',
-    '........',
-  ],
-  じ: [
-    '..#.....',
-    '..#..#..',
-    '######..',
-    '..#.....',
-    '..#.....',
-    '...#....',
-    '....###.',
-    '........',
-  ],
-  め: [
-    '........',
-    '.#..#...',
-    '.#.#.#..',
-    '.##..#..',
-    '.##..#..',
-    '.#.#.#..',
-    '....#...',
-    '........',
-  ],
-} as const satisfies Record<string, Glyph>;
-
-type GlyphChar = keyof typeof GLYPHS;
-
-// Ordered list of characters — index+1 is the tile number (0 = blank)
-const CHAR_ORDER: GlyphChar[] = ['J', 'R', 'P', 'G', 'E', 'N', 'S', 'T', 'A', 'は', 'じ', 'め'];
-
-/** Map from character to tile index */
+/** Map from character to tile index. Tile 0 = blank (space). */
 export const CHAR_MAP: Record<string, number> = { ' ': 0 };
 CHAR_ORDER.forEach((ch, i) => {
   CHAR_MAP[ch] = i + 1;
 });
 
-/** Number of tiles (excluding the blank tile 0) */
+/** Number of character tiles (excluding blank) */
 export const TILE_COUNT = CHAR_ORDER.length;
 
 /** All tile data as a flat byte array, starting with tile 0 (blank) */
 export function buildTileData(): Uint8Array {
   const blank = new Uint8Array(16); // tile 0: all zeros
-  const tiles = [blank, ...CHAR_ORDER.map((ch) => glyphToTile(GLYPHS[ch]))];
+  const tiles = [
+    blank,
+    ...CHAR_ORDER.map((ch) => {
+      const glyph = ALL_GLYPHS[ch];
+      if (glyph === undefined) {
+        throw new Error(`Missing glyph for character: ${ch}`);
+      }
+      return glyphToTile(glyph);
+    }),
+  ];
   const data = new Uint8Array(tiles.length * 16);
   tiles.forEach((tile, i) => {
     data.set(tile, i * 16);
