@@ -66,18 +66,28 @@ export const MEM = {
   DLG_VRAM_LO: u16(0xc027), // Current VRAM write position (lo byte)
   DLG_VRAM_HI: u16(0xc028), // Current VRAM write position (hi byte)
   DLG_RESULT: u16(0xc029), // Chosen response index after selection
+  DLG_NODE_ID: u16(0xc02a), // Current node index in dialogue tree (0xFF = done)
+  DLG_TREE_LO: u16(0xc02b), // Base pointer to current tree data (lo)
+  DLG_TREE_HI: u16(0xc02c), // Base pointer to current tree data (hi)
+  // Per-choice metadata pointers (ROM address of next_node byte for each choice)
+  DLG_META0_LO: u16(0xc02d), // ROM ptr to choice 0's next_node byte
+  DLG_META0_HI: u16(0xc02e),
+  DLG_META1_LO: u16(0xc02f), // ROM ptr to choice 1's next_node byte
+  DLG_META1_HI: u16(0xc030),
+  DLG_META2_LO: u16(0xc031), // ROM ptr to choice 2's next_node byte
+  DLG_META2_HI: u16(0xc032),
 
   // WRAM — kana mini-game
-  KANA_STATE: u16(0xc030), // 0=idle, 1=showing, 2=awaiting, 3=feedback
-  KANA_CORRECT: u16(0xc031), // Correct direction (0=up,1=down,2=left,3=right)
-  KANA_ANSWER: u16(0xc032), // Player's answer direction
-  KANA_SCORE: u16(0xc033), // Confidence meter (0-255)
-  KANA_Q_IDX: u16(0xc034), // Current question index
+  KANA_STATE: u16(0xc040), // 0=idle, 1=showing, 2=awaiting, 3=feedback
+  KANA_CORRECT: u16(0xc041), // Correct direction (0=up,1=down,2=left,3=right)
+  KANA_ANSWER: u16(0xc042), // Player's answer direction
+  KANA_SCORE: u16(0xc043), // Confidence meter (0-255)
+  KANA_Q_IDX: u16(0xc044), // Current question index
 
   // WRAM — scene system
-  SCENE_ID: u16(0xc010), // Current scene index (0-4, 0xFF = title)
-  SCENE_FLAGS: u16(0xc011), // Per-scene completion bitfield
-  GAME_MODE: u16(0xc012), // 0=title, 1=dialogue, 2=kana, 3=transition
+  SCENE_ID: u16(0xc050), // Current scene index (0-4, 0xFF = title)
+  SCENE_FLAGS: u16(0xc051), // Per-scene completion bitfield
+  GAME_MODE: u16(0xc052), // 0=title, 1=dialogue, 2=kana, 3=transition
 } as const satisfies Record<string, U16>;
 
 // Joypad bit flags (active-high after our read routine)

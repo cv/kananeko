@@ -5,12 +5,17 @@
  * reveals text character-by-character, presents response choices,
  * and handles cursor navigation with d-pad + A confirm.
  *
- * Dialogue data format in ROM:
- *   [tile_index...] 0x00               — NPC text (null-terminated tile indices)
- *   [choice_count: u8]                 — number of choices (0 = press A to continue)
- *   [tile_index...] 0x00               — choice 0 text
- *   [tile_index...] 0x00               — choice 1 text
- *   ...
+ * Supports branching dialogue trees. Each tree has:
+ *   [node_count: u8]
+ *   [offset_lo, offset_hi] × node_count   — offset table (from tree start)
+ *   Per node:
+ *     [tile_indices...] 0x00              — NPC text
+ *     [choice_count: u8]
+ *     Per choice:
+ *       [tile_indices...] 0x00            — choice text
+ *       [next_node: u8]                   — 0xFF = end, else node index
+ *       [hint_length: u8]                 — 0 = no hint
+ *       [hint_tiles × hint_length]        — hint text (length-prefixed)
  */
 
 import { type Op, ref, u8, u16 } from '../asm/types';
@@ -30,6 +35,9 @@ import {
   and_n,
   cp_n,
   cp_r,
+  add_r,
+  adc_r,
+  add_hl_rr,
   inc_r,
   inc_rr,
   dec_r,
@@ -73,43 +81,81 @@ function tilemapAddr(row: number, col: number): number {
 // Dialogue data types & encoder
 // ---------------------------------------------------------------------------
 
-export interface DialogueEntry {
+export interface DialogueNode {
   text: string;
-  choices: string[];
+  choices: {
+    text: string;
+    next: number | null; // next node index, null = end conversation
+    hint?: string; // shown briefly if this isn't the ideal response
+  }[];
 }
 
-/**
- * Pack dialogue entries into ROM data (tile index sequences).
- * Returns the packed bytes and per-entry offsets (relative to start of data).
- */
-export function buildDialogueData(entries: DialogueEntry[]): {
-  data: Uint8Array;
-  offsets: number[];
-} {
-  const bytes: number[] = [];
-  const offsets: number[] = [];
+export type DialogueTree = DialogueNode[];
 
-  for (const entry of entries) {
-    offsets.push(bytes.length);
-    // NPC text as tile indices, null-terminated
-    for (const tile of textToTiles(entry.text)) {
-      bytes.push(tile);
+const END_MARKER = 0xff;
+
+/**
+ * Pack a dialogue tree into ROM data with an offset table for random access.
+ *
+ * Per node:
+ *   [text_tiles...] 0x00
+ *   [choice_count]
+ *   [next_node × choice_count]           ← compact lookup table
+ *   [choice_0_text...] 0x00
+ *   [choice_1_text...] 0x00
+ *   ...
+ *
+ * This layout lets the assembly engine read next_node[cursor] directly
+ * without tracking per-choice metadata pointers.
+ */
+export function buildDialogueTree(tree: DialogueTree): Uint8Array {
+  const nodeChunks: number[][] = [];
+  for (const node of tree) {
+    const chunk: number[] = [];
+    // NPC text, null-terminated
+    for (const tile of textToTiles(node.text)) {
+      chunk.push(tile);
     }
-    bytes.push(0x00); // terminator
+    chunk.push(0x00);
 
     // Choice count
-    bytes.push(entry.choices.length);
+    chunk.push(node.choices.length);
 
-    // Each choice, null-terminated
-    for (const choice of entry.choices) {
-      for (const tile of textToTiles(choice)) {
-        bytes.push(tile);
+    // Next-node lookup table (one byte per choice, right after count)
+    for (const choice of node.choices) {
+      chunk.push(choice.next ?? END_MARKER);
+    }
+
+    // Choice texts, each null-terminated
+    for (const choice of node.choices) {
+      for (const tile of textToTiles(choice.text)) {
+        chunk.push(tile);
       }
-      bytes.push(0x00);
+      chunk.push(0x00);
+    }
+
+    nodeChunks.push(chunk);
+  }
+
+  // Header: node_count + offset table (2 bytes per node)
+  const headerSize = 1 + tree.length * 2;
+  const header: number[] = [tree.length];
+
+  let currentOffset = headerSize;
+  for (const chunk of nodeChunks) {
+    header.push(currentOffset & 0xff);
+    header.push((currentOffset >> 8) & 0xff);
+    currentOffset += chunk.length;
+  }
+
+  const bytes = [...header];
+  for (const chunk of nodeChunks) {
+    for (const b of chunk) {
+      bytes.push(b);
     }
   }
 
-  return { data: new Uint8Array(bytes), offsets };
+  return new Uint8Array(bytes);
 }
 
 // ---------------------------------------------------------------------------
@@ -164,14 +210,15 @@ function buildDrawTextbox(): Op[] {
 
 /**
  * Build the dialogue engine assembly subroutines.
- * Call dlg_open to start a dialogue (DE = pointer to dialogue data in ROM).
- * Call dlg_update each frame in the main loop.
- * When dlg_state returns to 0, the dialogue is done and dlg_result has the choice.
+ *
+ * dlg_open: DE = pointer to a node's data in ROM. Draws textbox, starts reveal.
+ * dlg_update: Call each frame. When state returns to 0, check DLG_NODE_ID:
+ *   0xFF = conversation over, else = next node to open.
  */
 export function buildDialogueEngine(): Op[] {
   return [
     // =================================================================
-    // dlg_open — Start a new dialogue. DE = pointer to dialogue data.
+    // dlg_open — Start showing a dialogue node. DE = pointer to node data.
     // Turns LCD off, draws textbox, turns LCD back on, sets up state.
     // =================================================================
     label('dlg_open'),
@@ -193,7 +240,7 @@ export function buildDialogueEngine(): Op[] {
     ld_r_n('a', u8(LCDC.LCD_ON | LCDC.TILE_DATA_8000 | LCDC.BG_ON)),
     ldh_n_a(HW.LCDC),
 
-    // Store string pointer
+    // Store node data pointer
     ld_r_r('a', 'e'),
     ld_nn_a(MEM.DLG_STR_LO),
     ld_r_r('a', 'd'),
@@ -300,18 +347,28 @@ export function buildDialogueEngine(): Op[] {
     ld_a_nn(MEM.DLG_STR_HI),
     ld_r_r('h', 'a'),
     ldi_a_hl(), // A = choice count
+    ld_nn_a(MEM.DLG_CHOICE_CNT),
 
-    // Save updated pointer (past choice_count)
-    ld_r_r('b', 'a'),
+    // HL now points to the next_node lookup table. Save this position.
+    ld_r_r('a', 'l'),
+    ld_nn_a(MEM.DLG_META0_LO), // reuse META0 as "next_node table pointer"
+    ld_r_r('a', 'h'),
+    ld_nn_a(MEM.DLG_META0_HI),
+
+    // Skip past the next_node table (choice_count bytes) to reach choice texts
+    ld_a_nn(MEM.DLG_CHOICE_CNT),
+    ld_r_r('c', 'a'),
+    ld_r_n('b', u8(0)),
+    add_hl_rr('bc'), // HL += choice_count
+
+    // Save pointer to first choice text
     ld_r_r('a', 'l'),
     ld_nn_a(MEM.DLG_STR_LO),
     ld_r_r('a', 'h'),
     ld_nn_a(MEM.DLG_STR_HI),
-    ld_r_r('a', 'b'),
-
-    ld_nn_a(MEM.DLG_CHOICE_CNT),
 
     // If 0 choices, go to wait-for-A mode
+    ld_a_nn(MEM.DLG_CHOICE_CNT),
     cp_n(u8(0)),
     jr_cc('nz', ref('dlg_setup_choices')),
     ld_r_n('a', u8(2)), // state = wait
@@ -377,6 +434,7 @@ export function buildDialogueEngine(): Op[] {
     jr(ref('dlg_choice_char')),
 
     label('dlg_choice_str_done'),
+    // Choice texts are now simple null-terminated strings with no metadata
     inc_r('b'), // next choice index
     dec_r('c'), // remaining--
     jr_cc('nz', ref('dlg_draw_choice_loop')),
@@ -471,8 +529,25 @@ export function buildDialogueEngine(): Op[] {
     label('dlg_confirm_choice'),
     ld_a_nn(MEM.DLG_CURSOR),
     ld_nn_a(MEM.DLG_RESULT),
+
+    // Read next_node = table_base[cursor]
+    // Load table base pointer into HL
+    ld_a_nn(MEM.DLG_META0_LO),
+    ld_r_r('l', 'a'),
+    ld_a_nn(MEM.DLG_META0_HI),
+    ld_r_r('h', 'a'),
+    // Add cursor offset
+    ld_a_nn(MEM.DLG_CURSOR),
+    ld_r_r('c', 'a'),
+    ld_r_n('b', u8(0)),
+    add_hl_rr('bc'), // HL = table_base + cursor
+    // Read next_node
+    ldi_a_hl(),
+    ld_nn_a(MEM.DLG_NODE_ID),
+
+    // Set state = idle
     xor_r('a'),
-    ld_nn_a(MEM.DLG_STATE), // state = idle
+    ld_nn_a(MEM.DLG_STATE),
     ret(),
 
     // =================================================================
@@ -517,5 +592,55 @@ export function buildDialogueEngine(): Op[] {
     ld_r_n('a', u8(CURSOR_TILE)),
     ldi_hl_a(),
     ret(),
+
+    // =================================================================
+    // dlg_open_tree — Start a dialogue tree. DE = pointer to tree data.
+    // Stores tree base, sets node 0, opens the first node.
+    // =================================================================
+    label('dlg_open_tree'),
+    // Save tree base pointer
+    ld_r_r('a', 'e'),
+    ld_nn_a(MEM.DLG_TREE_LO),
+    ld_r_r('a', 'd'),
+    ld_nn_a(MEM.DLG_TREE_HI),
+    // Start at node 0
+    xor_r('a'),
+    ld_nn_a(MEM.DLG_NODE_ID),
+    // Fall through to dlg_open_node
+
+    // =================================================================
+    // dlg_open_node — Open the node at DLG_NODE_ID from the tree.
+    // Looks up the offset table, computes ROM pointer, calls dlg_open.
+    // =================================================================
+    label('dlg_open_node'),
+    // Load tree base into HL
+    ld_a_nn(MEM.DLG_TREE_LO),
+    ld_r_r('l', 'a'),
+    ld_a_nn(MEM.DLG_TREE_HI),
+    ld_r_r('h', 'a'),
+    // HL = tree base. Skip node_count byte.
+    inc_rr('hl'),
+    // Offset table entry = base + 1 + node_id * 2
+    ld_a_nn(MEM.DLG_NODE_ID),
+    // Multiply by 2: shift left
+    add_r('a'), // A = node_id * 2
+    // Add A to HL (HL += A)
+    ld_r_r('c', 'a'),
+    ld_r_n('b', u8(0)),
+    add_hl_rr('bc'), // HL = tree_base + 1 + node_id * 2
+    // Read offset (16-bit LE)
+    ldi_a_hl(), // lo byte
+    ld_r_r('e', 'a'),
+    ldi_a_hl(), // hi byte
+    ld_r_r('d', 'a'),
+    // DE = offset from tree start. Compute absolute: tree_base + offset
+    ld_a_nn(MEM.DLG_TREE_LO),
+    add_r('e'),
+    ld_r_r('e', 'a'),
+    ld_a_nn(MEM.DLG_TREE_HI),
+    adc_r('d'),
+    ld_r_r('d', 'a'),
+    // DE = absolute ROM pointer to node data
+    jp(ref('dlg_open')),
   ];
 }

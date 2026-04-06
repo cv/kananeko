@@ -3,7 +3,7 @@ import { assemble } from '@asm/assembler';
 import { buildProgram } from '@game/main';
 import { buildTileData, CHAR_MAP, textToTiles } from '@game/font';
 import { JOY } from '@asm/hardware';
-import { buildDialogueData } from '@game/dialogue';
+import { buildDialogueTree } from '@game/dialogue';
 import { buildKanaData, KANA_QUESTIONS } from '@game/kana';
 import { SCENES } from '@game/scene';
 
@@ -297,7 +297,7 @@ describe('joypad', () => {
     gb.loadRom(Buffer.from(rom));
 
     // Run a few frames to get past init
-    for (let i = 0; i < 10; i++) gb.doFrame();
+    for (let i = 0; i < 200; i++) gb.doFrame();
 
     // Press START
     gb.pressKey(Gameboy.KEYMAP.START);
@@ -314,7 +314,7 @@ describe('joypad', () => {
     const gb = new Gameboy();
     gb.loadRom(Buffer.from(rom));
 
-    for (let i = 0; i < 10; i++) gb.doFrame();
+    for (let i = 0; i < 200; i++) gb.doFrame();
 
     // Press A for one frame
     gb.pressKey(Gameboy.KEYMAP.A);
@@ -336,7 +336,7 @@ describe('joypad', () => {
     const gb = new Gameboy();
     gb.loadRom(Buffer.from(rom));
 
-    for (let i = 0; i < 10; i++) gb.doFrame();
+    for (let i = 0; i < 200; i++) gb.doFrame();
 
     gb.pressKey(Gameboy.KEYMAP.UP);
     gb.doFrame();
@@ -349,7 +349,7 @@ describe('joypad', () => {
     const gb = new Gameboy();
     gb.loadRom(Buffer.from(rom));
 
-    for (let i = 0; i < 10; i++) gb.doFrame();
+    for (let i = 0; i < 200; i++) gb.doFrame();
 
     gb.pressKeys([Gameboy.KEYMAP.RIGHT, Gameboy.KEYMAP.A]);
     gb.doFrame();
@@ -365,21 +365,25 @@ describe('joypad', () => {
 // ---------------------------------------------------------------------------
 
 describe('dialogue', () => {
-  it('encodes dialogue data correctly', () => {
-    const { data, offsets } = buildDialogueData([
-      { text: 'こんにちは', choices: ['はい', 'いいえ'] },
+  it('encodes dialogue tree correctly', () => {
+    const data = buildDialogueTree([
+      {
+        text: 'こんにちは',
+        choices: [
+          { text: 'はい', next: 1 },
+          { text: 'いいえ', next: null, hint: 'はい!' },
+        ],
+      },
+      { text: 'さようなら', choices: [{ text: 'またね', next: null }] },
     ]);
-    expect(offsets).toHaveLength(1);
-    expect(offsets[0]).toBe(0);
-    // Data should contain tile indices for the text, null, choice count, then choices
-    expect(data.length).toBeGreaterThan(0);
-    // Find the null terminator after the text
-    const tiles = textToTiles('こんにちは');
-    for (let i = 0; i < tiles.length; i++) {
-      expect(data[i]).toBe(tiles[i]);
-    }
-    expect(data[tiles.length]).toBe(0); // null terminator
-    expect(data[tiles.length + 1]).toBe(2); // 2 choices
+    // First byte is node count
+    expect(data[0]).toBe(2);
+    // Offset table: 2 entries × 2 bytes = 4 bytes, starting at byte 1
+    // Node 0 offset at bytes 1-2, Node 1 offset at bytes 3-4
+    const node0Offset = (data[1] ?? 0) | ((data[2] ?? 0) << 8);
+    const node1Offset = (data[3] ?? 0) | ((data[4] ?? 0) << 8);
+    expect(node0Offset).toBe(5); // header = 1 + 2*2 = 5 bytes
+    expect(node1Offset).toBeGreaterThan(node0Offset);
   });
 
   it('opens dialogue after START press (dlg_state becomes 1)', () => {
@@ -387,7 +391,7 @@ describe('dialogue', () => {
     gb.loadRom(Buffer.from(rom));
 
     // Get past init to title screen
-    for (let i = 0; i < 10; i++) gb.doFrame();
+    for (let i = 0; i < 200; i++) gb.doFrame();
 
     // Press START to open dialogue
     gb.pressKey(Gameboy.KEYMAP.START);
@@ -405,7 +409,7 @@ describe('dialogue', () => {
     const gb = new Gameboy();
     gb.loadRom(Buffer.from(rom));
 
-    for (let i = 0; i < 10; i++) gb.doFrame();
+    for (let i = 0; i < 200; i++) gb.doFrame();
 
     // Open dialogue
     gb.pressKey(Gameboy.KEYMAP.START);
@@ -424,7 +428,7 @@ describe('dialogue', () => {
     const gb = new Gameboy();
     gb.loadRom(Buffer.from(rom));
 
-    for (let i = 0; i < 10; i++) gb.doFrame();
+    for (let i = 0; i < 200; i++) gb.doFrame();
 
     // Open dialogue
     gb.pressKey(Gameboy.KEYMAP.START);
@@ -448,7 +452,7 @@ describe('dialogue', () => {
     const gb = new Gameboy();
     gb.loadRom(Buffer.from(rom));
 
-    for (let i = 0; i < 10; i++) gb.doFrame();
+    for (let i = 0; i < 200; i++) gb.doFrame();
 
     // Open dialogue
     gb.pressKey(Gameboy.KEYMAP.START);
@@ -486,24 +490,25 @@ describe('kana', () => {
     expect(data[data.length - 1]).toBe(0);
   });
 
-  /** Helper: advance through title → dialogue → kana */
+  /** Helper: advance through title → full dialogue tree → kana */
   function enterKanaGame(gb: InstanceType<typeof Gameboy>): void {
     // Boot and get to title
-    for (let i = 0; i < 10; i++) gb.doFrame();
+    for (let i = 0; i < 200; i++) gb.doFrame();
 
     // Press START to open dialogue
     gb.pressKey(Gameboy.KEYMAP.START);
     gb.doFrame();
 
-    // Wait for dialogue to reach choices
-    for (let i = 0; i < 60; i++) gb.doFrame();
+    // Complete all dialogue tree nodes (scene 0 has 3 nodes)
+    for (let d = 0; d < SCENES[0]!.dialogue.length; d++) {
+      for (let i = 0; i < 80; i++) gb.doFrame();
+      gb.pressKey(Gameboy.KEYMAP.A);
+      gb.doFrame();
+      for (let i = 0; i < 5; i++) gb.doFrame();
+    }
 
-    // Confirm first choice with A
-    gb.pressKey(Gameboy.KEYMAP.A);
-    gb.doFrame();
-
-    // Run a few frames to let kana game start
-    for (let i = 0; i < 5; i++) gb.doFrame();
+    // Wait for kana game to start
+    for (let i = 0; i < 200; i++) gb.doFrame();
   }
 
   it('enters kana game after dialogue closes', () => {
@@ -513,7 +518,7 @@ describe('kana', () => {
 
     const memory = gb.getMemory();
     // kana_state at $C030 should be 2 (awaiting input)
-    expect(memory[0xc030]).toBe(2);
+    expect(memory[0xc040]).toBe(2);
   });
 
   it('awards score for correct answer', () => {
@@ -527,9 +532,9 @@ describe('kana', () => {
 
     const memory = gb.getMemory();
     // Score at $C033 should be 4 (SCORE_PER_CORRECT)
-    expect(memory[0xc033]).toBe(4);
+    expect(memory[0xc043]).toBe(4);
     // State should be feedback (3)
-    expect(memory[0xc030]).toBe(3);
+    expect(memory[0xc040]).toBe(3);
   });
 
   it('does not award score for wrong answer', () => {
@@ -543,9 +548,9 @@ describe('kana', () => {
 
     const memory = gb.getMemory();
     // Score should remain 0
-    expect(memory[0xc033]).toBe(0);
+    expect(memory[0xc043]).toBe(0);
     // But state should still transition to feedback
-    expect(memory[0xc030]).toBe(3);
+    expect(memory[0xc040]).toBe(3);
   });
 
   it('advances to next question after feedback', () => {
@@ -562,9 +567,9 @@ describe('kana', () => {
 
     const memory = gb.getMemory();
     // Question index at $C034 should be 1 (moved to second question)
-    expect(memory[0xc034]).toBe(1);
+    expect(memory[0xc044]).toBe(1);
     // State should be awaiting input again (2)
-    expect(memory[0xc030]).toBe(2);
+    expect(memory[0xc040]).toBe(2);
   });
 });
 
@@ -577,7 +582,7 @@ describe('scene system', () => {
     expect(SCENES).toHaveLength(5);
     for (const scene of SCENES) {
       expect(scene.name.length).toBeGreaterThan(0);
-      expect(scene.dialogues.length).toBeGreaterThan(0);
+      expect(scene.dialogue.length).toBeGreaterThan(0);
       expect(scene.kanaQuestions.length).toBeGreaterThan(0);
     }
   });
@@ -594,18 +599,18 @@ describe('scene system', () => {
     gb.loadRom(Buffer.from(rom));
 
     // Boot to title
-    for (let i = 0; i < 10; i++) gb.doFrame();
+    for (let i = 0; i < 200; i++) gb.doFrame();
 
     // Press START
     gb.pressKey(Gameboy.KEYMAP.START);
     gb.doFrame();
 
     // Run frames for scene to load
-    for (let i = 0; i < 10; i++) gb.doFrame();
+    for (let i = 0; i < 200; i++) gb.doFrame();
 
     const memory = gb.getMemory();
     // Scene ID at $C010 should be 0
-    expect(memory[0xc010]).toBe(0);
+    expect(memory[0xc050]).toBe(0);
     // Dialogue state should be active (non-zero)
     expect(memory[0xc020]).toBeGreaterThan(0);
   });
@@ -615,28 +620,25 @@ describe('scene system', () => {
     gb.loadRom(Buffer.from(rom));
 
     // Boot to title
-    for (let i = 0; i < 10; i++) gb.doFrame();
+    for (let i = 0; i < 200; i++) gb.doFrame();
 
     // START to begin
     gb.pressKey(Gameboy.KEYMAP.START);
     gb.doFrame();
 
-    // Scene 0 dialogue: complete all dialogues
-    // Each dialogue: wait for text reveal, then press A to confirm choice
-    for (let d = 0; d < SCENES[0]!.dialogues.length; d++) {
-      // Wait for text to reveal and choices to appear
-      for (let i = 0; i < 60; i++) gb.doFrame();
-      // Select first choice
+    // Scene 0 dialogue tree: 3 nodes (0→1→2→end)
+    // Each node: wait for text reveal + choices, press A for first choice
+    for (let d = 0; d < SCENES[0]!.dialogue.length; d++) {
+      for (let i = 0; i < 80; i++) gb.doFrame();
       gb.pressKey(Gameboy.KEYMAP.A);
       gb.doFrame();
-      // If there are more dialogues, the next one should auto-start
-      // (Actually in current implementation, dialogue ends after one entry)
+      for (let i = 0; i < 5; i++) gb.doFrame();
     }
 
     // Should be in kana game now
     for (let i = 0; i < 5; i++) gb.doFrame();
     let memory = gb.getMemory();
-    expect(memory[0xc030]).toBe(2); // kana awaiting input
+    expect(memory[0xc040]).toBe(2); // kana awaiting input
 
     // Complete both kana questions for scene 0
     const scene0 = SCENES[0]!;
@@ -655,13 +657,13 @@ describe('scene system', () => {
     }
 
     // After all kana done, should advance to scene 1
-    for (let i = 0; i < 10; i++) gb.doFrame();
+    for (let i = 0; i < 200; i++) gb.doFrame();
     memory = gb.getMemory();
 
     // Scene ID should be 1
-    expect(memory[0xc010]).toBe(1);
+    expect(memory[0xc050]).toBe(1);
     // Scene 0 completion flag should be set (bit 0)
-    expect(memory[0xc011] & 0x01).toBe(0x01);
+    expect(memory[0xc051] & 0x01).toBe(0x01);
   });
 
   it('ROM fits within 32KB', () => {

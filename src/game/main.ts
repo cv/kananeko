@@ -20,6 +20,7 @@ import {
   ldh_a_n,
   ldh_n_a,
   ld_r_r,
+  jr,
   jr_cc,
   jp,
   jp_cc,
@@ -157,6 +158,9 @@ export function buildProgram(): Op[] {
     ld_nn_a(MEM.JOYPAD_PREV),
     ld_nn_a(MEM.JOYPAD_NEW),
     ld_nn_a(MEM.DLG_STATE),
+    ld_r_n('a', u8(0xff)),
+    ld_nn_a(MEM.DLG_NODE_ID),
+    xor_r('a'),
     ld_nn_a(MEM.KANA_STATE),
     ld_nn_a(MEM.SCENE_ID),
     ld_nn_a(MEM.SCENE_FLAGS),
@@ -307,9 +311,9 @@ export function buildProgram(): Op[] {
     ld_rr_nn('de', ref(at(sceneLabels, 4).dlg)),
 
     label('load_dlg_done'),
-    call(ref('dlg_open')),
+    call(ref('dlg_open_tree')), // initialize tree and open node 0
 
-    // Dialogue loop — process all dialogues for this scene
+    // Dialogue loop — process nodes until conversation ends
     label('scene_dlg_loop'),
     halt(),
     nop(),
@@ -318,6 +322,17 @@ export function buildProgram(): Op[] {
     ld_a_nn(MEM.DLG_STATE),
     cp_n(u8(0)),
     jr_cc('nz', ref('scene_dlg_loop')),
+
+    // Node done — check if conversation continues
+    ld_a_nn(MEM.DLG_NODE_ID),
+    cp_n(u8(0xff)), // 0xFF = conversation over
+    jr_cc('z', ref('scene_dlg_done')),
+
+    // More nodes — open the next one
+    call(ref('dlg_open_node')),
+    jr(ref('scene_dlg_loop')),
+
+    label('scene_dlg_done'),
 
     // ==== Start kana mini-game for this scene ====
     ld_a_nn(MEM.SCENE_ID),

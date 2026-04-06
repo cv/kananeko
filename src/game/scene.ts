@@ -1,14 +1,10 @@
 /**
  * Scene system — manages the 5 game locations and progression.
  *
- * Each scene has:
- * - A location name displayed at the top
- * - A set of dialogue entries (NPC conversation)
- * - A set of kana questions (mini-game)
- * - A completion bit that gates the next scene
+ * Each scene has a location name, a branching dialogue tree, and kana questions.
  */
 
-import { type DialogueEntry, buildDialogueData } from './dialogue';
+import { type DialogueNode, buildDialogueTree } from './dialogue';
 import { type KanaQuestion, buildKanaData } from './kana';
 import { textToTiles } from './font';
 
@@ -18,26 +14,39 @@ import { textToTiles } from './font';
 
 export interface Scene {
   name: string;
-  dialogues: DialogueEntry[];
+  dialogue: DialogueNode[]; // branching tree — node 0 is the entry point
   kanaQuestions: KanaQuestion[];
 }
 
 // ---------------------------------------------------------------------------
-// Game scenes
+// Game scenes with branching dialogue
 // ---------------------------------------------------------------------------
 
 export const SCENES: Scene[] = [
   // Scene 0: Train Station
   {
     name: 'えき',
-    dialogues: [
+    dialogue: [
       {
+        // Node 0
         text: 'こんにちは!',
-        choices: ['こんにちは', 'さようなら'],
+        choices: [
+          { text: 'こんにちは', next: 1 },
+          { text: '...', next: 1, hint: 'こんにちは!' },
+        ],
       },
       {
+        // Node 1
         text: 'おげんきですか?',
-        choices: ['はい げんきです', 'いいえ'],
+        choices: [
+          { text: 'はい げんきです', next: 2 },
+          { text: 'わかりません', next: 2, hint: 'げんき!' },
+        ],
+      },
+      {
+        // Node 2
+        text: 'いってらっしゃい!',
+        choices: [{ text: 'ありがとう', next: null }],
       },
     ],
     kanaQuestions: [
@@ -59,10 +68,30 @@ export const SCENES: Scene[] = [
   // Scene 1: Street
   {
     name: 'みち',
-    dialogues: [
+    dialogue: [
       {
-        text: 'どこにいきますか?',
-        choices: ['レストラン', 'コンビニ'],
+        // Node 0
+        text: 'すみません!',
+        choices: [
+          { text: 'はい?', next: 1 },
+          { text: '...', next: 1, hint: 'はい!' },
+        ],
+      },
+      {
+        // Node 1
+        text: 'レストランはどこですか?',
+        choices: [
+          { text: 'あちらです', next: 2 },
+          { text: 'わかりません', next: 2 },
+        ],
+      },
+      {
+        // Node 2
+        text: 'ありがとう!',
+        choices: [
+          { text: 'どういたしまして', next: null },
+          { text: 'いいえ', next: null, hint: 'どういたしまして!' },
+        ],
       },
     ],
     kanaQuestions: [
@@ -84,14 +113,40 @@ export const SCENES: Scene[] = [
   // Scene 2: Restaurant
   {
     name: 'レストラン',
-    dialogues: [
+    dialogue: [
       {
-        text: 'なにをたべますか?',
-        choices: ['ラーメン', 'おちゃ'],
+        // Node 0
+        text: 'いらっしゃいませ!',
+        choices: [
+          { text: 'こんにちは', next: 1 },
+          { text: '...', next: 1 },
+        ],
       },
       {
+        // Node 1
+        text: 'なにをたべますか?',
+        choices: [
+          { text: 'ラーメン ください', next: 2 },
+          { text: 'おちゃ ください', next: 3 },
+        ],
+      },
+      {
+        // Node 2
+        text: 'ラーメンですね!',
+        choices: [{ text: 'はい', next: 4 }],
+      },
+      {
+        // Node 3
+        text: 'おちゃですね!',
+        choices: [{ text: 'はい', next: 4 }],
+      },
+      {
+        // Node 4
         text: 'おいしいですか?',
-        choices: ['はい おいしい', 'まあまあ'],
+        choices: [
+          { text: 'おいしい!', next: null },
+          { text: 'まあまあ', next: null },
+        ],
       },
     ],
     kanaQuestions: [
@@ -113,14 +168,32 @@ export const SCENES: Scene[] = [
   // Scene 3: Convenience Store
   {
     name: 'コンビニ',
-    dialogues: [
+    dialogue: [
       {
+        // Node 0
         text: 'いらっしゃいませ!',
-        choices: ['これ ください', 'みているだけ'],
+        choices: [
+          { text: 'これ ください', next: 1 },
+          { text: 'みているだけ', next: 2 },
+        ],
       },
       {
+        // Node 1
         text: 'ひゃくえんです',
-        choices: ['はい', 'たかい!'],
+        choices: [
+          { text: 'はい', next: 3 },
+          { text: 'たかい!', next: 3, hint: 'ひゃくえん!' },
+        ],
+      },
+      {
+        // Node 2
+        text: 'どうぞ ゆっくり!',
+        choices: [{ text: 'ありがとう', next: 0 }],
+      },
+      {
+        // Node 3
+        text: 'ありがとうございます!',
+        choices: [{ text: 'ありがとう', next: null }],
       },
     ],
     kanaQuestions: [
@@ -142,14 +215,38 @@ export const SCENES: Scene[] = [
   // Scene 4: Evening Park
   {
     name: 'こうえん',
-    dialogues: [
+    dialogue: [
       {
-        text: 'おなまえは?',
-        choices: ['わたしは..です', 'ひみつです'],
+        // Node 0
+        text: 'こんばんは!',
+        choices: [
+          { text: 'こんばんは', next: 1 },
+          { text: 'こんにちは', next: 1, hint: 'こんばんは!' },
+        ],
       },
       {
-        text: 'たのしかったです!',
-        choices: ['またね', 'さようなら'],
+        // Node 1
+        text: 'おなまえは?',
+        choices: [
+          { text: 'カナネコです', next: 2 },
+          { text: 'ひみつです', next: 2 },
+        ],
+      },
+      {
+        // Node 2
+        text: 'たのしかったですか?',
+        choices: [
+          { text: 'たのしかった!', next: 3 },
+          { text: 'まあまあです', next: 3 },
+        ],
+      },
+      {
+        // Node 3
+        text: 'またあいましょう!',
+        choices: [
+          { text: 'またね!', next: null },
+          { text: 'さようなら', next: null },
+        ],
       },
     ],
     kanaQuestions: [
@@ -174,9 +271,8 @@ export const SCENES: Scene[] = [
 // ---------------------------------------------------------------------------
 
 export interface PackedSceneData {
-  /** Per-scene: { nameRow, dialogueOffset, kanaOffset } */
   scenes: Array<{
-    nameRow: number[]; // tile indices for the location name (centered in 20 cols)
+    nameRow: number[];
     dialogueData: Uint8Array;
     kanaData: Uint8Array;
   }>;
@@ -186,11 +282,10 @@ export function buildSceneData(): PackedSceneData {
   return {
     scenes: SCENES.map((scene) => {
       const nameTiles = textToTiles(scene.name);
-      // Center the name in 20 columns
       const pad = Math.floor((20 - nameTiles.length) / 2);
       const nameRow = [...Array<number>(pad).fill(0), ...nameTiles];
 
-      const { data: dialogueData } = buildDialogueData(scene.dialogues);
+      const dialogueData = buildDialogueTree(scene.dialogue);
       const kanaData = buildKanaData(scene.kanaQuestions);
 
       return { nameRow, dialogueData, kanaData };
