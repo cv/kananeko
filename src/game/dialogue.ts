@@ -55,10 +55,10 @@ import { requireTile, textToTiles } from './font';
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const BOX_TOP_ROW = 12;
-const BOX_ROWS = 6; // rows 12-17
-const TEXT_ROW_1 = 13;
-const CHOICE_START_ROW = 15;
+const BOX_TOP_ROW = 11;
+const BOX_ROWS = 7; // rows 11-17
+const TEXT_ROW_1 = 12;
+const CHOICE_START_ROW = 14;
 const MAP_COLS = 32;
 const SCREEN_COLS = 20;
 const REVEAL_DELAY = 3; // frames between each character reveal
