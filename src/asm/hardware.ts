@@ -30,6 +30,9 @@ export const HW = {
   // GBC color palettes
   BCPS: ioReg(0x68), // BG Color Palette Spec (index + auto-increment bit 7)
   BCPD: ioReg(0x69), // BG Color Palette Data (write color bytes)
+
+  // GBC VRAM bank
+  VBK: ioReg(0x4f), // VRAM Bank Select (0 or 1)
 } as const satisfies Record<string, IoRegOffset>;
 
 // LCDC bit flags — plain numbers, composed with bitwise OR then wrapped in u8()

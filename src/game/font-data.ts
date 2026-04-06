@@ -1921,6 +1921,18 @@ const CAT: Record<string, Glyph> = {
     '..#.#...',
     '........',
   ],
+
+  // Bold inverted blank — solid block with ? cutout (kana game missing character)
+  '\uE011': [
+    '########',
+    '##.##.##',
+    '#.#..#.#',
+    '#####..#',
+    '####..##',
+    '###..###',
+    '########',
+    '###..###',
+  ],
 };
 
 // ---------------------------------------------------------------------------
@@ -2063,6 +2075,8 @@ export const CAT_TILES = {
   HAPPY_TL: '\uE004',
   HAPPY_TR: '\uE005',
   ICON: '\uE010',
+  // Bold inverted blank for kana game — impossible to miss
+  BLANK: '\uE011',
 } as const;
 
 // Scene icon tile pairs [left, right]

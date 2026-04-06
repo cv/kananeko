@@ -44,6 +44,7 @@ import {
 } from '../asm/ops';
 import { HW, JOY, LCDC, MEM } from '../asm/hardware';
 import { requireTile, textToTiles } from './font';
+import { CAT_TILES } from './font-data';
 
 // ---------------------------------------------------------------------------
 // Layout
@@ -72,7 +73,7 @@ function tilemapAddr(row: number, col: number): number {
   return 0x9800 + row * MAP_COLS + col;
 }
 
-const UNDERSCORE_TILE = requireTile('-');
+const BLANK_TILE = requireTile(CAT_TILES.BLANK); // bold inverted ? block
 
 // ---------------------------------------------------------------------------
 // Question type & data encoder
@@ -261,7 +262,7 @@ export function buildKanaEngine(): Op[] {
     cp_n(u8(BLANK_MARKER)),
     jr_cc('nz', ref('kana_draw_normal')),
     // Blank position — draw underscore
-    ld_r_n('a', u8(UNDERSCORE_TILE)),
+    ld_r_n('a', u8(BLANK_TILE)),
     label('kana_draw_normal'),
     // Write tile to VRAM at DE
     ld_r_r('b', 'a'), // save tile
