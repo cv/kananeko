@@ -16,6 +16,7 @@ import type { KanaDir } from '@game/kana';
 // Build the ROM once — shared across all tests
 const { rom, symbols } = assemble(buildProgram(), {
   title: 'KANANEKO',
+  cgbFlag: 0x80,
   destinationCode: 0x00,
 });
 

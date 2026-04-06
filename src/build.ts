@@ -9,6 +9,7 @@ fs.mkdirSync(outDir, { recursive: true });
 const program = buildProgram();
 const { rom, symbols } = assemble(program, {
   title: 'KANANEKO',
+  cgbFlag: 0x80, // CGB+DMG compatible
   destinationCode: 0x00, // Japan
 });
 

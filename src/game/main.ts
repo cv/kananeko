@@ -39,7 +39,7 @@ import { CAT_TILES } from './font-data';
 import { buildReadJoypad } from './joypad';
 import { buildDialogueEngine } from './dialogue';
 import { buildKanaEngine } from './kana';
-import { buildSceneData, SCENES } from './scene';
+import { buildSceneData, rgb, SCENES, type Palette } from './scene';
 
 // ---------------------------------------------------------------------------
 // Data
@@ -65,9 +65,15 @@ function at<T>(arr: readonly T[], i: number): T {
   return v;
 }
 
-// Title screen text
+// Title screen text & palette
 const TITLE = 'カナネコ';
 const SUBTITLE = 'はじめ';
+const TITLE_PALETTE: Palette = [
+  rgb(0xe0, 0xf0, 0xe0),
+  rgb(0xa0, 0xc0, 0xa0),
+  rgb(0x50, 0x70, 0x50),
+  rgb(0x10, 0x20, 0x10),
+];
 
 // Cat portrait tile indices
 const CAT_TL = requireTile(CAT_TILES.FACE_TL);
@@ -78,6 +84,26 @@ const CAT_BR = requireTile(CAT_TILES.FACE_BR);
 // ---------------------------------------------------------------------------
 // Helper: write a row of tiles at a tilemap address
 // ---------------------------------------------------------------------------
+
+/**
+ * Write a 4-color GBC palette to BG palette 0 via BCPS/BCPD.
+ * On DMG this is harmless (registers are ignored).
+ */
+function buildSetPalette(palette: Palette): Op[] {
+  const ops: Op[] = [
+    // Set BCPS to palette 0, color 0, auto-increment
+    ld_r_n('a', u8(0x80)),
+    ldh_n_a(HW.BCPS),
+  ];
+  // Write 4 colors × 2 bytes each
+  for (const color of palette) {
+    ops.push(ld_r_n('a', u8(color & 0xff)));
+    ops.push(ldh_n_a(HW.BCPD));
+    ops.push(ld_r_n('a', u8((color >> 8) & 0xff)));
+    ops.push(ldh_n_a(HW.BCPD));
+  }
+  return ops;
+}
 
 /** Draw a 2x2 tile portrait at the given tilemap position */
 function buildDrawPortrait(
@@ -222,9 +248,11 @@ export function buildProgram(): Op[] {
     dec_r('b'),
     jr_cc('nz', ref('init_copy')),
 
-    // Set palette
+    // Set DMG palette (for original GB compatibility)
     ld_r_n('a', u8(0xe4)),
     ldh_n_a(HW.BGP),
+    // Set GBC palette (ignored on DMG)
+    ...buildSetPalette(TITLE_PALETTE),
 
     // ==== Title Screen ====
     label('title_screen'),
@@ -282,6 +310,9 @@ export function buildProgram(): Op[] {
 
     // Draw scene name at row 1 (dispatched by scene_id)
     ...buildSceneDispatch((i) => buildWriteRow(1, at(sceneData.scenes, i).nameRow)),
+
+    // Set scene palette (dispatched by scene_id)
+    ...buildSceneDispatch((i) => buildSetPalette(at(SCENES, i).palette)),
 
     // Turn LCD back on
     ld_r_n('a', u8(LCDC.LCD_ON | LCDC.TILE_DATA_8000 | LCDC.BG_ON)),

@@ -12,10 +12,19 @@ import { textToTiles } from './font';
 // Scene data types
 // ---------------------------------------------------------------------------
 
+/** GBC RGB555 color: (r5) | (g5 << 5) | (b5 << 10). Pass 8-bit RGB, auto-truncated. */
+export function rgb(r: number, g: number, b: number): number {
+  return ((r >> 3) & 0x1f) | (((g >> 3) & 0x1f) << 5) | (((b >> 3) & 0x1f) << 10);
+}
+
+/** 4-color GBC palette: [bg, light, mid, dark] as RGB555 values */
+export type Palette = [number, number, number, number];
+
 export interface Scene {
   name: string;
-  dialogue: DialogueNode[]; // branching tree — node 0 is the entry point
+  dialogue: DialogueNode[];
   kanaQuestions: KanaQuestion[];
+  palette: Palette; // GBC background colors [bg, light, mid, dark]
 }
 
 // ---------------------------------------------------------------------------
@@ -26,6 +35,12 @@ export const SCENES: Scene[] = [
   // Scene 0: Train Station
   {
     name: 'えき',
+    palette: [
+      rgb(0xe8, 0xe8, 0xe0),
+      rgb(0xb0, 0xb0, 0xa0),
+      rgb(0x60, 0x60, 0x58),
+      rgb(0x18, 0x18, 0x18),
+    ],
     dialogue: [
       {
         // Node 0
@@ -68,6 +83,12 @@ export const SCENES: Scene[] = [
   // Scene 1: Street
   {
     name: 'みち',
+    palette: [
+      rgb(0xf0, 0xf0, 0xc0),
+      rgb(0xc0, 0xd0, 0x80),
+      rgb(0x60, 0x80, 0x30),
+      rgb(0x18, 0x30, 0x10),
+    ],
     dialogue: [
       {
         // Node 0
@@ -113,6 +134,12 @@ export const SCENES: Scene[] = [
   // Scene 2: Restaurant
   {
     name: 'レストラン',
+    palette: [
+      rgb(0xf0, 0xe0, 0xd0),
+      rgb(0xd0, 0xa0, 0x80),
+      rgb(0x80, 0x50, 0x30),
+      rgb(0x30, 0x18, 0x10),
+    ],
     dialogue: [
       {
         // Node 0
@@ -168,6 +195,12 @@ export const SCENES: Scene[] = [
   // Scene 3: Convenience Store
   {
     name: 'コンビニ',
+    palette: [
+      rgb(0xf0, 0xf0, 0xf0),
+      rgb(0xa0, 0xc0, 0xe0),
+      rgb(0x40, 0x60, 0xa0),
+      rgb(0x10, 0x10, 0x30),
+    ],
     dialogue: [
       {
         // Node 0
@@ -215,6 +248,12 @@ export const SCENES: Scene[] = [
   // Scene 4: Evening Park
   {
     name: 'こうえん',
+    palette: [
+      rgb(0xd0, 0xc0, 0xe0),
+      rgb(0x80, 0x70, 0xb0),
+      rgb(0x40, 0x30, 0x60),
+      rgb(0x10, 0x10, 0x28),
+    ],
     dialogue: [
       {
         // Node 0

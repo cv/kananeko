@@ -26,6 +26,10 @@ export const HW = {
 
   // Interrupts
   IF: ioReg(0x0f), // Interrupt flag
+
+  // GBC color palettes
+  BCPS: ioReg(0x68), // BG Color Palette Spec (index + auto-increment bit 7)
+  BCPD: ioReg(0x69), // BG Color Palette Data (write color bytes)
 } as const satisfies Record<string, IoRegOffset>;
 
 // LCDC bit flags — plain numbers, composed with bitwise OR then wrapped in u8()
