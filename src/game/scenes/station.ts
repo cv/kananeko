@@ -357,19 +357,374 @@ export const STATION_DIALOGUE: DialogueNode[] = [
     ],
   },
   {
-    // 39: END
+    // 39: bridge to new NPCs
     text: 'いってきまーす!',
     choices: [
-      { text: 'いってきます!', next: null },
+      { text: 'いってきます!', next: 40 },
       { text: 'たのしもう!', next: null },
       { text: 'さあ いこう!', next: null },
     ],
   },
+  // --- NPC 3: Station guard (directions) ---
+  {
+    // 40
+    text: 'ちょっとまって!',
+    choices: [
+      { text: 'はい なんですか?', next: 41 },
+      { text: 'だれですか?', next: 41 },
+      { text: '...', next: 41, hint: 'はい がいいですよ' },
+    ],
+  },
+  {
+    // 41
+    text: 'えきのあんないです',
+    choices: [
+      { text: 'よろしく!', next: 42 },
+      { text: 'あんない?', next: 42, hint: 'みちをおしえます' },
+      { text: 'ありがとう', next: 42 },
+    ],
+  },
+  {
+    // 42
+    text: 'どこにいきたい?',
+    choices: [
+      { text: 'にしぐちです', next: 43 },
+      { text: 'ひがしぐちです', next: 44 },
+      { text: 'わかりません', next: 45 },
+    ],
+  },
+  {
+    // 43: にしぐち path
+    text: 'にしぐちはこちら!',
+    choices: [
+      { text: 'ありがとう!', next: 46 },
+      { text: 'とおいですか?', next: 46, hint: 'すぐそこです' },
+      { text: 'わかりました', next: 46 },
+    ],
+  },
+  {
+    // 44: ひがしぐち path
+    text: 'ひがしはあちら!',
+    choices: [
+      { text: 'みえました!', next: 46 },
+      { text: 'ありがとう!', next: 46 },
+      { text: 'すぐいきます', next: 46 },
+    ],
+  },
+  {
+    // 45: わからない path
+    text: 'なにがしたい?',
+    choices: [
+      { text: 'でんしゃにのる', next: 46 },
+      { text: 'おみせにいく', next: 46 },
+      { text: 'さんぽしたい', next: 46 },
+    ],
+  },
+  {
+    // 46: converge - platform info
+    text: 'のりばはしってる?',
+    choices: [
+      { text: 'はい しってます', next: 47 },
+      { text: 'いいえ', next: 48 },
+      { text: 'のりば?', next: 48, hint: 'でんしゃのばしょ' },
+    ],
+  },
+  {
+    // 47: しってる
+    text: 'すごいですね!',
+    choices: [
+      { text: 'ありがとう!', next: 49 },
+      { text: 'よくきます', next: 49 },
+      { text: 'すきなんです', next: 49 },
+    ],
+  },
+  {
+    // 48: しらない
+    text: 'いちばんのりばです!',
+    choices: [
+      { text: 'わかりました!', next: 49 },
+      { text: 'ありがとう!', next: 49 },
+      { text: 'いちばん?', next: 49, hint: 'さいしょのばしょ' },
+    ],
+  },
+  {
+    // 49: converge - schedule
+    text: 'つぎは なんじ?',
+    choices: [
+      { text: 'さんじです', next: 50 },
+      { text: 'わかりません', next: 51 },
+      { text: 'もうすぐ?', next: 51 },
+    ],
+  },
+  {
+    // 50: さんじ
+    text: 'さんじ? もうすぐ!',
+    choices: [
+      { text: 'よかった!', next: 52 },
+      { text: 'はやい!', next: 52 },
+      { text: 'まにあう!', next: 52 },
+    ],
+  },
+  {
+    // 51: わからない
+    text: 'あと すこしですよ!',
+    choices: [
+      { text: 'ありがとう!', next: 52 },
+      { text: 'たすかります', next: 52 },
+      { text: 'うれしいです', next: 52 },
+    ],
+  },
+  {
+    // 52: converge - manners
+    text: 'きをつけてね!',
+    choices: [
+      { text: 'はい!', next: 53 },
+      { text: 'ありがとう!', next: 53 },
+      { text: 'やさしいですね', next: 53 },
+    ],
+  },
+  {
+    // 53: guard farewell
+    text: 'いいたびを!',
+    choices: [
+      { text: 'ありがとう!', next: 54 },
+      { text: 'がんばります!', next: 54 },
+      { text: 'またきます!', next: 54 },
+    ],
+  },
+  {
+    // 54: converge - meet NPC 4
+    text: 'あのひと だれだろう?',
+    choices: [
+      { text: 'はなしかけよう', next: 55 },
+      { text: 'きになる', next: 55 },
+      { text: 'いってみよう', next: 55 },
+    ],
+  },
+  {
+    // 55: dummy bridging node to fix index alignment
+    text: 'あ おみせがある!',
+    choices: [
+      { text: 'みてみよう', next: 56 },
+      { text: 'なにかな?', next: 56 },
+      { text: 'はいろう!', next: 56 },
+    ],
+  },
+  // --- NPC 4: Vendor (buying a ticket) ---
+  {
+    // 56
+    text: 'いらっしゃい!',
+    choices: [
+      { text: 'こんにちは!', next: 57 },
+      { text: 'すみません', next: 57 },
+      { text: 'なにがある?', next: 57 },
+    ],
+  },
+  {
+    // 57
+    text: 'きっぷ うりますよ!',
+    choices: [
+      { text: 'ほしいです!', next: 58 },
+      { text: 'いくらですか?', next: 59 },
+      { text: 'みるだけです', next: 60 },
+    ],
+  },
+  {
+    // 58: ほしい path
+    text: 'どこまでですか?',
+    choices: [
+      { text: 'まちまでです', next: 61 },
+      { text: 'うみまでです', next: 62 },
+      { text: 'やままでです', next: 63 },
+    ],
+  },
+  {
+    // 59: いくら path
+    text: 'にひゃくえんから!',
+    choices: [
+      { text: 'やすいですね!', next: 58 },
+      { text: 'ちょうどいい', next: 58 },
+      { text: 'かいます!', next: 58 },
+    ],
+  },
+  {
+    // 60: みるだけ
+    text: 'ゆっくりどうぞ!',
+    choices: [
+      { text: 'ありがとう', next: 58 },
+      { text: 'やっぱりかう!', next: 58 },
+      { text: 'すみません', next: 58 },
+    ],
+  },
+  {
+    // 61: まち
+    text: 'まちは にひゃくえん!',
+    choices: [
+      { text: 'はい どうぞ!', next: 64 },
+      { text: 'やすい!', next: 64 },
+      { text: 'おねがいします', next: 64 },
+    ],
+  },
+  {
+    // 62: うみ
+    text: 'うみは さんびゃく!',
+    choices: [
+      { text: 'はい どうぞ!', next: 64 },
+      { text: 'いいですね', next: 64 },
+      { text: 'おねがいします', next: 64 },
+    ],
+  },
+  {
+    // 63: やま
+    text: 'やまは よんひゃく!',
+    choices: [
+      { text: 'はい どうぞ!', next: 64 },
+      { text: 'たかい!', next: 64, hint: 'やまはとおいです' },
+      { text: 'おねがいします', next: 64 },
+    ],
+  },
+  {
+    // 64: converge - payment
+    text: 'はい きっぷです!',
+    choices: [
+      { text: 'ありがとう!', next: 65 },
+      { text: 'うれしいです!', next: 65 },
+      { text: 'たすかります', next: 65 },
+    ],
+  },
+  {
+    // 65: おまけ
+    text: 'おまけに ちず!',
+    choices: [
+      { text: 'ありがとう!', next: 66 },
+      { text: 'うれしい!', next: 66 },
+      { text: 'やさしいですね', next: 66 },
+    ],
+  },
+  {
+    // 66: ちず説明
+    text: 'ちずがあるとべんり!',
+    choices: [
+      { text: 'そうですね!', next: 67 },
+      { text: 'たすかります', next: 67 },
+      { text: 'つかいます!', next: 67 },
+    ],
+  },
+  {
+    // 67: travel tips
+    text: 'でんしゃ たのしい?',
+    choices: [
+      { text: 'だいすき!', next: 68 },
+      { text: 'はじめてです', next: 69 },
+      { text: 'まあまあです', next: 70 },
+    ],
+  },
+  {
+    // 68: だいすき
+    text: 'わたしもだいすき!',
+    choices: [
+      { text: 'おなじですね!', next: 71 },
+      { text: 'うれしい!', next: 71 },
+      { text: 'でんしゃいいね', next: 71 },
+    ],
+  },
+  {
+    // 69: はじめて
+    text: 'はじめて? いいなあ!',
+    choices: [
+      { text: 'どきどきです', next: 71 },
+      { text: 'たのしみです', next: 71 },
+      { text: 'うきうきです', next: 71 },
+    ],
+  },
+  {
+    // 70: まあまあ
+    text: 'そうですか!',
+    choices: [
+      { text: 'でもたのしい!', next: 71 },
+      { text: 'すきになりたい', next: 71 },
+      { text: 'けしきがいい', next: 71 },
+    ],
+  },
+  {
+    // 71: converge - recommendation
+    text: 'まどぎわがいいよ!',
+    choices: [
+      { text: 'わかりました!', next: 72 },
+      { text: 'けしきみたい!', next: 72 },
+      { text: 'ありがとう!', next: 72 },
+    ],
+  },
+  {
+    // 72: おべんとう
+    text: 'おべんとう いる?',
+    choices: [
+      { text: 'ほしいです!', next: 73 },
+      { text: 'もうたべた', next: 74 },
+      { text: 'いくらですか?', next: 75 },
+    ],
+  },
+  {
+    // 73: ほしい
+    text: 'はい どうぞ!',
+    choices: [
+      { text: 'ありがとう!', next: 76 },
+      { text: 'おいしそう!', next: 76 },
+      { text: 'うれしい!', next: 76 },
+    ],
+  },
+  {
+    // 74: もうたべた
+    text: 'そうですか!',
+    choices: [
+      { text: 'おなかいっぱい', next: 76 },
+      { text: 'おいしかった!', next: 76 },
+      { text: 'ありがとう', next: 76 },
+    ],
+  },
+  {
+    // 75: いくら
+    text: 'さんびゃくえんです!',
+    choices: [
+      { text: 'かいます!', next: 73 },
+      { text: 'やすい!', next: 73 },
+      { text: 'やめておきます', next: 76 },
+    ],
+  },
+  {
+    // 76: converge - farewell vendor
+    text: 'たのしいたびを!',
+    choices: [
+      { text: 'ありがとう!', next: 77 },
+      { text: 'またきます!', next: 77 },
+      { text: 'やさしいですね', next: 77 },
+    ],
+  },
+  {
+    // 77
+    text: 'いつでもきてね!',
+    choices: [
+      { text: 'はい!', next: 78 },
+      { text: 'きっとまた!', next: 78 },
+      { text: 'やくそく!', next: 78 },
+    ],
+  },
+  {
+    // 78
+    text: 'じゃあ いってらっしゃい',
+    choices: [
+      { text: 'いってきます!', next: 79 },
+      { text: 'ありがとう!', next: 79 },
+      { text: 'さようなら!', next: 79 },
+    ],
+  },
+  {
+    // 79: END
+    text: 'きをつけてね!',
+    choices: [
+      { text: 'いってきます!', next: null },
+      { text: 'たのしみます!', next: null },
+      { text: 'さあ いこう!', next: null },
+    ],
+  },
 ];
-
-// ---------------------------------------------------------------------------
-// Scene 1: Street (みち) — 40 nodes, hiragana + easy katakana signs
-//
-// NPC 1 (lost tourist): asking/giving directions (nodes 0-19)
-// NPC 2 (shopkeeper さくら): intro, local sights, farewell (nodes 20-39)
-// ---------------------------------------------------------------------------

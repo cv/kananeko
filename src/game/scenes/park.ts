@@ -357,14 +357,374 @@ export const PARK_DIALOGUE: DialogueNode[] = [
     ],
   },
   {
-    // 39: END
+    // 39: bridge to new NPCs
     text: 'またあいましょう!',
     choices: [
-      { text: 'またね!', next: null },
+      { text: 'またね!', next: 40 },
       { text: 'さようなら!', next: null },
       { text: 'たのしかった!', next: null },
     ],
   },
+  // --- NPC 3: Jogger (health/exercise) ---
+  {
+    // 40
+    text: 'ハアハア... やあ!',
+    choices: [
+      { text: 'こんばんは!', next: 41 },
+      { text: 'だいじょうぶ?', next: 41 },
+      { text: 'おつかれさま!', next: 41 },
+    ],
+  },
+  {
+    // 41
+    text: 'はしりちゅう!',
+    choices: [
+      { text: 'すごいですね!', next: 42 },
+      { text: 'がんばって!', next: 42 },
+      { text: 'けんこうてき!', next: 42 },
+    ],
+  },
+  {
+    // 42
+    text: 'まいにち はしるよ!',
+    choices: [
+      { text: 'えらいですね!', next: 43 },
+      { text: 'なんキロ?', next: 44 },
+      { text: 'たいへんですね', next: 43 },
+    ],
+  },
+  {
+    // 43: えらい path
+    text: 'からだにいいよ!',
+    choices: [
+      { text: 'そうですね!', next: 45 },
+      { text: 'けんこうだいじ', next: 45 },
+      { text: 'わたしもしたい', next: 45 },
+    ],
+  },
+  {
+    // 44: なんキロ path
+    text: '5キロ はしった!',
+    choices: [
+      { text: 'すごい! 5キロ!', next: 45 },
+      { text: 'わたしはむり!', next: 45 },
+      { text: 'がんばったね!', next: 45 },
+    ],
+  },
+  {
+    // 45: converge - exercise talk
+    text: 'うんどう すき?',
+    choices: [
+      { text: 'すきです!', next: 46 },
+      { text: 'あまり...', next: 47 },
+      { text: 'さんぽがすき', next: 48 },
+    ],
+  },
+  {
+    // 46: すき
+    text: 'なにがすき?',
+    choices: [
+      { text: 'テニス!', next: 49 },
+      { text: 'ヨガ!', next: 49 },
+      { text: 'すいえい!', next: 49 },
+    ],
+  },
+  {
+    // 47: あまり
+    text: 'さんぽでもいいよ!',
+    choices: [
+      { text: 'そうですね!', next: 49 },
+      { text: 'やってみる!', next: 49 },
+      { text: 'ありがとう!', next: 49 },
+    ],
+  },
+  {
+    // 48: さんぽ
+    text: 'さんぽ いいよね!',
+    choices: [
+      { text: 'きもちいい!', next: 49 },
+      { text: 'だいすき!', next: 49 },
+      { text: 'よるのさんぽ!', next: 49 },
+    ],
+  },
+  {
+    // 49: converge - health tips
+    text: 'みずをのんでね!',
+    choices: [
+      { text: 'だいじですよね', next: 50 },
+      { text: 'はい のみます!', next: 50 },
+      { text: 'ありがとう!', next: 50 },
+    ],
+  },
+  {
+    // 50
+    text: 'ねることもだいじ!',
+    choices: [
+      { text: 'そうですね!', next: 51 },
+      { text: 'ねるのすき!', next: 51 },
+      { text: 'はやくねよう', next: 51 },
+    ],
+  },
+  {
+    // 51: converge - park beauty
+    text: 'よるのこうえん すき',
+    choices: [
+      { text: 'きれいですね!', next: 52 },
+      { text: 'しずかでいい', next: 52 },
+      { text: 'ほしがみえる!', next: 52 },
+    ],
+  },
+  {
+    // 52: farewell jogger
+    text: 'じゃあ またはしる!',
+    choices: [
+      { text: 'がんばって!', next: 53 },
+      { text: 'きをつけて!', next: 53 },
+      { text: 'おつかれさま!', next: 53 },
+    ],
+  },
+  {
+    // 53
+    text: 'バイバイ! げんきで!',
+    choices: [
+      { text: 'ばいばい!', next: 54 },
+      { text: 'またね!', next: 54 },
+      { text: 'げんきでね!', next: 54 },
+    ],
+  },
+  {
+    // 54: transition to NPC 4
+    text: 'あ おんがくがきこえる',
+    choices: [
+      { text: 'なんだろう?', next: 55 },
+      { text: 'いってみよう!', next: 55 },
+      { text: 'きれいなおと!', next: 55 },
+    ],
+  },
+  {
+    // 55
+    text: 'ふえのおとだ!',
+    choices: [
+      { text: 'すてき!', next: 56 },
+      { text: 'ちかくにいこう', next: 56 },
+      { text: 'きいてみよう', next: 56 },
+    ],
+  },
+  // --- NPC 4: Musician (art/music) ---
+  {
+    // 56
+    text: 'あ きいてくれた?',
+    choices: [
+      { text: 'はい すてき!', next: 57 },
+      { text: 'じょうずですね!', next: 57 },
+      { text: 'きれいなおと!', next: 57 },
+    ],
+  },
+  {
+    // 57
+    text: 'ありがとう! うれしい',
+    choices: [
+      { text: 'おんがくすき?', next: 58 },
+      { text: 'すごいひと?', next: 59 },
+      { text: 'まいにちひく?', next: 58 },
+    ],
+  },
+  {
+    // 58: おんがく talk
+    text: 'おんがくがいのち!',
+    choices: [
+      { text: 'かっこいい!', next: 60 },
+      { text: 'すてきです!', next: 60 },
+      { text: 'わたしもすき!', next: 60 },
+    ],
+  },
+  {
+    // 59: すごいひと
+    text: 'まだまだだけど!',
+    choices: [
+      { text: 'じょうずです!', next: 60 },
+      { text: 'すごいですよ!', next: 60 },
+      { text: 'すてきです!', next: 60 },
+    ],
+  },
+  {
+    // 60: converge - genre
+    text: 'どんなおんがくすき?',
+    choices: [
+      { text: 'ピアノ!', next: 61 },
+      { text: 'ふえ!', next: 62 },
+      { text: 'うた!', next: 61 },
+    ],
+  },
+  {
+    // 61: ピアノ/うた
+    text: 'いいね! のれるよね',
+    choices: [
+      { text: 'たのしいよね!', next: 63 },
+      { text: 'だいすき!', next: 63 },
+      { text: 'げんきがでる!', next: 63 },
+    ],
+  },
+  {
+    // 62: ふえ
+    text: 'ふえ? すてきだね!',
+    choices: [
+      { text: 'おちつくよね', next: 63 },
+      { text: 'きれいなおと!', next: 63 },
+      { text: 'だいすき!', next: 63 },
+    ],
+  },
+  {
+    // 63: converge - request
+    text: 'リクエスト ある?',
+    choices: [
+      { text: 'なんでもいい!', next: 64 },
+      { text: 'しずかなきょく', next: 65 },
+      { text: 'げんきなきょく', next: 64 },
+    ],
+  },
+  {
+    // 64: げんき/なんでも
+    text: 'じゃあ これ きいて!',
+    choices: [
+      { text: 'うわあ きれい!', next: 66 },
+      { text: 'すてき!', next: 66 },
+      { text: 'かんどう!', next: 66 },
+    ],
+  },
+  {
+    // 65: しずか
+    text: 'しずかなきょく...!',
+    choices: [
+      { text: 'きれい...', next: 66 },
+      { text: 'なみだがでる', next: 66 },
+      { text: 'すばらしい!', next: 66 },
+    ],
+  },
+  {
+    // 66: converge - reaction
+    text: 'たのしんでくれた?',
+    choices: [
+      { text: 'さいこうです!', next: 67 },
+      { text: 'かんどうした!', next: 67 },
+      { text: 'だいすき!', next: 67 },
+    ],
+  },
+  {
+    // 67
+    text: 'おんがくのちから!',
+    choices: [
+      { text: 'すごいちから!', next: 68 },
+      { text: 'こころにひびく', next: 68 },
+      { text: 'ありがとう!', next: 68 },
+    ],
+  },
+  {
+    // 68: converge - art talk
+    text: 'えも かくよ!',
+    choices: [
+      { text: 'すごい!', next: 69 },
+      { text: 'みせて!', next: 70 },
+      { text: 'たさいですね!', next: 69 },
+    ],
+  },
+  {
+    // 69: すごい
+    text: 'こうえんのえがすき',
+    choices: [
+      { text: 'きれいですね!', next: 71 },
+      { text: 'みたいです!', next: 71 },
+      { text: 'すてき!', next: 71 },
+    ],
+  },
+  {
+    // 70: みせて
+    text: 'こんどみせるね!',
+    choices: [
+      { text: 'たのしみ!', next: 71 },
+      { text: 'ありがとう!', next: 71 },
+      { text: 'やくそく!', next: 71 },
+    ],
+  },
+  {
+    // 71: converge - life advice
+    text: 'ゆめをもとうね!',
+    choices: [
+      { text: 'いいことば!', next: 72 },
+      { text: 'がんばります!', next: 72 },
+      { text: 'ありがとう!', next: 72 },
+    ],
+  },
+  {
+    // 72
+    text: 'きょうに かんしゃ!',
+    choices: [
+      { text: 'そうですね!', next: 73 },
+      { text: 'いいひだった!', next: 73 },
+      { text: 'しあわせです!', next: 73 },
+    ],
+  },
+  {
+    // 73: farewell musician
+    text: 'じゃあ もういっきょく',
+    choices: [
+      { text: 'うれしい!', next: 74 },
+      { text: 'ありがとう!', next: 74 },
+      { text: 'きかせて!', next: 74 },
+    ],
+  },
+  {
+    // 74
+    text: 'さいごのきょくです!',
+    choices: [
+      { text: 'すてき...!', next: 75 },
+      { text: 'かんどう!', next: 75 },
+      { text: 'きれい...!', next: 75 },
+    ],
+  },
+  {
+    // 75: converge - final reflection
+    text: 'いいよるだったね!',
+    choices: [
+      { text: 'さいこうの よる!', next: 76 },
+      { text: 'わすれない!', next: 76 },
+      { text: 'ありがとう!', next: 76 },
+    ],
+  },
+  {
+    // 76
+    text: 'またあおうね!',
+    choices: [
+      { text: 'きっとまた!', next: 77 },
+      { text: 'やくそく!', next: 77 },
+      { text: 'ぜったいに!', next: 77 },
+    ],
+  },
+  {
+    // 77
+    text: 'ゆめを おいかけて!',
+    choices: [
+      { text: 'がんばります!', next: 78 },
+      { text: 'あなたも!', next: 78 },
+      { text: 'ありがとう!', next: 78 },
+    ],
+  },
+  {
+    // 78
+    text: 'さようなら!',
+    choices: [
+      { text: 'さようなら!', next: 79 },
+      { text: 'またね!', next: 79 },
+      { text: 'げんきでね!', next: 79 },
+    ],
+  },
+  {
+    // 79: END
+    text: 'またあいましょう!',
+    choices: [
+      { text: 'ありがとう!', next: null },
+      { text: 'さようなら!', next: null },
+      { text: 'だいすき にほん!', next: null },
+    ],
+  },
 ];
-
-// ---------------------------------------------------------------------------

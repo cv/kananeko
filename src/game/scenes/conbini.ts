@@ -357,19 +357,374 @@ export const CONBINI_DIALOGUE: DialogueNode[] = [
     ],
   },
   {
-    // 39: END
+    // 39: bridge to new NPCs
     text: 'こうえんにつくよ!',
     choices: [
-      { text: 'やった!', next: null },
+      { text: 'やった!', next: 40 },
       { text: 'たのしみ!', next: null },
       { text: 'いこう!', next: null },
     ],
   },
+  // --- NPC 3: Delivery person (work talk) ---
+  {
+    // 40
+    text: 'すみません!',
+    choices: [
+      { text: 'はい?', next: 41 },
+      { text: 'なんですか?', next: 41 },
+      { text: 'どうしました?', next: 41 },
+    ],
+  },
+  {
+    // 41
+    text: 'はいたつの ものです',
+    choices: [
+      { text: 'おつかれさま!', next: 42 },
+      { text: 'はいたつ?', next: 42, hint: 'ものをはこぶ!' },
+      { text: 'がんばって!', next: 42 },
+    ],
+  },
+  {
+    // 42
+    text: 'きょう いそがしい!',
+    choices: [
+      { text: 'たいへんですね', next: 43 },
+      { text: 'なんこある?', next: 44 },
+      { text: 'がんばって!', next: 43 },
+    ],
+  },
+  {
+    // 43: たいへん path
+    text: 'でも たのしいよ!',
+    choices: [
+      { text: 'すごいですね!', next: 45 },
+      { text: 'えらいです!', next: 45 },
+      { text: 'すてきです!', next: 45 },
+    ],
+  },
+  {
+    // 44: なんこ path
+    text: '50こ はこんだ!',
+    choices: [
+      { text: 'すごい!', next: 45 },
+      { text: 'たくさん!', next: 45 },
+      { text: 'がんばった!', next: 45 },
+    ],
+  },
+  {
+    // 45: converge - what's inside
+    text: 'なかみ なにかな?',
+    choices: [
+      { text: 'おかし?', next: 46 },
+      { text: 'ジュース?', next: 47 },
+      { text: 'おべんとう?', next: 48 },
+    ],
+  },
+  {
+    // 46: おかし
+    text: 'あたり! おかしだよ!',
+    choices: [
+      { text: 'すごい!', next: 49 },
+      { text: 'おいしそう!', next: 49 },
+      { text: 'いいな!', next: 49 },
+    ],
+  },
+  {
+    // 47: ジュース
+    text: 'おしい! ちがうよ!',
+    choices: [
+      { text: 'なんだろう?', next: 49 },
+      { text: 'おしえて!', next: 49 },
+      { text: 'むずかしい!', next: 49 },
+    ],
+  },
+  {
+    // 48: おべんとう
+    text: 'ちがうけど いいね!',
+    choices: [
+      { text: 'なにかな?', next: 49 },
+      { text: 'おしえて!', next: 49 },
+      { text: 'きになる!', next: 49 },
+    ],
+  },
+  {
+    // 49: converge - delivery facts
+    text: 'まいにち 100こ!',
+    choices: [
+      { text: 'すごい! 100!', next: 50 },
+      { text: 'たいへんですね', next: 50 },
+      { text: 'がんばりますね', next: 50 },
+    ],
+  },
+  {
+    // 50
+    text: 'くるまではこぶ!',
+    choices: [
+      { text: 'くるま? すごい!', next: 51 },
+      { text: 'おおきいですね', next: 51 },
+      { text: 'かっこいい!', next: 51 },
+    ],
+  },
+  {
+    // 51: converge - hobby
+    text: 'やすみは なにする?',
+    choices: [
+      { text: 'あそび!', next: 52 },
+      { text: 'さんぽ!', next: 53 },
+      { text: 'ねる!', next: 53 },
+    ],
+  },
+  {
+    // 52: あそび
+    text: 'あそび すき!',
+    choices: [
+      { text: 'なに あそび?', next: 54 },
+      { text: 'わたしも!', next: 54 },
+      { text: 'たのしいよね', next: 54 },
+    ],
+  },
+  {
+    // 53: さんぽ/ねる
+    text: 'いいね! のんびり!',
+    choices: [
+      { text: 'だいすき!', next: 54 },
+      { text: 'きもちいい!', next: 54 },
+      { text: 'さいこう!', next: 54 },
+    ],
+  },
+  {
+    // 54: converge - farewell delivery
+    text: 'じゃあ しごとに!',
+    choices: [
+      { text: 'がんばって!', next: 55 },
+      { text: 'おつかれさま!', next: 55 },
+      { text: 'ありがとう!', next: 55 },
+    ],
+  },
+  {
+    // 55: transition
+    text: 'あ あのひとは...',
+    choices: [
+      { text: 'だれかな?', next: 56 },
+      { text: 'みてみよう', next: 56 },
+      { text: 'はなしかけよう', next: 56 },
+    ],
+  },
+  {
+    // 56
+    text: 'こまってるみたい',
+    choices: [
+      { text: 'たすけよう!', next: 57 },
+      { text: 'だいじょうぶ?', next: 57 },
+      { text: 'きになるね', next: 57 },
+    ],
+  },
+  // --- NPC 4: Tourist (asking for help) ---
+  {
+    // 57
+    text: 'すみません!',
+    choices: [
+      { text: 'はい!', next: 58 },
+      { text: 'どうしました?', next: 58 },
+      { text: 'こんにちは!', next: 58 },
+    ],
+  },
+  {
+    // 58
+    text: 'にほんご すこし...',
+    choices: [
+      { text: 'だいじょうぶ!', next: 59 },
+      { text: 'がんばって!', next: 59 },
+      { text: 'ゆっくりどうぞ', next: 59 },
+    ],
+  },
+  {
+    // 59: what do they need
+    text: 'ホテル どこですか?',
+    choices: [
+      { text: 'あちらですよ!', next: 60 },
+      { text: 'ちかいですよ', next: 61 },
+      { text: 'わかりません', next: 62 },
+    ],
+  },
+  {
+    // 60: あちら
+    text: 'あちら? ありがとう!',
+    choices: [
+      { text: 'まっすぐいって', next: 63 },
+      { text: 'みぎにまがって', next: 63 },
+      { text: 'すぐそこです', next: 63 },
+    ],
+  },
+  {
+    // 61: ちかい
+    text: 'ちかい? よかった!',
+    choices: [
+      { text: 'あるいて5ふん', next: 63 },
+      { text: 'すぐそこです', next: 63 },
+      { text: 'いっしょにいく?', next: 63 },
+    ],
+  },
+  {
+    // 62: わからない
+    text: 'そうですか...',
+    choices: [
+      { text: 'いっしょにさがす?', next: 63 },
+      { text: 'すみません', next: 63 },
+      { text: 'スマホでみよう', next: 63 },
+    ],
+  },
+  {
+    // 63: converge - more help
+    text: 'スーパー もある?',
+    choices: [
+      { text: 'あります!', next: 64 },
+      { text: 'コンビニなら!', next: 65 },
+      { text: 'わかりません', next: 64 },
+    ],
+  },
+  {
+    // 64: ある
+    text: 'どこですか?',
+    choices: [
+      { text: 'えきのちかく!', next: 66 },
+      { text: 'あるいて10ぷん', next: 66 },
+      { text: 'ちょっととおい', next: 66 },
+    ],
+  },
+  {
+    // 65: コンビニ
+    text: 'コンビニ? いいね!',
+    choices: [
+      { text: 'ここにあるよ!', next: 66 },
+      { text: 'べんりだよ!', next: 66 },
+      { text: 'やすいよ!', next: 66 },
+    ],
+  },
+  {
+    // 66: converge - food recs
+    text: 'おすすめ たべもの?',
+    choices: [
+      { text: 'ラーメン!', next: 67 },
+      { text: 'おにぎり!', next: 68 },
+      { text: 'おすし!', next: 67 },
+    ],
+  },
+  {
+    // 67: ラーメン/おすし
+    text: 'おいしそう!',
+    choices: [
+      { text: 'だいすきです!', next: 69 },
+      { text: 'おいしいよ!', next: 69 },
+      { text: 'ぜひたべて!', next: 69 },
+    ],
+  },
+  {
+    // 68: おにぎり
+    text: 'おにぎり? なにそれ?',
+    choices: [
+      { text: 'おこめのたべもの', next: 69 },
+      { text: 'おいしいよ!', next: 69 },
+      { text: 'コンビニにある!', next: 69 },
+    ],
+  },
+  {
+    // 69: converge - gratitude
+    text: 'とてもやさしいね!',
+    choices: [
+      { text: 'ありがとう!', next: 70 },
+      { text: 'いいえいいえ', next: 70 },
+      { text: 'たのしいです!', next: 70 },
+    ],
+  },
+  {
+    // 70
+    text: 'にほん だいすき!',
+    choices: [
+      { text: 'うれしいです!', next: 71 },
+      { text: 'わたしも!', next: 71 },
+      { text: 'いいくにだよ!', next: 71 },
+    ],
+  },
+  {
+    // 71: converge - exchange
+    text: 'なまえ おしえて?',
+    choices: [
+      { text: 'カナネコです!', next: 72 },
+      { text: 'ひみつです!', next: 72 },
+      { text: 'あなたは?', next: 73 },
+    ],
+  },
+  {
+    // 72
+    text: 'いいなまえ!',
+    choices: [
+      { text: 'ありがとう!', next: 74 },
+      { text: 'えへへ', next: 74 },
+      { text: 'そうですか?', next: 74 },
+    ],
+  },
+  {
+    // 73: あなたは
+    text: 'マイクです!',
+    choices: [
+      { text: 'はじめまして!', next: 72 },
+      { text: 'いいなまえ!', next: 72 },
+      { text: 'よろしく!', next: 72 },
+    ],
+  },
+  {
+    // 74: converge - farewell tourist
+    text: 'ほんとうにありがとう',
+    choices: [
+      { text: 'どういたしまして', next: 75 },
+      { text: 'たのしかった!', next: 75 },
+      { text: 'よいたびを!', next: 75 },
+    ],
+  },
+  {
+    // 75
+    text: 'またあいたいな!',
+    choices: [
+      { text: 'きっとまた!', next: 76 },
+      { text: 'やくそく!', next: 76 },
+      { text: 'またね!', next: 76 },
+    ],
+  },
+  {
+    // 76: farewell
+    text: 'サンキュー!',
+    choices: [
+      { text: 'ばいばい!', next: 77 },
+      { text: 'またね!', next: 77 },
+      { text: 'きをつけてね!', next: 77 },
+    ],
+  },
+  {
+    // 77
+    text: 'げんきでね!',
+    choices: [
+      { text: 'あなたも!', next: 78 },
+      { text: 'ありがとう!', next: 78 },
+      { text: 'げんきで!', next: 78 },
+    ],
+  },
+  {
+    // 78
+    text: 'じゃあ いこう!',
+    choices: [
+      { text: 'うん! いこう!', next: 79 },
+      { text: 'こうえんへ!', next: 79 },
+      { text: 'たのしみ!', next: 79 },
+    ],
+  },
+  {
+    // 79: END
+    text: 'こうえんにいこう!',
+    choices: [
+      { text: 'いこう!', next: null },
+      { text: 'たのしみ!', next: null },
+      { text: 'やった!', next: null },
+    ],
+  },
 ];
-
-// ---------------------------------------------------------------------------
-// Scene 4: Evening Park (こうえん) — 40 nodes, everything
-//
-// NPC 1 (stranger ゆき): time, weather, feelings (nodes 0-19)
-// NPC 2 (reflection/farewell): travel recap, farewell (nodes 20-39)
-// ---------------------------------------------------------------------------

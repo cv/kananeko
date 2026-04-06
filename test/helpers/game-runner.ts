@@ -197,7 +197,7 @@ export class GameRunner {
 
   /** Complete an entire dialogue tree (always choosing first option until conversation ends) */
   completeDialogueTree(_sceneIndex: number): this {
-    for (let safety = 0; safety < 50; safety++) {
+    for (let safety = 0; safety < 100; safety++) {
       this.advanceDialogue();
       if (this.dlgNodeId === 0xff && this.dlgState === 0) break;
     }

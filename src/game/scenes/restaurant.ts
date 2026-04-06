@@ -357,19 +357,374 @@ export const RESTAURANT_DIALOGUE: DialogueNode[] = [
     ],
   },
   {
-    // 39: END
+    // 39: bridge to new NPCs
     text: 'ごちそうさまでした!',
     choices: [
-      { text: 'ごちそうさま!', next: null },
+      { text: 'ごちそうさま!', next: 40 },
       { text: 'おいしかった!', next: null },
       { text: 'またきます!', next: null },
     ],
   },
+  // --- NPC 3: Chef (kitchen talk) ---
+  {
+    // 40
+    text: 'おきゃくさん!',
+    choices: [
+      { text: 'はい?', next: 41 },
+      { text: 'だれですか?', next: 41 },
+      { text: 'こんにちは!', next: 41 },
+    ],
+  },
+  {
+    // 41
+    text: 'りょうりにんです!',
+    choices: [
+      { text: 'はじめまして!', next: 42 },
+      { text: 'すごいですね!', next: 42 },
+      { text: 'おいしかった!', next: 42 },
+    ],
+  },
+  {
+    // 42
+    text: 'あじ どうだった?',
+    choices: [
+      { text: 'おいしかった!', next: 43 },
+      { text: 'さいこうです!', next: 44 },
+      { text: 'からかった!', next: 45 },
+    ],
+  },
+  {
+    // 43: おいしい path
+    text: 'うれしいなあ!',
+    choices: [
+      { text: 'ありがとう!', next: 46 },
+      { text: 'だいすきです', next: 46 },
+      { text: 'またたべたい!', next: 46 },
+    ],
+  },
+  {
+    // 44: さいこう path
+    text: 'さいこう? やったー!',
+    choices: [
+      { text: 'ほんとうです!', next: 46 },
+      { text: 'すばらしい!', next: 46 },
+      { text: 'すごいあじ!', next: 46 },
+    ],
+  },
+  {
+    // 45: からい path
+    text: 'からかった? ごめん!',
+    choices: [
+      { text: 'だいじょうぶ!', next: 46 },
+      { text: 'でもおいしい!', next: 46 },
+      { text: 'すこしだけ', next: 46 },
+    ],
+  },
+  {
+    // 46: converge - recipe talk
+    text: 'ひみつのレシピ!',
+    choices: [
+      { text: 'おしえて!', next: 47 },
+      { text: 'ひみつ?', next: 48 },
+      { text: 'きになる!', next: 47 },
+    ],
+  },
+  {
+    // 47: おしえて
+    text: 'バター がだいじ!',
+    choices: [
+      { text: 'バター? なるほど', next: 49 },
+      { text: 'おいしそう!', next: 49 },
+      { text: 'すごいですね!', next: 49 },
+    ],
+  },
+  {
+    // 48: ひみつ
+    text: 'ちょっとだけね!',
+    choices: [
+      { text: 'ありがとう!', next: 49 },
+      { text: 'うれしい!', next: 49 },
+      { text: 'たのしみ!', next: 49 },
+    ],
+  },
+  {
+    // 49: converge - ingredients
+    text: 'やさいがだいじ!',
+    choices: [
+      { text: 'やさいすき!', next: 50 },
+      { text: 'なにやさい?', next: 51 },
+      { text: 'けんこうてき!', next: 50 },
+    ],
+  },
+  {
+    // 50: やさいすき
+    text: 'トマトがいちばん!',
+    choices: [
+      { text: 'トマトすき!', next: 52 },
+      { text: 'おいしいよね!', next: 52 },
+      { text: 'あかいですね!', next: 52 },
+    ],
+  },
+  {
+    // 51: なにやさい
+    text: 'たまねぎとにんじん!',
+    choices: [
+      { text: 'おいしそう!', next: 52 },
+      { text: 'すきです!', next: 52 },
+      { text: 'いいですね!', next: 52 },
+    ],
+  },
+  {
+    // 52: converge - cooking dream
+    text: 'りょうり すきかい?',
+    choices: [
+      { text: 'だいすきです!', next: 53 },
+      { text: 'すこしだけ', next: 54 },
+      { text: 'たべるのがすき', next: 54 },
+    ],
+  },
+  {
+    // 53: だいすき
+    text: 'いっしょにつくる?',
+    choices: [
+      { text: 'やりたい!', next: 55 },
+      { text: 'うれしい!', next: 55 },
+      { text: 'ほんとう?', next: 55 },
+    ],
+  },
+  {
+    // 54: すこし/たべる
+    text: 'たべるのもだいじ!',
+    choices: [
+      { text: 'そうですね!', next: 55 },
+      { text: 'おいしいもの!', next: 55 },
+      { text: 'しあわせ!', next: 55 },
+    ],
+  },
+  {
+    // 55: converge - chef farewell
+    text: 'またきてね!',
+    choices: [
+      { text: 'かならず!', next: 56 },
+      { text: 'ありがとう!', next: 56 },
+      { text: 'たのしかった!', next: 56 },
+    ],
+  },
+  {
+    // 56: transition to NPC 4
+    text: 'あ ともだちがいるよ',
+    choices: [
+      { text: 'ほんとうだ!', next: 57 },
+      { text: 'だれだろう?', next: 57 },
+      { text: 'みてみよう', next: 57 },
+    ],
+  },
+  {
+    // 57
+    text: 'いっしょにすわろう!',
+    choices: [
+      { text: 'いいね!', next: 58 },
+      { text: 'うん!', next: 58 },
+      { text: 'たのしそう!', next: 58 },
+    ],
+  },
+  // --- NPC 4: Friend at table (opinions) ---
+  {
+    // 58
+    text: 'やあ! きたんだ!',
+    choices: [
+      { text: 'うん きたよ!', next: 59 },
+      { text: 'ひさしぶり!', next: 59 },
+      { text: 'こんにちは!', next: 59 },
+    ],
+  },
+  {
+    // 59: what to order
+    text: 'なに たのむ?',
+    choices: [
+      { text: 'ケーキ!', next: 60 },
+      { text: 'コーヒー!', next: 61 },
+      { text: 'ジュース!', next: 62 },
+    ],
+  },
+  {
+    // 60: ケーキ
+    text: 'ケーキがおすすめ!',
+    choices: [
+      { text: 'たべたい!', next: 63 },
+      { text: 'おいしそう!', next: 63 },
+      { text: 'いいね!', next: 63 },
+    ],
+  },
+  {
+    // 61: コーヒー
+    text: 'コーヒーいいね!',
+    choices: [
+      { text: 'すきなんだ', next: 63 },
+      { text: 'のみたい!', next: 63 },
+      { text: 'いいかおり!', next: 63 },
+    ],
+  },
+  {
+    // 62: ジュース
+    text: 'ジュース? いいよ!',
+    choices: [
+      { text: 'つめたいの!', next: 63 },
+      { text: 'あまいのがいい', next: 63 },
+      { text: 'オレンジ!', next: 63 },
+    ],
+  },
+  {
+    // 63: converge - opinion talk
+    text: 'このおみせ どう?',
+    choices: [
+      { text: 'だいすき!', next: 64 },
+      { text: 'おいしいね!', next: 64 },
+      { text: 'すてきなおみせ', next: 65 },
+    ],
+  },
+  {
+    // 64: だいすき/おいしい
+    text: 'わたしもだいすき!',
+    choices: [
+      { text: 'おなじだね!', next: 66 },
+      { text: 'うれしい!', next: 66 },
+      { text: 'よくくるの?', next: 66 },
+    ],
+  },
+  {
+    // 65: すてき
+    text: 'ふんいきがいいよね',
+    choices: [
+      { text: 'そうだね!', next: 66 },
+      { text: 'おちつくね', next: 66 },
+      { text: 'きれいだね', next: 66 },
+    ],
+  },
+  {
+    // 66: converge - memories
+    text: 'おもいでつくろう!',
+    choices: [
+      { text: 'いいね!', next: 67 },
+      { text: 'うん!', next: 67 },
+      { text: 'たのしい!', next: 67 },
+    ],
+  },
+  {
+    // 67: photo
+    text: 'しゃしん とろう!',
+    choices: [
+      { text: 'いいね!', next: 68 },
+      { text: 'はい ニコリ!', next: 68 },
+      { text: 'たのしい!', next: 68 },
+    ],
+  },
+  {
+    // 68
+    text: 'いいしゃしん!',
+    choices: [
+      { text: 'うれしい!', next: 69 },
+      { text: 'きれい!', next: 69 },
+      { text: 'おもいでだね', next: 69 },
+    ],
+  },
+  {
+    // 69: converge - next plan
+    text: 'つぎ どこいく?',
+    choices: [
+      { text: 'コンビニ!', next: 70 },
+      { text: 'こうえん!', next: 71 },
+      { text: 'あなたは?', next: 70 },
+    ],
+  },
+  {
+    // 70: コンビニ
+    text: 'コンビニ いこう!',
+    choices: [
+      { text: 'うん!', next: 72 },
+      { text: 'おかしかいたい', next: 72 },
+      { text: 'たのしみ!', next: 72 },
+    ],
+  },
+  {
+    // 71: こうえん
+    text: 'こうえん いいね!',
+    choices: [
+      { text: 'いこう!', next: 72 },
+      { text: 'たのしそう!', next: 72 },
+      { text: 'あるきたい!', next: 72 },
+    ],
+  },
+  {
+    // 72: converge - pay
+    text: 'おかいけい しよう!',
+    choices: [
+      { text: 'うん!', next: 73 },
+      { text: 'いくらかな?', next: 74 },
+      { text: 'はい!', next: 73 },
+    ],
+  },
+  {
+    // 73: pay
+    text: 'わたしがだすよ!',
+    choices: [
+      { text: 'ありがとう!', next: 75 },
+      { text: 'いいの?', next: 75 },
+      { text: 'やさしい!', next: 75 },
+    ],
+  },
+  {
+    // 74: いくら
+    text: 'はっぴゃくえん!',
+    choices: [
+      { text: 'はんぶんずつ?', next: 75 },
+      { text: 'わたしがだす!', next: 75 },
+      { text: 'おねがいします', next: 75 },
+    ],
+  },
+  {
+    // 75: converge
+    text: 'おいしかったね!',
+    choices: [
+      { text: 'さいこう!', next: 76 },
+      { text: 'ほんとうに!', next: 76 },
+      { text: 'しあわせだった', next: 76 },
+    ],
+  },
+  {
+    // 76: farewell friend
+    text: 'またいっしょに!',
+    choices: [
+      { text: 'やくそく!', next: 77 },
+      { text: 'きっとまた!', next: 77 },
+      { text: 'たのしみ!', next: 77 },
+    ],
+  },
+  {
+    // 77
+    text: 'じゃあ いこう!',
+    choices: [
+      { text: 'うん! いこう!', next: 78 },
+      { text: 'ありがとう!', next: 78 },
+      { text: 'たのしかった!', next: 78 },
+    ],
+  },
+  {
+    // 78
+    text: 'ありがとう!',
+    choices: [
+      { text: 'こちらこそ!', next: 79 },
+      { text: 'またね!', next: 79 },
+      { text: 'たのしかった!', next: 79 },
+    ],
+  },
+  {
+    // 79: END
+    text: 'またあおうね!',
+    choices: [
+      { text: 'またね!', next: null },
+      { text: 'やくそく!', next: null },
+      { text: 'ばいばい!', next: null },
+    ],
+  },
 ];
-
-// ---------------------------------------------------------------------------
-// Scene 3: Convenience Store (コンビニ) — 40 nodes, mixed + numbers
-//
-// NPC 1 (clerk): shopping, prices, items (nodes 0-19)
-// NPC 2 (friend from restaurant): comparing snacks, farewell (nodes 20-39)
-// ---------------------------------------------------------------------------

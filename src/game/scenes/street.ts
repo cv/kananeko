@@ -357,19 +357,374 @@ export const STREET_DIALOGUE: DialogueNode[] = [
     ],
   },
   {
-    // 39: END
+    // 39: bridge to new NPCs
     text: 'いってらっしゃい!',
     choices: [
-      { text: 'いってきます!', next: null },
+      { text: 'いってきます!', next: 40 },
       { text: 'ばいばい!', next: null },
       { text: 'またね!', next: null },
     ],
   },
+  // --- NPC 3: Elderly person (local history) ---
+  {
+    // 40
+    text: 'おや? わかいひと!',
+    choices: [
+      { text: 'こんにちは!', next: 41 },
+      { text: 'はじめまして', next: 41 },
+      { text: 'すみません', next: 41 },
+    ],
+  },
+  {
+    // 41
+    text: 'このまち すきかい?',
+    choices: [
+      { text: 'はい すきです!', next: 42 },
+      { text: 'はじめてです', next: 43 },
+      { text: 'きれいなまち!', next: 42 },
+    ],
+  },
+  {
+    // 42: すき path
+    text: 'うれしいのう!',
+    choices: [
+      { text: 'いいまちですね', next: 44 },
+      { text: 'すてきです', next: 44 },
+      { text: 'だいすきです', next: 44 },
+    ],
+  },
+  {
+    // 43: はじめて path
+    text: 'そうかい はじめて!',
+    choices: [
+      { text: 'おしえてください', next: 44 },
+      { text: 'たのしいです', next: 44 },
+      { text: 'きれいですね', next: 44 },
+    ],
+  },
+  {
+    // 44: converge - history
+    text: 'むかし うみだった!',
+    choices: [
+      { text: 'ほんとうですか?', next: 45 },
+      { text: 'すごいですね!', next: 46 },
+      { text: 'しりませんでした', next: 46 },
+    ],
+  },
+  {
+    // 45: ほんとう path
+    text: 'ほんとうだよ!',
+    choices: [
+      { text: 'おもしろい!', next: 46 },
+      { text: 'びっくり!', next: 46 },
+      { text: 'すごいです', next: 46 },
+    ],
+  },
+  {
+    // 46: converge - landmark
+    text: 'あのタワー みえる?',
+    choices: [
+      { text: 'はい みえます!', next: 47 },
+      { text: 'たかいですね!', next: 47 },
+      { text: 'どこですか?', next: 48 },
+    ],
+  },
+  {
+    // 47: みえる
+    text: 'ひゃくねんまえから!',
+    choices: [
+      { text: 'ふるいですね!', next: 49 },
+      { text: 'すごい!', next: 49 },
+      { text: 'きれいですね', next: 49 },
+    ],
+  },
+  {
+    // 48: どこ
+    text: 'あちらの たかいの!',
+    choices: [
+      { text: 'あ みえました!', next: 49 },
+      { text: 'おおきいですね', next: 49 },
+      { text: 'わかりました!', next: 49 },
+    ],
+  },
+  {
+    // 49: converge - seasons
+    text: 'はるがいちばん!',
+    choices: [
+      { text: 'さくらきれい!', next: 50 },
+      { text: 'わたしもはる!', next: 50 },
+      { text: 'あきもいいです', next: 51 },
+    ],
+  },
+  {
+    // 50: はる
+    text: 'さくらがさくよ!',
+    choices: [
+      { text: 'みたいです!', next: 52 },
+      { text: 'きれいですね!', next: 52 },
+      { text: 'すてき!', next: 52 },
+    ],
+  },
+  {
+    // 51: あき
+    text: 'あきもいいのう!',
+    choices: [
+      { text: 'もみじきれい!', next: 52 },
+      { text: 'すずしいですね', next: 52 },
+      { text: 'だいすきです', next: 52 },
+    ],
+  },
+  {
+    // 52: converge - farewell elderly
+    text: 'げんきでね!',
+    choices: [
+      { text: 'ありがとう!', next: 53 },
+      { text: 'おげんきで!', next: 53 },
+      { text: 'またきます!', next: 53 },
+    ],
+  },
+  {
+    // 53: transition
+    text: 'あ こどもがいる!',
+    choices: [
+      { text: 'はなしかけよう', next: 54 },
+      { text: 'みてみよう', next: 54 },
+      { text: 'なにしてる?', next: 54 },
+    ],
+  },
+  {
+    // 54
+    text: 'いいてんきだね!',
+    choices: [
+      { text: 'そうだね!', next: 55 },
+      { text: 'きもちいい!', next: 55 },
+      { text: 'あたたかい!', next: 55 },
+    ],
+  },
+  // --- NPC 4: Child (playing) ---
+  {
+    // 55
+    text: 'ねえ ねえ!',
+    choices: [
+      { text: 'なあに?', next: 56 },
+      { text: 'こんにちは!', next: 56 },
+      { text: 'どうしたの?', next: 56 },
+    ],
+  },
+  {
+    // 56
+    text: 'あそぼう!',
+    choices: [
+      { text: 'いいよ!', next: 57 },
+      { text: 'なにする?', next: 58 },
+      { text: 'ちょっとだけ', next: 57 },
+    ],
+  },
+  {
+    // 57: いいよ
+    text: 'やったー!',
+    choices: [
+      { text: 'たのしそう!', next: 59 },
+      { text: 'なにであそぶ?', next: 59 },
+      { text: 'うれしい!', next: 59 },
+    ],
+  },
+  {
+    // 58: なにする
+    text: 'なわとび あるよ!',
+    choices: [
+      { text: 'なわとびすき!', next: 59 },
+      { text: 'いいね!', next: 59 },
+      { text: 'やろう!', next: 59 },
+    ],
+  },
+  {
+    // 59: converge - game
+    text: 'しりとり しよう!',
+    choices: [
+      { text: 'いいね!', next: 60 },
+      { text: 'しりとり?', next: 61, hint: 'ことばあそびだよ' },
+      { text: 'やろう!', next: 60 },
+    ],
+  },
+  {
+    // 60: しりとり start
+    text: 'りんご!',
+    choices: [
+      { text: 'ごりら!', next: 62 },
+      { text: 'ごはん!', next: 62 },
+      { text: 'ごま!', next: 62 },
+    ],
+  },
+  {
+    // 61: しりとり explain
+    text: 'ことばであそぶの!',
+    choices: [
+      { text: 'おもしろい!', next: 60 },
+      { text: 'やってみる!', next: 60 },
+      { text: 'わかった!', next: 60 },
+    ],
+  },
+  {
+    // 62: しりとり continue
+    text: 'じょうず! らっぱ!',
+    choices: [
+      { text: 'ぱんだ!', next: 63 },
+      { text: 'ぱん!', next: 63 },
+      { text: 'ぱいなっぷる!', next: 63 },
+    ],
+  },
+  {
+    // 63
+    text: 'すごい! たのしい!',
+    choices: [
+      { text: 'うん たのしい!', next: 64 },
+      { text: 'もっとやろう!', next: 64 },
+      { text: 'じょうずだね!', next: 64 },
+    ],
+  },
+  {
+    // 64: converge - favourite
+    text: 'すきなたべものは?',
+    choices: [
+      { text: 'カレー!', next: 65 },
+      { text: 'ラーメン!', next: 66 },
+      { text: 'おにぎり!', next: 67 },
+    ],
+  },
+  {
+    // 65: カレー
+    text: 'カレー おいしいね!',
+    choices: [
+      { text: 'だいすき!', next: 68 },
+      { text: 'あなたは?', next: 68 },
+      { text: 'おいしいよね', next: 68 },
+    ],
+  },
+  {
+    // 66: ラーメン
+    text: 'ラーメン すき!',
+    choices: [
+      { text: 'わたしも!', next: 68 },
+      { text: 'おいしいよね', next: 68 },
+      { text: 'だいすき!', next: 68 },
+    ],
+  },
+  {
+    // 67: おにぎり
+    text: 'おにぎり いいね!',
+    choices: [
+      { text: 'うん おいしい!', next: 68 },
+      { text: 'まいにちたべる', next: 68 },
+      { text: 'だいすき!', next: 68 },
+    ],
+  },
+  {
+    // 68: converge - animal
+    text: 'すきなどうぶつは?',
+    choices: [
+      { text: 'ねこ!', next: 69 },
+      { text: 'いぬ!', next: 70 },
+      { text: 'うさぎ!', next: 70 },
+    ],
+  },
+  {
+    // 69: ねこ
+    text: 'ねこ かわいいよね!',
+    choices: [
+      { text: 'だいすき!', next: 71 },
+      { text: 'かわいい!', next: 71 },
+      { text: 'もふもふ!', next: 71 },
+    ],
+  },
+  {
+    // 70: いぬ/うさぎ
+    text: 'いいね! かわいい!',
+    choices: [
+      { text: 'うん!', next: 71 },
+      { text: 'だいすき!', next: 71 },
+      { text: 'ふわふわ!', next: 71 },
+    ],
+  },
+  {
+    // 71: converge - dream
+    text: 'おおきくなったら?',
+    choices: [
+      { text: 'せんせい!', next: 72 },
+      { text: 'わからない', next: 73 },
+      { text: 'パンやさん!', next: 72 },
+    ],
+  },
+  {
+    // 72: ゆめある
+    text: 'すごいね! がんばれ!',
+    choices: [
+      { text: 'ありがとう!', next: 74 },
+      { text: 'がんばる!', next: 74 },
+      { text: 'うれしい!', next: 74 },
+    ],
+  },
+  {
+    // 73: わからない
+    text: 'きっとみつかるよ!',
+    choices: [
+      { text: 'そうだね!', next: 74 },
+      { text: 'ありがとう!', next: 74 },
+      { text: 'たのしみ!', next: 74 },
+    ],
+  },
+  {
+    // 74: converge - time to go
+    text: 'もういくの?',
+    choices: [
+      { text: 'うん いかなきゃ', next: 75 },
+      { text: 'もうすこし!', next: 76 },
+      { text: 'ざんねん...', next: 75 },
+    ],
+  },
+  {
+    // 75: いく path
+    text: 'さびしいなあ...',
+    choices: [
+      { text: 'またあそぼう!', next: 77 },
+      { text: 'ごめんね', next: 77 },
+      { text: 'たのしかった!', next: 77 },
+    ],
+  },
+  {
+    // 76: もうすこし
+    text: 'やったー! もっと!',
+    choices: [
+      { text: 'たのしい!', next: 77 },
+      { text: 'うれしい!', next: 77 },
+      { text: 'あそぼう!', next: 77 },
+    ],
+  },
+  {
+    // 77: converge - farewell child
+    text: 'またあそぼうね!',
+    choices: [
+      { text: 'やくそく!', next: 78 },
+      { text: 'きっとまた!', next: 78 },
+      { text: 'ありがとう!', next: 78 },
+    ],
+  },
+  {
+    // 78
+    text: 'ばいばーい!',
+    choices: [
+      { text: 'ばいばい!', next: 79 },
+      { text: 'またね!', next: 79 },
+      { text: 'げんきでね!', next: 79 },
+    ],
+  },
+  {
+    // 79: END
+    text: 'たのしかったー!',
+    choices: [
+      { text: 'たのしかった!', next: null },
+      { text: 'またあおうね!', next: null },
+      { text: 'さようなら!', next: null },
+    ],
+  },
 ];
-
-// ---------------------------------------------------------------------------
-// Scene 2: Restaurant (レストラン) — 40 nodes, katakana food + hiragana
-//
-// NPC 1 (waiter): seating, ordering, eating (nodes 0-19)
-// NPC 2 (another customer): food chat, adjectives, farewell (nodes 20-39)
-// ---------------------------------------------------------------------------

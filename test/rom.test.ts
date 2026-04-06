@@ -65,7 +65,7 @@ describe('ROM structure', () => {
         break;
       }
     }
-    expect(lastNonZero).toBeLessThan(16384);
+    expect(lastNonZero).toBeLessThan(24576);
   });
 });
 

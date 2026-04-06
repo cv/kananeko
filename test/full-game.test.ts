@@ -60,37 +60,25 @@ describe('title screen', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Scene 0: Train Station (40 nodes)
+// Scene 0: Train Station (80 nodes)
 // ---------------------------------------------------------------------------
 
 describe('scene 0: station', () => {
   const startScene = (): GameRunner => new GameRunner().boot().start();
 
-  // Happy path: 0->1->2->5->6->7->11->12->15->16->18->19->20->21->22->23->26->27->30->31->34->35->38->39->END
-  it('happy path: clerk + passenger all choice 0', () => {
-    playDialogueTree(
-      startScene(),
-      0,
-      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    );
+  // Happy path through all 80 nodes (4 NPCs)
+  it('happy path: all 4 NPCs choice 0', () => {
+    playDialogueTree(startScene(), 0, Array<number>(52).fill(0));
   });
 
   // Tired path: node 1 choice 2 -> node 3 (つかれた)
   it('tired path: つかれました -> だいじょうぶ', () => {
-    playDialogueTree(
-      startScene(),
-      0,
-      [0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    );
+    playDialogueTree(startScene(), 0, [0, 2, 0, ...Array<number>(49).fill(0)]);
   });
 
   // Name detour: node 15 choice 2 -> node 17 (あなたは? -> たなか)
   it('name detour: あなたは? -> たなか', () => {
-    playDialogueTree(
-      startScene(),
-      0,
-      [0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    );
+    playDialogueTree(startScene(), 0, [0, 0, 0, 0, 0, 0, 0, 0, 2, 0, ...Array<number>(42).fill(0)]);
   });
 
   it('kana Q1+Q2 correct', () => {
@@ -109,37 +97,46 @@ describe('scene 0: station', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Scene 1: Street (40 nodes)
+// Scene 1: Street (80 nodes)
 // ---------------------------------------------------------------------------
 
 describe('scene 1: street', () => {
   const startScene = (): GameRunner => new GameRunner().boot().start().completeScene(0);
 
-  // Happy path: 0->1->2->3->7->8->9->10->12->13->15->16->17->18->19->20->21->22->23->26->27->30->31->34->35->37->38->39->END
-  it('happy path: directions + shopkeeper all choice 0', () => {
-    playDialogueTree(
-      startScene(),
-      1,
-      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    );
+  // Happy path through all 80 nodes (4 NPCs)
+  it('happy path: all 4 NPCs choice 0', () => {
+    playDialogueTree(startScene(), 1, Array<number>(57).fill(0));
   });
 
   // Lost path: node 1 choice 2 -> node 4 (わからない)
   it('lost path: わかりません -> すみません', () => {
-    playDialogueTree(
-      startScene(),
-      1,
-      [0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    );
+    playDialogueTree(startScene(), 1, [0, 2, 0, ...Array<number>(54).fill(0)]);
   });
 
   // Return visitor: node 22 choice 1 -> node 25 (にかいめ)
   it('return visitor: にかいめです -> おかえり', () => {
-    playDialogueTree(
-      startScene(),
+    playDialogueTree(startScene(), 1, [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
       1,
-      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    );
+      0,
+      ...Array<number>(38).fill(0),
+    ]);
   });
 
   it('advances to scene 2', () => {
@@ -151,38 +148,46 @@ describe('scene 1: street', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Scene 2: Restaurant (40 nodes)
+// Scene 2: Restaurant (80 nodes)
 // ---------------------------------------------------------------------------
 
 describe('scene 2: restaurant', () => {
   const startScene = (): GameRunner =>
     new GameRunner().boot().start().completeScene(0).completeScene(1);
 
-  // Happy path: 0->1->2->4->5->7->10->11->14->15->16->17->19->20->21->22->25->26->29->30->32->33->35->36->38->39->END
-  it('happy path: ラーメン + あつい', () => {
-    playDialogueTree(
-      startScene(),
-      2,
-      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    );
+  // Happy path through all 80 nodes (4 NPCs)
+  it('happy path: all 4 NPCs choice 0', () => {
+    playDialogueTree(startScene(), 2, Array<number>(56).fill(0));
   });
 
   // Curry path: node 5 choice 1 -> node 8
   it('curry path: カレー ください', () => {
-    playDialogueTree(
-      startScene(),
-      2,
-      [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    );
+    playDialogueTree(startScene(), 2, [0, 0, 0, 0, 1, 0, ...Array<number>(50).fill(0)]);
   });
 
   // Tea + sweet path: node 5 choice 2 -> node 9, node 25 choice 1 -> node 27
   it('tea + sweet path: おちゃ + つめたくてあまい', () => {
-    playDialogueTree(
-      startScene(),
+    playDialogueTree(startScene(), 2, [
+      0,
+      0,
+      0,
+      0,
       2,
-      [0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    );
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      ...Array<number>(38).fill(0),
+    ]);
   });
 
   it('advances to scene 3', () => {
@@ -194,38 +199,26 @@ describe('scene 2: restaurant', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Scene 3: Convenience Store (40 nodes)
+// Scene 3: Convenience Store (80 nodes)
 // ---------------------------------------------------------------------------
 
 describe('scene 3: conbini', () => {
   const startScene = (): GameRunner =>
     new GameRunner().boot().start().completeScene(0).completeScene(1).completeScene(2);
 
-  // Happy path: 0->1->2->5->8->11->12->14->15->16->17->18->19->20->21->22->25->26->29->30->32->33->35->36->37->38->39->END
-  it('happy path: おにぎり -> buy', () => {
-    playDialogueTree(
-      startScene(),
-      3,
-      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    );
+  // Happy path through all 80 nodes (4 NPCs)
+  it('happy path: all 4 NPCs choice 0', () => {
+    playDialogueTree(startScene(), 3, Array<number>(58).fill(0));
   });
 
   // Browse path: node 1 choice 2 -> node 4
   it('browse path: みるだけ -> ゆっくり', () => {
-    playDialogueTree(
-      startScene(),
-      3,
-      [0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    );
+    playDialogueTree(startScene(), 3, [0, 2, 0, ...Array<number>(55).fill(0)]);
   });
 
   // Sweets path: node 1 choice 1 -> node 3
   it('sweets path: おかし -> チョコ', () => {
-    playDialogueTree(
-      startScene(),
-      3,
-      [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    );
+    playDialogueTree(startScene(), 3, [0, 1, 0, ...Array<number>(55).fill(0)]);
   });
 
   it('advances to scene 4', () => {
@@ -237,7 +230,7 @@ describe('scene 3: conbini', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Scene 4: Evening Park (40 nodes)
+// Scene 4: Evening Park (80 nodes)
 // ---------------------------------------------------------------------------
 
 describe('scene 4: park', () => {
@@ -250,31 +243,32 @@ describe('scene 4: park', () => {
       .completeScene(2)
       .completeScene(3);
 
-  // Happy path: 0->1->2->4->5->6->10->11->12->14->15->17->18->19->20->21->22->23->24->25->27->28->30->31->33->34->36->37->39->END
-  it('happy path: きょうのこと -> たのしい -> ともだち', () => {
-    playDialogueTree(
-      startScene(),
-      4,
-      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    );
+  // Happy path through all 80 nodes (4 NPCs)
+  it('happy path: all 4 NPCs choice 0', () => {
+    playDialogueTree(startScene(), 4, Array<number>(62).fill(0));
   });
 
   // Weather path: node 4 choice 1 -> node 7
   it('weather path: おてんき -> あたたかかった', () => {
-    playDialogueTree(
-      startScene(),
-      4,
-      [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    );
+    playDialogueTree(startScene(), 4, [0, 0, 0, 1, 0, ...Array<number>(57).fill(0)]);
   });
 
   // Lonely path: node 14 choice 1 -> node 16
   it('lonely path: さびしい -> ともだちほしい', () => {
-    playDialogueTree(
-      startScene(),
-      4,
-      [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    );
+    playDialogueTree(startScene(), 4, [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      ...Array<number>(51).fill(0),
+    ]);
   });
 
   it('all flags set', () => {
