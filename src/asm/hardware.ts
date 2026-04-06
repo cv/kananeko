@@ -21,6 +21,9 @@ export const HW = {
   // Joypad
   P1: ioReg(0x00), // Joypad register
 
+  // Timer
+  DIV: ioReg(0x04), // Divider register (free-running counter, pseudo-RNG source)
+
   // Sound
   NR52: ioReg(0x26), // Sound on/off
 
@@ -85,11 +88,18 @@ export const MEM = {
   DLG_META2_HI: u16(0xc032),
 
   // WRAM — kana mini-game
-  KANA_STATE: u16(0xc040), // 0=idle, 1=showing, 2=awaiting, 3=feedback
-  KANA_CORRECT: u16(0xc041), // Correct direction (0=up,1=down,2=left,3=right)
-  KANA_ANSWER: u16(0xc042), // Player's answer direction
-  KANA_SCORE: u16(0xc043), // Confidence meter (0-255)
-  KANA_Q_IDX: u16(0xc044), // Current question index
+  KANA_STATE: u16(0xc040), // 0=idle, 2=awaiting, 3=correct feedback, 4=wrong feedback
+  KANA_CORRECT_POS: u16(0xc041), // Which d-pad direction has the correct answer (0-3)
+  KANA_ANSWER: u16(0xc042), // Player's answer direction (0-3)
+  KANA_SCORE_LO: u16(0xc043), // 16-bit score (low byte)
+  KANA_SCORE_HI: u16(0xc044), // 16-bit score (high byte)
+  KANA_Q_IDX: u16(0xc045), // Current question index
+  KANA_LIVES: u16(0xc046), // Lives remaining (3,2,1,0)
+  KANA_ATTEMPTS: u16(0xc047), // Attempts on current question (0,1,2)
+  KANA_SHUFFLE: u16(0xc048), // shuffle buffer[0] (correct tile)
+  KANA_SHUFFLE1: u16(0xc049), // shuffle buffer[1]
+  KANA_SHUFFLE2: u16(0xc04a), // shuffle buffer[2]
+  KANA_SHUFFLE3: u16(0xc04b), // shuffle buffer[3]
 
   // WRAM — scene system
   SCENE_ID: u16(0xc050), // Current scene index (0-4, 0xFF = title)

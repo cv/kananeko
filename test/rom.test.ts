@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { GameRunner, rom, symbols } from './helpers/game-runner';
 import { buildTileData, CHAR_MAP, textToTiles } from '@game/font';
 import { buildDialogueTree } from '@game/dialogue';
-import { buildKanaData, KANA_QUESTIONS } from '@game/kana';
+import { buildKanaData, type KanaQuestion } from '@game/kana';
 import { JOY } from '@asm/hardware';
 import { SCENES } from '@game/scene';
 
@@ -269,9 +269,12 @@ describe('dialogue', () => {
 
 describe('kana', () => {
   it('encodes question data correctly', () => {
-    const data = buildKanaData(KANA_QUESTIONS);
+    const testQ: KanaQuestion[] = [
+      { word: 'こんにちは', blankIndex: 0, correct: 'こ', distractors: ['か', 'く', 'き'] },
+    ];
+    const data = buildKanaData(testQ);
     expect(data.length).toBeGreaterThan(0);
-    expect(data[0]).toBe(textToTiles(KANA_QUESTIONS[0]!.word).length);
+    expect(data[0]).toBe(textToTiles('こんにちは').length);
     expect(data[data.length - 1]).toBe(0); // end sentinel
   });
 
@@ -281,23 +284,31 @@ describe('kana', () => {
     expect(runner.kanaState).toBe(2);
   });
 
-  it('awards score for correct answer', () => {
+  it('awards 100 points for correct first try', () => {
     const runner = new GameRunner().boot().start().completeDialogueTree(0);
-    runner.waitForKanaInput().press('UP'); // scene 0 Q1 correct = up
-    expect(runner.kanaScore).toBe(4);
-    expect(runner.kanaState).toBe(3);
+    runner.answerKanaCorrectly();
+    expect(runner.kanaScore).toBe(100);
   });
 
-  it('does not award score for wrong answer', () => {
+  it('awards 10 points for correct second try', () => {
     const runner = new GameRunner().boot().start().completeDialogueTree(0);
-    runner.waitForKanaInput().press('DOWN'); // wrong
-    expect(runner.kanaScore).toBe(0);
-    expect(runner.kanaState).toBe(3);
+    runner.answerKanaWrong(); // attempt 1 wrong
+    runner.answerKanaCorrectly(); // attempt 2 correct
+    expect(runner.kanaScore).toBe(10);
   });
 
-  it('advances to next question after feedback', () => {
+  it('loses a life after 3 wrong answers', () => {
     const runner = new GameRunner().boot().start().completeDialogueTree(0);
-    runner.answerKana('up').frames(5);
+    expect(runner.kanaLives).toBe(3);
+    runner.answerKanaWrong(); // attempt 1
+    runner.answerKanaWrong(); // attempt 2
+    runner.answerKanaWrong(); // attempt 3 = death
+    expect(runner.kanaLives).toBe(2);
+  });
+
+  it('advances to next question after correct answer', () => {
+    const runner = new GameRunner().boot().start().completeDialogueTree(0);
+    runner.answerKanaCorrectly();
     expect(runner.kanaQuestionIdx).toBe(1);
     expect(runner.kanaState).toBe(2); // awaiting next
   });

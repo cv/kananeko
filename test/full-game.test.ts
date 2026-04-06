@@ -8,7 +8,7 @@
 import { describe, it, expect } from 'vitest';
 import { GameRunner } from './helpers/game-runner';
 import { SCENES } from '@game/scene';
-import type { KanaDir } from '@game/kana';
+// KanaDir removed — answers are randomized, tests use answerKanaCorrectly()
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -37,17 +37,10 @@ function playDialogueTree(runner: GameRunner, sceneIdx: number, choicePerNode: n
   }
 }
 
-function answerKana(
-  runner: GameRunner,
-  dir: KanaDir,
-  isCorrect: boolean,
-  expectedScore: number,
-): void {
-  runner.waitForKanaInput();
-  runner.press(dir.toUpperCase());
-  expect(runner.kanaState).toBe(3);
-  if (isCorrect) expect(runner.kanaScore).toBe(expectedScore);
-  runner.waitUntil(() => runner.kanaState !== 3, 'kana feedback');
+/** Answer kana correctly and check score */
+function answerKanaAndCheckScore(runner: GameRunner, expectedScore: number): void {
+  runner.answerKanaCorrectly();
+  expect(runner.kanaScore).toBe(expectedScore);
 }
 
 // ---------------------------------------------------------------------------
@@ -103,8 +96,8 @@ describe('scene 0: station', () => {
   it('kana Q1+Q2 correct', () => {
     const r = startScene();
     r.completeDialogueTree(0);
-    answerKana(r, 'up', true, 4);
-    answerKana(r, 'left', true, 8);
+    answerKanaAndCheckScore(r, 100); // Q1 correct first try
+    answerKanaAndCheckScore(r, 200); // Q2 correct first try
   });
 
   it('advances to scene 1', () => {
@@ -309,8 +302,8 @@ describe('full game', () => {
     const r = new GameRunner().boot().start();
     for (let i = 0; i < SCENES.length; i++) {
       r.completeDialogueTree(i);
-      for (const q of SCENES[i]!.kanaQuestions) r.answerKana(q.correctDir);
-      expect(r.kanaScore).toBe(SCENES[i]!.kanaQuestions.length * 4);
+      for (let j = 0; j < SCENES[i]!.kanaQuestions.length; j++) r.answerKanaCorrectly();
+      expect(r.kanaScore).toBe(SCENES[i]!.kanaQuestions.length * 100);
       r.frames(10);
     }
   });

@@ -11,7 +11,7 @@ import { assemble } from '@asm/assembler';
 import { buildProgram } from '@game/main';
 import { MEM } from '@asm/hardware';
 import { SCENES } from '@game/scene';
-import type { KanaDir } from '@game/kana';
+// KanaDir removed — answers are now randomized, tests read correct position from WRAM
 
 // Build the ROM once — shared across all tests
 const { rom, symbols } = assemble(buildProgram(), {
@@ -22,13 +22,13 @@ const { rom, symbols } = assemble(buildProgram(), {
 
 export { rom, symbols };
 
-// Direction → serverboy key mapping
-const DIR_KEYS: Record<KanaDir, number> = {
-  up: Gameboy.KEYMAP.UP as number,
-  down: Gameboy.KEYMAP.DOWN as number,
-  left: Gameboy.KEYMAP.LEFT as number,
-  right: Gameboy.KEYMAP.RIGHT as number,
-};
+// Direction index → serverboy key mapping (0=UP, 1=DOWN, 2=LEFT, 3=RIGHT)
+const DIR_KEYS: number[] = [
+  Gameboy.KEYMAP.UP as number,
+  Gameboy.KEYMAP.DOWN as number,
+  Gameboy.KEYMAP.LEFT as number,
+  Gameboy.KEYMAP.RIGHT as number,
+];
 
 /**
  * A test-friendly Game Boy runner with high-level game actions.
@@ -114,7 +114,19 @@ export class GameRunner {
   }
 
   get kanaScore(): number {
-    return this.readMem(MEM.KANA_SCORE);
+    return this.readMem(MEM.KANA_SCORE_LO) | (this.readMem(MEM.KANA_SCORE_HI) << 8);
+  }
+
+  get kanaLives(): number {
+    return this.readMem(MEM.KANA_LIVES);
+  }
+
+  get kanaAttempts(): number {
+    return this.readMem(MEM.KANA_ATTEMPTS);
+  }
+
+  get kanaCorrectPos(): number {
+    return this.readMem(MEM.KANA_CORRECT_POS);
   }
 
   get kanaQuestionIdx(): number {
@@ -192,21 +204,37 @@ export class GameRunner {
     return this.frames(GameRunner.INPUT_DEBOUNCE);
   }
 
-  /** Answer a kana question with a d-pad direction */
-  answerKana(dir: KanaDir): this {
+  /** Answer the current kana question correctly (reads randomized position from WRAM) */
+  answerKanaCorrectly(): this {
     this.waitForKanaInput();
-    const key = DIR_KEYS[dir];
+    const correctPos = this.kanaCorrectPos;
+    const key = DIR_KEYS[correctPos];
+    if (key === undefined) throw new Error(`Invalid correct pos: ${String(correctPos)}`);
     this.gb.pressKey(key);
     this.gb.doFrame();
-    // Wait for feedback to complete and next question (or end) to load
-    return this.waitUntil(() => this.kanaState !== 3, 'kana feedback complete');
+    return this.waitUntil(() => this.kanaState !== 3, 'kana correct feedback');
   }
 
-  /** Complete all kana questions for a scene (correct answers) */
+  /** Answer the current kana question WRONG */
+  answerKanaWrong(): this {
+    this.waitForKanaInput();
+    const correctPos = this.kanaCorrectPos;
+    const wrongPos = (correctPos + 1) & 3;
+    const key = DIR_KEYS[wrongPos];
+    if (key === undefined) throw new Error(`Invalid wrong pos: ${String(wrongPos)}`);
+    this.gb.pressKey(key);
+    this.gb.doFrame();
+    return this.waitUntil(
+      () => this.kanaState === 2 || this.kanaState === 0,
+      'kana wrong feedback',
+    );
+  }
+
+  /** Complete all kana questions for a scene (correct on first try) */
   completeKanaQuestions(sceneIndex: number): this {
     const questions = SCENES[sceneIndex]?.kanaQuestions ?? [];
-    for (const q of questions) {
-      this.answerKana(q.correctDir);
+    for (let i = 0; i < questions.length; i++) {
+      this.answerKanaCorrectly();
     }
     return this.frames(10);
   }
