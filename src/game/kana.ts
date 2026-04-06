@@ -191,42 +191,91 @@ function buildDrawHudOps(): Op[] {
     label('kana_h3_draw'),
     ...buildDrawTileAt(0, 3, 'from_a'),
 
-    // === Draw score at row 0, cols 15-17 (3 digits) ===
-    // Read score low byte. If high byte has bit 7 set (negative), show 000.
+    // === Draw 4-digit score at row 0, cols 14-17 ===
+    // Score is 16-bit (SCORE_HI:SCORE_LO). Max 2500. If negative, show 0000.
     ld_a_nn(MEM.KANA_SCORE_HI),
-    // Check if negative (bit 7 set)
     and_n(u8(0x80)),
     jr_cc('z', ref('kana_score_positive')),
-    // Negative: draw "000"
+    // Negative: draw "0000"
+    ...buildDrawTileAt(0, 14, d0),
     ...buildDrawTileAt(0, 15, d0),
     ...buildDrawTileAt(0, 16, d0),
     ...buildDrawTileAt(0, 17, d0),
     jr(ref('kana_hud_done')),
 
     label('kana_score_positive'),
-    // Score is in SCORE_LO (0-255 range for positive scores within a scene)
-    // Convert to 3 decimal digits: hundreds, tens, ones
+    // Load 16-bit score into D:E (D=hi, E=lo)
+    ld_a_nn(MEM.KANA_SCORE_HI),
+    ld_r_r('d', 'a'),
     ld_a_nn(MEM.KANA_SCORE_LO),
-    ld_r_r('b', 'a'), // B = score
+    ld_r_r('e', 'a'),
 
-    // Hundreds digit: subtract 100 repeatedly
-    ld_r_n('c', u8(0)), // C = hundreds count
+    // Thousands: subtract 1000 (0x03E8) repeatedly
+    // 1000 = hi:0x03 lo:0xE8
+    ld_r_n('c', u8(0)),
+    label('kana_thousands'),
+    // Compare DE >= 1000: check D > 3, or D == 3 and E >= 0xE8
+    ld_r_r('a', 'd'),
+    cp_n(u8(4)), // if D >= 4, definitely >= 1000
+    jr_cc('nc', ref('kana_th_sub')),
+    cp_n(u8(3)),
+    jr_cc('c', ref('kana_thousands_done')), // D < 3, done
+    // D == 3, check E >= 0xE8
+    ld_r_r('a', 'e'),
+    cp_n(u8(0xe8)),
+    jr_cc('c', ref('kana_thousands_done')),
+    label('kana_th_sub'),
+    // DE -= 1000: E -= 0xE8 with borrow into D
+    ld_r_r('a', 'e'),
+    sub_n(u8(0xe8)),
+    ld_r_r('e', 'a'),
+    ld_r_r('a', 'd'),
+    sbc_n(u8(3)),
+    ld_r_r('d', 'a'),
+    inc_r('c'),
+    jr(ref('kana_thousands')),
+    label('kana_thousands_done'),
+    ld_r_r('a', 'c'),
+    add_n(u8(d0)),
+    ...buildDrawTileAt(0, 14, 'from_a'),
+
+    // Now DE < 1000. D is 0-3, E is 0-255. Combine to single byte for hundreds.
+    // Value = D*256 + E. Since D <= 3, max = 999.
+    // Hundreds: D tells us how many 256s. 256 = 2*100 + 56.
+    // Simpler: just do 8-bit hundreds on E, adding D*2 to hundreds count (plus leftover).
+    // Actually simplest: convert DE to a single value.
+    // Since D <= 3: if D=0, val=E. If D=1, val=E+256. Etc.
+    // For hundreds digit extraction, just subtract 100 in a loop that handles the borrow.
+
+    // Hundreds: subtract 100 (0x64) from DE repeatedly
+    ld_r_n('c', u8(0)),
     label('kana_hundreds'),
-    ld_r_r('a', 'b'),
+    // Check DE >= 100
+    ld_r_r('a', 'd'),
+    cp_n(u8(1)), // D >= 1 means >= 256 > 100
+    jr_cc('nc', ref('kana_h_sub')),
+    // D == 0, check E >= 100
+    ld_r_r('a', 'e'),
     cp_n(u8(100)),
     jr_cc('c', ref('kana_hundreds_done')),
+    label('kana_h_sub'),
+    ld_r_r('a', 'e'),
     sub_n(u8(100)),
-    ld_r_r('b', 'a'),
+    ld_r_r('e', 'a'),
+    ld_r_r('a', 'd'),
+    sbc_n(u8(0)),
+    ld_r_r('d', 'a'),
     inc_r('c'),
     jr(ref('kana_hundreds')),
     label('kana_hundreds_done'),
-    // C = hundreds digit, B = remainder
-    // Draw hundreds: DIGIT_TILES[0] + C
     ld_r_r('a', 'c'),
-    add_n(u8(d0)), // A = digit tile for hundreds
+    add_n(u8(d0)),
     ...buildDrawTileAt(0, 15, 'from_a'),
 
-    // Tens digit: subtract 10 repeatedly
+    // Now D=0, E < 100. Standard 8-bit tens/ones on E.
+    ld_r_r('b', 'e'),
+
+    // Tens
     ld_r_n('c', u8(0)),
     label('kana_tens'),
     ld_r_r('a', 'b'),
@@ -241,7 +290,7 @@ function buildDrawHudOps(): Op[] {
     add_n(u8(d0)),
     ...buildDrawTileAt(0, 16, 'from_a'),
 
-    // Ones digit: remainder in B
+    // Ones
     ld_r_r('a', 'b'),
     add_n(u8(d0)),
     ...buildDrawTileAt(0, 17, 'from_a'),
@@ -266,9 +315,9 @@ export function buildKanaEngine(): Op[] {
     ld_r_r('a', 'd'),
     ld_nn_a(MEM.DLG_STR_HI),
 
+    // Score persists across scenes — don't reset it here.
+    // Lives reset each scene (3 fresh lives per kana round).
     xor_r('a'),
-    ld_nn_a(MEM.KANA_SCORE_LO),
-    ld_nn_a(MEM.KANA_SCORE_HI),
     ld_nn_a(MEM.KANA_Q_IDX),
     ld_nn_a(MEM.KANA_ATTEMPTS),
 

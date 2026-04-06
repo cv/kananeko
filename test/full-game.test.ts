@@ -292,13 +292,17 @@ describe('full game', () => {
     expect(r.sceneFlags).toBe(0x1f);
   });
 
-  it('perfect kana in every scene', () => {
+  it('perfect kana — score accumulates across scenes', () => {
     const r = new GameRunner().boot().start();
+    let totalExpected = 0;
     for (let i = 0; i < SCENES.length; i++) {
       r.completeDialogueTree(i);
       for (let j = 0; j < SCENES[i]!.kanaQuestions.length; j++) r.answerKanaCorrectly();
-      expect(r.kanaScore).toBe(SCENES[i]!.kanaQuestions.length * 100);
+      totalExpected += SCENES[i]!.kanaQuestions.length * 100;
+      expect(r.kanaScore).toBe(totalExpected);
       r.frames(10);
     }
+    // Perfect game: 5 scenes × 5 questions × 100 points = 2500
+    expect(r.kanaScore).toBe(2500);
   });
 });
