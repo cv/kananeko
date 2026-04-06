@@ -75,11 +75,10 @@ const TITLE_PALETTE: Palette = [
   rgb(0x10, 0x20, 0x10),
 ];
 
-// Cat portrait tile indices
-const CAT_TL = requireTile(CAT_TILES.FACE_TL);
-const CAT_TR = requireTile(CAT_TILES.FACE_TR);
-const CAT_BL = requireTile(CAT_TILES.FACE_BL);
-const CAT_BR = requireTile(CAT_TILES.FACE_BR);
+// Cat portrait tile rows (4x3 grid)
+const CAT_ROW0 = CAT_TILES.ROW0.map((ch) => requireTile(ch));
+const CAT_ROW1 = CAT_TILES.ROW1.map((ch) => requireTile(ch));
+const CAT_ROW2 = CAT_TILES.ROW2.map((ch) => requireTile(ch));
 
 // ---------------------------------------------------------------------------
 // Helper: write a row of tiles at a tilemap address
@@ -103,29 +102,6 @@ function buildSetPalette(palette: Palette): Op[] {
     ops.push(ldh_n_a(HW.BCPD));
   }
   return ops;
-}
-
-/** Draw a 2x2 tile portrait at the given tilemap position */
-function buildDrawPortrait(
-  row: number,
-  col: number,
-  tl: number,
-  tr: number,
-  bl: number,
-  br: number,
-): Op[] {
-  return [
-    ld_rr_nn('hl', u16(tilemapAddr(row, col))),
-    ld_r_n('a', u8(tl)),
-    ldi_hl_a(),
-    ld_r_n('a', u8(tr)),
-    ldi_hl_a(),
-    ld_rr_nn('hl', u16(tilemapAddr(row + 1, col))),
-    ld_r_n('a', u8(bl)),
-    ldi_hl_a(),
-    ld_r_n('a', u8(br)),
-    ldi_hl_a(),
-  ];
 }
 
 function buildWriteRow(row: number, tiles: number[]): Op[] {
@@ -260,12 +236,14 @@ export function buildProgram(): Op[] {
     // Clear tilemap (LCD already off or we turn it off)
     ...buildClearTilemap(),
 
-    // Draw cat portrait centered above title
-    ...buildDrawPortrait(3, 9, CAT_TL, CAT_TR, CAT_BL, CAT_BR),
+    // Draw cat portrait (4x3 tiles, centered)
+    ...buildWriteRow(2, CAT_ROW0),
+    ...buildWriteRow(3, CAT_ROW1),
+    ...buildWriteRow(4, CAT_ROW2),
 
     // Draw title text
     ...buildWriteRow(7, textToTiles(TITLE)),
-    ...buildWriteRow(11, textToTiles(SUBTITLE)),
+    ...buildWriteRow(10, textToTiles(SUBTITLE)),
 
     // Turn on LCD
     ld_r_n('a', u8(LCDC.LCD_ON | LCDC.TILE_DATA_8000 | LCDC.BG_ON)),
