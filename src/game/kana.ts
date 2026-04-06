@@ -43,7 +43,7 @@ import {
   ret_cc,
 } from '../asm/ops';
 import { HW, JOY, LCDC, MEM } from '../asm/hardware';
-import { CHAR_MAP, textToTiles } from './font';
+import { requireTile, textToTiles } from './font';
 
 // ---------------------------------------------------------------------------
 // Layout
@@ -72,7 +72,7 @@ function tilemapAddr(row: number, col: number): number {
   return 0x9800 + row * MAP_COLS + col;
 }
 
-const UNDERSCORE_TILE = CHAR_MAP['-'] ?? 0; // blank placeholder
+const UNDERSCORE_TILE = requireTile('-');
 
 // ---------------------------------------------------------------------------
 // Question type & data encoder
@@ -94,7 +94,7 @@ export interface KanaQuestion {
 const DIR_MAP: Record<KanaDir, number> = { up: 0, down: 1, left: 2, right: 3 };
 
 function charToTile(ch: string): number {
-  return CHAR_MAP[ch] ?? 0;
+  return requireTile(ch);
 }
 
 export function buildKanaData(questions: KanaQuestion[]): Uint8Array {
@@ -106,7 +106,11 @@ export function buildKanaData(questions: KanaQuestion[]): Uint8Array {
 
     // Tile indices with blank marker at blankIndex
     for (let i = 0; i < tiles.length; i++) {
-      bytes.push(i === q.blankIndex ? BLANK_MARKER : (tiles[i] ?? 0));
+      const tile = tiles[i];
+      if (tile === undefined) {
+        throw new Error(`Tile index out of bounds at position ${String(i)} in word "${q.word}"`);
+      }
+      bytes.push(i === q.blankIndex ? BLANK_MARKER : tile);
     }
 
     bytes.push(DIR_MAP[q.correctDir]); // correct direction

@@ -42,7 +42,7 @@ import {
   ret_cc,
 } from '../asm/ops';
 import { HW, JOY, LCDC, MEM } from '../asm/hardware';
-import { CHAR_MAP, textToTiles } from './font';
+import { requireTile, textToTiles } from './font';
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -57,13 +57,13 @@ const SCREEN_COLS = 20;
 const REVEAL_DELAY = 3; // frames between each character reveal
 
 // Tile indices for border characters
-const BORDER_TL = CHAR_MAP['┌'] ?? 0;
-const BORDER_TR = CHAR_MAP['┐'] ?? 0;
-const BORDER_BL = CHAR_MAP['└'] ?? 0;
-const BORDER_BR = CHAR_MAP['┘'] ?? 0;
-const BORDER_H = CHAR_MAP['─'] ?? 0;
-const BORDER_V = CHAR_MAP['│'] ?? 0;
-const CURSOR_TILE = CHAR_MAP['▶'] ?? 0;
+const BORDER_TL = requireTile('┌');
+const BORDER_TR = requireTile('┐');
+const BORDER_BL = requireTile('└');
+const BORDER_BR = requireTile('┘');
+const BORDER_H = requireTile('─');
+const BORDER_V = requireTile('│');
+const CURSOR_TILE = requireTile('▶');
 
 function tilemapAddr(row: number, col: number): number {
   return 0x9800 + row * MAP_COLS + col;

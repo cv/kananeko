@@ -33,7 +33,7 @@ import {
   call,
 } from '../asm/ops';
 import { HW, JOY, LCDC, MEM } from '../asm/hardware';
-import { buildTileData, textToTiles, CHAR_MAP } from './font';
+import { buildTileData, textToTiles, requireTile } from './font';
 import { CAT_TILES } from './font-data';
 import { buildReadJoypad } from './joypad';
 import { buildDialogueEngine } from './dialogue';
@@ -69,10 +69,10 @@ const TITLE = 'カナネコ';
 const SUBTITLE = 'はじめ';
 
 // Cat portrait tile indices
-const CAT_TL = CHAR_MAP[CAT_TILES.FACE_TL] ?? 0;
-const CAT_TR = CHAR_MAP[CAT_TILES.FACE_TR] ?? 0;
-const CAT_BL = CHAR_MAP[CAT_TILES.FACE_BL] ?? 0;
-const CAT_BR = CHAR_MAP[CAT_TILES.FACE_BR] ?? 0;
+const CAT_TL = requireTile(CAT_TILES.FACE_TL);
+const CAT_TR = requireTile(CAT_TILES.FACE_TR);
+const CAT_BL = requireTile(CAT_TILES.FACE_BL);
+const CAT_BR = requireTile(CAT_TILES.FACE_BR);
 
 // ---------------------------------------------------------------------------
 // Helper: write a row of tiles at a tilemap address
