@@ -1,0 +1,51 @@
+import { ioReg, u16, type IoRegOffset, type U16 } from './types';
+
+// SM83 / Game Boy hardware register addresses (offset from $FF00)
+// Use with ldh instructions: ldh_n_a(HW.LCDC) stores A into $FF40
+
+export const HW = {
+  // LCD
+  LCDC: ioReg(0x40), // LCD control
+  STAT: ioReg(0x41), // LCD status
+  SCY: ioReg(0x42), // Scroll Y
+  SCX: ioReg(0x43), // Scroll X
+  LY: ioReg(0x44), // Current scanline (read-only)
+  LYC: ioReg(0x45), // LY compare
+  DMA: ioReg(0x46), // OAM DMA transfer
+  BGP: ioReg(0x47), // BG palette
+  OBP0: ioReg(0x48), // Object palette 0
+  OBP1: ioReg(0x49), // Object palette 1
+  WY: ioReg(0x4a), // Window Y
+  WX: ioReg(0x4b), // Window X
+
+  // Joypad
+  P1: ioReg(0x00), // Joypad register
+
+  // Sound
+  NR52: ioReg(0x26), // Sound on/off
+
+  // Interrupts
+  IF: ioReg(0x0f), // Interrupt flag
+} as const satisfies Record<string, IoRegOffset>;
+
+// LCDC bit flags — plain numbers, composed with bitwise OR then wrapped in u8()
+export const LCDC = {
+  BG_ON: 0x01, // Bit 0: BG & Window enable
+  OBJ_ON: 0x02, // Bit 1: OBJ enable
+  OBJ_SIZE: 0x04, // Bit 2: OBJ size (0=8x8, 1=8x16)
+  BG_MAP_9C00: 0x08, // Bit 3: BG tile map ($9800 or $9C00)
+  TILE_DATA_8000: 0x10, // Bit 4: BG & Window tile data ($8800 or $8000)
+  WIN_ON: 0x20, // Bit 5: Window enable
+  WIN_MAP_9C00: 0x40, // Bit 6: Window tile map
+  LCD_ON: 0x80, // Bit 7: LCD enable
+} as const;
+
+// Memory map
+export const MEM = {
+  VRAM: u16(0x8000),
+  VRAM_TILES: u16(0x8000), // Tile data start (mode $8000)
+  VRAM_MAP0: u16(0x9800), // BG tilemap 0
+  VRAM_MAP1: u16(0x9c00), // BG tilemap 1
+  OAM: u16(0xfe00),
+  HRAM: u16(0xff80),
+} as const satisfies Record<string, U16>;
