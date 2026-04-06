@@ -9,13 +9,12 @@
  *   [node_count: u8]
  *   [offset_lo, offset_hi] × node_count   — offset table (from tree start)
  *   Per node:
- *     [tile_indices...] 0x00              — NPC text
+ *     [tile_indices...] 0xFE             — NPC text (0xFE = text end sentinel)
  *     [choice_count: u8]
- *     Per choice:
- *       [tile_indices...] 0x00            — choice text
- *       [next_node: u8]                   — 0xFF = end, else node index
- *       [hint_length: u8]                 — 0 = no hint
- *       [hint_tiles × hint_length]        — hint text (length-prefixed)
+ *     [next_node × choice_count]          — compact lookup (0xFF = end conversation)
+ *     [choice_text...] 0xFE              — choice 0 text
+ *     [choice_text...] 0xFE              — choice 1 text
+ *     ...
  */
 
 import { type Op, ref, u8, u16 } from '../asm/types';
@@ -92,8 +91,12 @@ export interface DialogueNode {
 
 export type DialogueTree = DialogueNode[];
 
-const END_MARKER = 0xff; // end of conversation marker (node next = null)
-const TEXT_END = 0xfe; // text string terminator (avoids collision with tile 0 = space)
+/**
+ * Sentinel bytes — deliberately outside the TileIndex range (0x00-0xFD)
+ * so they can never collide with valid tile data.
+ */
+const END_MARKER = 0xff; // end of conversation (node.next = null)
+const TEXT_END = 0xfe; // end of text string (tile 0 = space, so 0x00 is valid content)
 
 /**
  * Pack a dialogue tree into ROM data with an offset table for random access.

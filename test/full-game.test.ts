@@ -14,25 +14,14 @@ import type { KanaDir } from '@game/kana';
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Wait until dialogue state reaches `choosing` (3), then idle to debounce input */
-function waitForChoices(runner: GameRunner): void {
-  for (let i = 0; i < 300; i++) {
-    runner.frames(1);
-    if (runner.dlgState === 3) {
-      runner.frames(10); // debounce: let previous A release clear from joypad edge detector
-      return;
-    }
-  }
-  throw new Error('Dialogue did not reach choosing state within 300 frames');
-}
-
 function playDialogueTree(runner: GameRunner, sceneIdx: number, choicePerNode: number[]): void {
   const tree = SCENES[sceneIdx]!.dialogue;
   let nodeIdx = 0;
 
   for (const choiceIdx of choicePerNode) {
     const node = tree[nodeIdx]!;
-    waitForChoices(runner);
+    runner.waitForDialogueChoices();
+    expect(runner.dlgState).toBe(3);
 
     for (let i = 0; i < choiceIdx; i++) {
       runner.press('DOWN').frames(1);
@@ -54,12 +43,11 @@ function answerKana(
   isCorrect: boolean,
   expectedScore: number,
 ): void {
-  runner.frames(5);
-  expect(runner.kanaState).toBe(2);
+  runner.waitForKanaInput();
   runner.press(dir.toUpperCase());
   expect(runner.kanaState).toBe(3);
   if (isCorrect) expect(runner.kanaScore).toBe(expectedScore);
-  runner.frames(35);
+  runner.waitUntil(() => runner.kanaState !== 3, 'kana feedback');
 }
 
 // ---------------------------------------------------------------------------

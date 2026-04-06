@@ -5,6 +5,7 @@
 declare const __u8: unique symbol;
 declare const __u16: unique symbol;
 declare const __ioReg: unique symbol;
+declare const __tileIndex: unique symbol;
 
 /** 8-bit unsigned integer (0x00–0xFF) */
 export type U8 = number & { readonly [__u8]: true };
@@ -14,6 +15,14 @@ export type U16 = number & { readonly [__u16]: true };
 
 /** I/O register offset from $FF00 (0x00–0xFF), used with LDH instructions */
 export type IoRegOffset = number & { readonly [__ioReg]: true };
+
+/**
+ * Tile index (0x00–0xFD). Values 0xFE and 0xFF are reserved as sentinels
+ * (text terminator and end-of-conversation marker respectively) and can
+ * never be a valid tile. This prevents the bug where tile 0 (space) was
+ * confused with a null terminator.
+ */
+export type TileIndex = number & { readonly [__tileIndex]: true };
 
 /** Brand a number as U8 with runtime range check */
 export function u8(n: number): U8 {

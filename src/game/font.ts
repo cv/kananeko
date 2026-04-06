@@ -4,6 +4,7 @@
  * This module handles tile encoding, character mapping, and data building.
  */
 
+import { type TileIndex } from '../asm/types';
 import { ALL_GLYPHS, type Glyph } from './font-data';
 
 function glyphToTile(glyph: Glyph): Uint8Array {
@@ -16,7 +17,6 @@ function glyphToTile(glyph: Glyph): Uint8Array {
         byte |= 0x80 >> col;
       }
     }
-    // 2bpp: both planes identical = color 3 (darkest)
     tile[row * 2] = byte;
     tile[row * 2 + 1] = byte;
   }
@@ -26,10 +26,17 @@ function glyphToTile(glyph: Glyph): Uint8Array {
 // Build CHAR_ORDER from all defined glyphs (deterministic order)
 const CHAR_ORDER = Object.keys(ALL_GLYPHS);
 
+// Validate: tile indices must not collide with sentinels
+if (CHAR_ORDER.length + 1 > 0xfe) {
+  throw new Error(
+    `Too many glyphs (${String(CHAR_ORDER.length)}): tile indices would collide with sentinels 0xFE/0xFF`,
+  );
+}
+
 /** Map from character to tile index. Tile 0 = blank (space). */
-export const CHAR_MAP: Record<string, number> = { ' ': 0 };
+export const CHAR_MAP: Record<string, TileIndex> = { ' ': 0 as TileIndex };
 CHAR_ORDER.forEach((ch, i) => {
-  CHAR_MAP[ch] = i + 1;
+  CHAR_MAP[ch] = (i + 1) as TileIndex;
 });
 
 /** Number of character tiles (excluding blank) */
@@ -37,9 +44,9 @@ export const TILE_COUNT = CHAR_ORDER.length;
 
 /**
  * Look up a tile index for a character, throwing if it's not in the font.
- * Use this instead of `CHAR_MAP[ch] ?? 0` to catch missing glyphs at build time.
+ * Returns a TileIndex — guaranteed to never be a sentinel value.
  */
-export function requireTile(ch: string): number {
+export function requireTile(ch: string): TileIndex {
   const idx = CHAR_MAP[ch];
   if (idx === undefined) {
     throw new Error(
@@ -51,7 +58,7 @@ export function requireTile(ch: string): number {
 
 /** All tile data as a flat byte array, starting with tile 0 (blank) */
 export function buildTileData(): Uint8Array {
-  const blank = new Uint8Array(16); // tile 0: all zeros
+  const blank = new Uint8Array(16);
   const tiles = [
     blank,
     ...CHAR_ORDER.map((ch) => {
@@ -70,6 +77,6 @@ export function buildTileData(): Uint8Array {
 }
 
 /** Convert a text string to an array of tile indices. Throws on unknown characters. */
-export function textToTiles(text: string): number[] {
+export function textToTiles(text: string): TileIndex[] {
   return Array.from(text).map((ch) => requireTile(ch));
 }

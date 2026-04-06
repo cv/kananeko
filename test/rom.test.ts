@@ -231,18 +231,23 @@ describe('dialogue', () => {
   });
 
   it('reveals text and transitions to choosing', () => {
-    const runner = new GameRunner().boot().start().frames(100);
-    expect(runner.dlgState).toBe(3); // choosing
+    const runner = new GameRunner().boot().start();
+    runner.waitForDialogueChoices();
+    expect(runner.dlgState).toBe(3);
   });
 
   it('confirms choice and stores result', () => {
-    const runner = new GameRunner().boot().start().frames(100).frames(10).press('A');
+    const runner = new GameRunner().boot().start();
+    runner.waitForDialogueChoices().press('A');
     expect(runner.dlgResult).toBe(0);
   });
 
   it('navigates choices with DOWN', () => {
-    const runner = new GameRunner().boot().start().frames(100).frames(10);
-    runner.press('DOWN').frames(5).press('A');
+    const runner = new GameRunner().boot().start();
+    // Use advanceDialogue to get to node 1 (skip node 0 which might auto-confirm)
+    runner.advanceDialogue(); // node 0 → node 1
+    runner.waitForDialogueChoices();
+    runner.press('DOWN').frames(3).press('A');
     expect(runner.dlgResult).toBe(1);
   });
 
@@ -272,21 +277,22 @@ describe('kana', () => {
 
   it('enters kana game after dialogue', () => {
     const runner = new GameRunner().boot().start().completeDialogueTree(0);
-    expect(runner.kanaState).toBe(2); // awaiting input
+    runner.waitForKanaInput();
+    expect(runner.kanaState).toBe(2);
   });
 
   it('awards score for correct answer', () => {
     const runner = new GameRunner().boot().start().completeDialogueTree(0);
-    runner.frames(5).press('UP'); // scene 0 Q1 correct = up
+    runner.waitForKanaInput().press('UP'); // scene 0 Q1 correct = up
     expect(runner.kanaScore).toBe(4);
-    expect(runner.kanaState).toBe(3); // feedback
+    expect(runner.kanaState).toBe(3);
   });
 
   it('does not award score for wrong answer', () => {
     const runner = new GameRunner().boot().start().completeDialogueTree(0);
-    runner.frames(5).press('DOWN'); // wrong
+    runner.waitForKanaInput().press('DOWN'); // wrong
     expect(runner.kanaScore).toBe(0);
-    expect(runner.kanaState).toBe(3); // feedback
+    expect(runner.kanaState).toBe(3);
   });
 
   it('advances to next question after feedback', () => {
