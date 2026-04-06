@@ -116,18 +116,22 @@ function buildWriteRow(row: number, tiles: number[]): Op[] {
 // Helper: clear tilemap
 // ---------------------------------------------------------------------------
 
+let clearTilemapCounter = 0;
+
 function buildClearTilemap(): Op[] {
+  const id = String(clearTilemapCounter++);
+  const lbl = `clear_map_${id}`;
   return [
     ld_rr_nn('hl', MEM.VRAM_MAP0),
     xor_r('a'),
     ld_r_n('b', u8(4)),
     ld_r_n('c', u8(0)),
-    label('main_clear'),
+    label(lbl),
     ldi_hl_a(),
     dec_r('c'),
-    jr_cc('nz', ref('main_clear')),
+    jr_cc('nz', ref(lbl)),
     dec_r('b'),
-    jr_cc('nz', ref('main_clear')),
+    jr_cc('nz', ref(lbl)),
   ];
 }
 
@@ -203,6 +207,15 @@ export function buildProgram(): Op[] {
     ld_r_n('a', u8(LCDC.LCD_ON | LCDC.TILE_DATA_8000 | LCDC.BG_ON)),
     ldh_n_a(HW.LCDC),
     ei(),
+
+    // Wait for all buttons to be released (debounce boot ROM START press)
+    label('title_debounce'),
+    halt(),
+    nop(),
+    call(ref('joy_read')),
+    ld_a_nn(MEM.JOYPAD_CUR),
+    cp_n(u8(0)),
+    jr_cc('nz', ref('title_debounce')),
 
     // Wait for START
     label('title_loop'),
