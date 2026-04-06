@@ -311,6 +311,13 @@ export function buildProgram(): Op[] {
     // Draw scene name at row 1 (dispatched by scene_id)
     ...buildSceneDispatch((i) => buildWriteRow(1, at(sceneData.scenes, i).nameRow)),
 
+    // Draw scene icon at row 4, centered (dispatched by scene_id)
+    ...buildSceneDispatch((i) => {
+      const scene = at(SCENES, i);
+      const iconTiles = scene.icon.map((ch) => requireTile(ch));
+      return buildWriteRow(4, iconTiles);
+    }),
+
     // Set scene palette (dispatched by scene_id)
     ...buildSceneDispatch((i) => buildSetPalette(at(SCENES, i).palette)),
 

@@ -7,6 +7,7 @@
 import { type DialogueNode, buildDialogueTree } from './dialogue';
 import { type KanaQuestion, buildKanaData } from './kana';
 import { textToTiles } from './font';
+import { SCENE_ICON_TILES } from './font-data';
 
 // ---------------------------------------------------------------------------
 // Scene data types
@@ -22,9 +23,10 @@ export type Palette = [number, number, number, number];
 
 export interface Scene {
   name: string;
+  icon: [string, string]; // 2-tile icon [left, right] from SCENE_ICON_TILES
   dialogue: DialogueNode[];
   kanaQuestions: KanaQuestion[];
-  palette: Palette; // GBC background colors [bg, light, mid, dark]
+  palette: Palette;
 }
 
 // ---------------------------------------------------------------------------
@@ -35,6 +37,7 @@ export const SCENES: Scene[] = [
   // Scene 0: Train Station
   {
     name: 'えき',
+    icon: [...SCENE_ICON_TILES.TRAIN],
     palette: [
       rgb(0xe8, 0xe8, 0xe0),
       rgb(0xb0, 0xb0, 0xa0),
@@ -83,6 +86,7 @@ export const SCENES: Scene[] = [
   // Scene 1: Street
   {
     name: 'みち',
+    icon: [...SCENE_ICON_TILES.HOUSE],
     palette: [
       rgb(0xf0, 0xf0, 0xc0),
       rgb(0xc0, 0xd0, 0x80),
@@ -134,6 +138,7 @@ export const SCENES: Scene[] = [
   // Scene 2: Restaurant
   {
     name: 'レストラン',
+    icon: [...SCENE_ICON_TILES.BOWL],
     palette: [
       rgb(0xf0, 0xe0, 0xd0),
       rgb(0xd0, 0xa0, 0x80),
@@ -195,6 +200,7 @@ export const SCENES: Scene[] = [
   // Scene 3: Convenience Store
   {
     name: 'コンビニ',
+    icon: [...SCENE_ICON_TILES.SHOP],
     palette: [
       rgb(0xf0, 0xf0, 0xf0),
       rgb(0xa0, 0xc0, 0xe0),
@@ -248,6 +254,7 @@ export const SCENES: Scene[] = [
   // Scene 4: Evening Park
   {
     name: 'こうえん',
+    icon: [...SCENE_ICON_TILES.TREE],
     palette: [
       rgb(0xd0, 0xc0, 0xe0),
       rgb(0x80, 0x70, 0xb0),
