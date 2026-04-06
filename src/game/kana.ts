@@ -87,12 +87,31 @@ const OPT_LEFT = { row: 6, col: 2 };
 const OPT_RIGHT = { row: 6, col: 17 };
 // Positions ordered: 0=UP, 1=DOWN, 2=LEFT, 3=RIGHT (matches direction encoding)
 
+// Game constants
 const FEEDBACK_FRAMES = 30;
+const INITIAL_LIVES = 3;
+const SCORE_FIRST_TRY = 100;
+const SCORE_SECOND_TRY = 10;
+const SCORE_DEATH_PENALTY = 100;
+const MAX_ATTEMPTS = 2; // 0-indexed: attempt 0, 1, 2 = 3 tries
+
+// State machine values
+const STATE_IDLE = 0;
+const STATE_AWAITING = 2;
+const STATE_CORRECT_FB = 3;
+const STATE_WRONG_FB = 4;
+
+// Direction encoding (matches d-pad bit order)
+const DIR_UP = 0;
+const DIR_DOWN = 1;
+const DIR_LEFT = 2;
+const DIR_RIGHT = 3;
 
 function tilemapAddr(row: number, col: number): number {
   return 0x9800 + row * MAP_COLS + col;
 }
 
+// Tile constants
 const BLANK_TILE: TileIndex = requireTile(CAT_TILES.BLANK);
 const HEART_FULL: TileIndex = requireTile(CAT_TILES.HEART_FULL);
 const HEART_EMPTY: TileIndex = requireTile(CAT_TILES.HEART_EMPTY);
@@ -128,6 +147,48 @@ export function buildKanaData(questions: KanaQuestion[]): Uint8Array {
 // Assembly: draw helpers (generated at build time, no register conflicts)
 // ---------------------------------------------------------------------------
 
+/** Generate 16-bit score add: SCORE += delta */
+function buildAddScore(delta: number): Op[] {
+  return [
+    ld_a_nn(MEM.KANA_SCORE_LO),
+    add_n(u8(delta)),
+    ld_nn_a(MEM.KANA_SCORE_LO),
+    ld_a_nn(MEM.KANA_SCORE_HI),
+    adc_n(u8(0)),
+    ld_nn_a(MEM.KANA_SCORE_HI),
+  ];
+}
+
+/** Generate 16-bit score subtract: SCORE -= delta */
+function buildSubScore(delta: number): Op[] {
+  return [
+    ld_a_nn(MEM.KANA_SCORE_LO),
+    sub_n(u8(delta)),
+    ld_nn_a(MEM.KANA_SCORE_LO),
+    ld_a_nn(MEM.KANA_SCORE_HI),
+    sbc_n(u8(0)),
+    ld_nn_a(MEM.KANA_SCORE_HI),
+  ];
+}
+
+let heartLabelCounter = 0;
+
+/** Generate assembly to draw a heart (full/empty) based on lives threshold */
+function buildHeartAtCol(col: number, minLives: number): Op[] {
+  const id = String(heartLabelCounter++);
+  return [
+    ld_a_nn(MEM.KANA_LIVES),
+    cp_n(u8(minLives)),
+    jr_cc('c', ref(`kana_h${id}_empty`)),
+    ld_r_n('a', u8(HEART_FULL)),
+    jr(ref(`kana_h${id}_draw`)),
+    label(`kana_h${id}_empty`),
+    ld_r_n('a', u8(HEART_EMPTY)),
+    label(`kana_h${id}_draw`),
+    ...buildDrawTileAt(0, col, 'from_a'),
+  ];
+}
+
 /** Draw a single tile at a fixed tilemap address (LCD must be off) */
 function buildDrawTileAt(row: number, col: number, tileExpr: 'from_a' | number): Op[] {
   const ops: Op[] = [ld_rr_nn('hl', u16(tilemapAddr(row, col)))];
@@ -157,39 +218,9 @@ function buildDrawHudOps(): Op[] {
     label('kana_draw_hud'),
 
     // === Draw 3 hearts at row 0, cols 1-3 ===
-    ld_a_nn(MEM.KANA_LIVES),
-
-    // Heart 1 (col 1): full if lives >= 1
-    cp_n(u8(1)),
-    jr_cc('c', ref('kana_h1_empty')),
-    ld_r_n('a', u8(HEART_FULL)),
-    jr(ref('kana_h1_draw')),
-    label('kana_h1_empty'),
-    ld_r_n('a', u8(HEART_EMPTY)),
-    label('kana_h1_draw'),
-    ...buildDrawTileAt(0, 1, 'from_a'),
-
-    // Heart 2 (col 2): full if lives >= 2
-    ld_a_nn(MEM.KANA_LIVES),
-    cp_n(u8(2)),
-    jr_cc('c', ref('kana_h2_empty')),
-    ld_r_n('a', u8(HEART_FULL)),
-    jr(ref('kana_h2_draw')),
-    label('kana_h2_empty'),
-    ld_r_n('a', u8(HEART_EMPTY)),
-    label('kana_h2_draw'),
-    ...buildDrawTileAt(0, 2, 'from_a'),
-
-    // Heart 3 (col 3): full if lives >= 3
-    ld_a_nn(MEM.KANA_LIVES),
-    cp_n(u8(3)),
-    jr_cc('c', ref('kana_h3_empty')),
-    ld_r_n('a', u8(HEART_FULL)),
-    jr(ref('kana_h3_draw')),
-    label('kana_h3_empty'),
-    ld_r_n('a', u8(HEART_EMPTY)),
-    label('kana_h3_draw'),
-    ...buildDrawTileAt(0, 3, 'from_a'),
+    ...buildHeartAtCol(1, 1),
+    ...buildHeartAtCol(2, 2),
+    ...buildHeartAtCol(3, 3),
 
     // === Draw 4-digit score at row 0, cols 14-17 ===
     // Score is 16-bit (SCORE_HI:SCORE_LO). Max 2500. If negative, show 0000.
@@ -321,7 +352,7 @@ export function buildKanaEngine(): Op[] {
     ld_nn_a(MEM.KANA_Q_IDX),
     ld_nn_a(MEM.KANA_ATTEMPTS),
 
-    ld_r_n('a', u8(3)),
+    ld_r_n('a', u8(INITIAL_LIVES)),
     ld_nn_a(MEM.KANA_LIVES),
 
     jp(ref('kana_load_question')),
@@ -493,7 +524,7 @@ export function buildKanaEngine(): Op[] {
     // Reset attempts, set state to awaiting
     xor_r('a'),
     ld_nn_a(MEM.KANA_ATTEMPTS),
-    ld_r_n('a', u8(2)),
+    ld_r_n('a', u8(STATE_AWAITING)),
     ld_nn_a(MEM.KANA_STATE),
 
     ld_r_n('a', u8(FEEDBACK_FRAMES)),
@@ -506,16 +537,16 @@ export function buildKanaEngine(): Op[] {
     // =================================================================
     label('kana_update'),
     ld_a_nn(MEM.KANA_STATE),
-    cp_n(u8(0)),
+    cp_n(u8(STATE_IDLE)),
     ret_cc('z'),
 
-    cp_n(u8(2)),
+    cp_n(u8(STATE_AWAITING)),
     jp_cc('z', ref('kana_await_input')),
 
-    cp_n(u8(3)),
+    cp_n(u8(STATE_CORRECT_FB)),
     jp_cc('z', ref('kana_correct_fb')),
 
-    cp_n(u8(4)),
+    cp_n(u8(STATE_WRONG_FB)),
     jp_cc('z', ref('kana_wrong_fb')),
 
     ret(),
@@ -527,31 +558,31 @@ export function buildKanaEngine(): Op[] {
     ld_a_nn(MEM.JOYPAD_NEW),
     ld_r_r('b', 'a'),
 
-    // UP = direction 0
+    // Map d-pad to direction index
     and_n(u8(JOY.UP)),
     jr_cc('z', ref('kana_chk_down')),
-    ld_r_n('a', u8(0)),
+    ld_r_n('a', u8(DIR_UP)),
     jr(ref('kana_got_answer')),
 
     label('kana_chk_down'),
     ld_r_r('a', 'b'),
     and_n(u8(JOY.DOWN)),
     jr_cc('z', ref('kana_chk_left')),
-    ld_r_n('a', u8(1)),
+    ld_r_n('a', u8(DIR_DOWN)),
     jr(ref('kana_got_answer')),
 
     label('kana_chk_left'),
     ld_r_r('a', 'b'),
     and_n(u8(JOY.LEFT)),
     jr_cc('z', ref('kana_chk_right')),
-    ld_r_n('a', u8(2)),
+    ld_r_n('a', u8(DIR_LEFT)),
     jr(ref('kana_got_answer')),
 
     label('kana_chk_right'),
     ld_r_r('a', 'b'),
     and_n(u8(JOY.RIGHT)),
     ret_cc('z'), // no d-pad input
-    ld_r_n('a', u8(3)),
+    ld_r_n('a', u8(DIR_RIGHT)),
 
     label('kana_got_answer'),
     ld_nn_a(MEM.KANA_ANSWER),
@@ -567,25 +598,13 @@ export function buildKanaEngine(): Op[] {
     ld_a_nn(MEM.KANA_ATTEMPTS),
     cp_n(u8(0)),
     jr_cc('nz', ref('kana_score_attempt1')),
-    // Attempt 0: +100
-    ld_a_nn(MEM.KANA_SCORE_LO),
-    add_n(u8(100)),
-    ld_nn_a(MEM.KANA_SCORE_LO),
-    ld_a_nn(MEM.KANA_SCORE_HI),
-    adc_n(u8(0)),
-    ld_nn_a(MEM.KANA_SCORE_HI),
+    ...buildAddScore(SCORE_FIRST_TRY),
     jr(ref('kana_correct_done')),
 
     label('kana_score_attempt1'),
     cp_n(u8(1)),
     jr_cc('nz', ref('kana_correct_done')),
-    // Attempt 1: +10
-    ld_a_nn(MEM.KANA_SCORE_LO),
-    add_n(u8(10)),
-    ld_nn_a(MEM.KANA_SCORE_LO),
-    ld_a_nn(MEM.KANA_SCORE_HI),
-    adc_n(u8(0)),
-    ld_nn_a(MEM.KANA_SCORE_HI),
+    ...buildAddScore(SCORE_SECOND_TRY),
     // Attempt 2: +0 (fall through)
 
     label('kana_correct_done'),
@@ -598,13 +617,13 @@ export function buildKanaEngine(): Op[] {
     // === WRONG ===
     label('kana_wrong'),
     ld_a_nn(MEM.KANA_ATTEMPTS),
-    cp_n(u8(2)),
+    cp_n(u8(MAX_ATTEMPTS)),
     jr_cc('z', ref('kana_death')),
 
     // Not dead yet — increment attempts, show wrong feedback, re-prompt
     inc_r('a'),
     ld_nn_a(MEM.KANA_ATTEMPTS),
-    ld_r_n('a', u8(4)), // state = wrong feedback (re-prompt)
+    ld_r_n('a', u8(STATE_WRONG_FB)), // state = wrong feedback (re-prompt)
     ld_nn_a(MEM.KANA_STATE),
     ld_r_n('a', u8(FEEDBACK_FRAMES)),
     ld_nn_a(MEM.DLG_DELAY),
@@ -612,13 +631,7 @@ export function buildKanaEngine(): Op[] {
 
     // === DEATH (3rd wrong) ===
     label('kana_death'),
-    // -100 points
-    ld_a_nn(MEM.KANA_SCORE_LO),
-    sub_n(u8(100)),
-    ld_nn_a(MEM.KANA_SCORE_LO),
-    ld_a_nn(MEM.KANA_SCORE_HI),
-    sbc_n(u8(0)),
-    ld_nn_a(MEM.KANA_SCORE_HI),
+    ...buildSubScore(SCORE_DEATH_PENALTY),
 
     // Lose a life
     ld_a_nn(MEM.KANA_LIVES),
@@ -626,7 +639,7 @@ export function buildKanaEngine(): Op[] {
     ld_nn_a(MEM.KANA_LIVES),
 
     // Show wrong feedback then advance (don't re-prompt)
-    ld_r_n('a', u8(3)), // state = correct feedback (advances to next Q)
+    ld_r_n('a', u8(STATE_CORRECT_FB)),
     ld_nn_a(MEM.KANA_STATE),
     ld_r_n('a', u8(FEEDBACK_FRAMES)),
     ld_nn_a(MEM.DLG_DELAY),
@@ -658,7 +671,7 @@ export function buildKanaEngine(): Op[] {
     ret_cc('nz'),
 
     // Return to awaiting input (same question, don't advance)
-    ld_r_n('a', u8(2)),
+    ld_r_n('a', u8(STATE_AWAITING)),
     ld_nn_a(MEM.KANA_STATE),
     ret(),
 
