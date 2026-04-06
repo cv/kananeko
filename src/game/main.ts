@@ -19,7 +19,6 @@ import {
   cp_n,
   ldh_a_n,
   ldh_n_a,
-  ld_r_r,
   jr,
   jr_cc,
   jp,
@@ -30,6 +29,7 @@ import {
   ld_a_nn,
   ld_nn_a,
   and_n,
+  or_r,
   inc_r,
   call,
 } from '../asm/ops';
@@ -137,11 +137,43 @@ function buildClearTilemap(): Op[] {
 }
 
 // ---------------------------------------------------------------------------
+// Helper: scene dispatch table
+// ---------------------------------------------------------------------------
+
+let dispatchCounter = 0;
+
+/**
+ * Build a scene-id-based dispatch: reads SCENE_ID, then for each scene
+ * executes the ops returned by `getOps(sceneIndex)`. Avoids repeating
+ * the compare-and-jump pattern 5 times per use site.
+ */
+function buildSceneDispatch(getOps: (i: number) => Op[]): Op[] {
+  const id = String(dispatchCounter++);
+  const doneLabel = `dispatch_done_${id}`;
+  const ops: Op[] = [ld_a_nn(MEM.SCENE_ID)];
+
+  for (let i = 0; i < SCENES.length; i++) {
+    const branchLabel = `dispatch_${id}_s${String(i + 1)}`;
+    if (i < SCENES.length - 1) {
+      ops.push(cp_n(u8(i)));
+      ops.push(jp_cc('nz', ref(branchLabel)));
+    }
+    ops.push(...getOps(i));
+    if (i < SCENES.length - 1) {
+      ops.push(jp(ref(doneLabel)));
+      ops.push(label(branchLabel));
+    }
+  }
+
+  ops.push(label(doneLabel));
+  return ops;
+}
+
+// ---------------------------------------------------------------------------
 // Program builder
 // ---------------------------------------------------------------------------
 
 export function buildProgram(): Op[] {
-  // Pre-pack all scene data labels
   const sceneLabels = SCENES.map((_, i) => ({
     dlg: `scene${String(i)}_dlg`,
     kana: `scene${String(i)}_kana`,
@@ -248,69 +280,15 @@ export function buildProgram(): Op[] {
     // Clear tilemap
     ...buildClearTilemap(),
 
-    // Draw scene name at row 1
-    // We dispatch based on scene_id to draw the right name
-    ld_a_nn(MEM.SCENE_ID),
-
-    // Scene 0
-    cp_n(u8(0)),
-    jp_cc('nz', ref('scene_name_1')),
-    ...buildWriteRow(1, at(sceneData.scenes, 0).nameRow),
-    jp(ref('scene_name_done')),
-
-    label('scene_name_1'),
-    cp_n(u8(1)),
-    jp_cc('nz', ref('scene_name_2')),
-    ...buildWriteRow(1, at(sceneData.scenes, 1).nameRow),
-    jp(ref('scene_name_done')),
-
-    label('scene_name_2'),
-    cp_n(u8(2)),
-    jp_cc('nz', ref('scene_name_3')),
-    ...buildWriteRow(1, at(sceneData.scenes, 2).nameRow),
-    jp(ref('scene_name_done')),
-
-    label('scene_name_3'),
-    cp_n(u8(3)),
-    jp_cc('nz', ref('scene_name_4')),
-    ...buildWriteRow(1, at(sceneData.scenes, 3).nameRow),
-    jp(ref('scene_name_done')),
-
-    label('scene_name_4'),
-    ...buildWriteRow(1, at(sceneData.scenes, 4).nameRow),
-
-    label('scene_name_done'),
+    // Draw scene name at row 1 (dispatched by scene_id)
+    ...buildSceneDispatch((i) => buildWriteRow(1, at(sceneData.scenes, i).nameRow)),
 
     // Turn LCD back on
     ld_r_n('a', u8(LCDC.LCD_ON | LCDC.TILE_DATA_8000 | LCDC.BG_ON)),
     ldh_n_a(HW.LCDC),
 
-    // ==== Start scene dialogue ====
-    // Load dialogue data pointer based on scene_id
-    ld_a_nn(MEM.SCENE_ID),
-    cp_n(u8(0)),
-    jp_cc('nz', ref('load_dlg_1')),
-    ld_rr_nn('de', ref(at(sceneLabels, 0).dlg)),
-    jp(ref('load_dlg_done')),
-    label('load_dlg_1'),
-    cp_n(u8(1)),
-    jp_cc('nz', ref('load_dlg_2')),
-    ld_rr_nn('de', ref(at(sceneLabels, 1).dlg)),
-    jp(ref('load_dlg_done')),
-    label('load_dlg_2'),
-    cp_n(u8(2)),
-    jp_cc('nz', ref('load_dlg_3')),
-    ld_rr_nn('de', ref(at(sceneLabels, 2).dlg)),
-    jp(ref('load_dlg_done')),
-    label('load_dlg_3'),
-    cp_n(u8(3)),
-    jp_cc('nz', ref('load_dlg_4')),
-    ld_rr_nn('de', ref(at(sceneLabels, 3).dlg)),
-    jp(ref('load_dlg_done')),
-    label('load_dlg_4'),
-    ld_rr_nn('de', ref(at(sceneLabels, 4).dlg)),
-
-    label('load_dlg_done'),
+    // Load dialogue data pointer (dispatched by scene_id)
+    ...buildSceneDispatch((i) => [ld_rr_nn('de', ref(at(sceneLabels, i).dlg))]),
     call(ref('dlg_open_tree')), // initialize tree and open node 0
 
     // Dialogue loop — process nodes until conversation ends
@@ -334,31 +312,8 @@ export function buildProgram(): Op[] {
 
     label('scene_dlg_done'),
 
-    // ==== Start kana mini-game for this scene ====
-    ld_a_nn(MEM.SCENE_ID),
-    cp_n(u8(0)),
-    jp_cc('nz', ref('load_kana_1')),
-    ld_rr_nn('de', ref(at(sceneLabels, 0).kana)),
-    jp(ref('load_kana_done')),
-    label('load_kana_1'),
-    cp_n(u8(1)),
-    jp_cc('nz', ref('load_kana_2')),
-    ld_rr_nn('de', ref(at(sceneLabels, 1).kana)),
-    jp(ref('load_kana_done')),
-    label('load_kana_2'),
-    cp_n(u8(2)),
-    jp_cc('nz', ref('load_kana_3')),
-    ld_rr_nn('de', ref(at(sceneLabels, 2).kana)),
-    jp(ref('load_kana_done')),
-    label('load_kana_3'),
-    cp_n(u8(3)),
-    jp_cc('nz', ref('load_kana_4')),
-    ld_rr_nn('de', ref(at(sceneLabels, 3).kana)),
-    jp(ref('load_kana_done')),
-    label('load_kana_4'),
-    ld_rr_nn('de', ref(at(sceneLabels, 4).kana)),
-
-    label('load_kana_done'),
+    // Load kana data pointer (dispatched by scene_id)
+    ...buildSceneDispatch((i) => [ld_rr_nn('de', ref(at(sceneLabels, i).kana))]),
     call(ref('kana_start')),
 
     // Kana game loop
@@ -371,66 +326,10 @@ export function buildProgram(): Op[] {
     cp_n(u8(0)),
     jr_cc('nz', ref('scene_kana_loop')),
 
-    // ==== Scene complete — mark flag and advance ====
-    // Set completion bit for current scene
-    ld_a_nn(MEM.SCENE_ID),
-    ld_r_r('b', 'a'), // B = scene index
-
-    // Set bit B in SCENE_FLAGS
+    // ==== Scene complete — set completion flag and advance ====
+    ...buildSceneDispatch((i) => [ld_r_n('b', u8(1 << i))]),
     ld_a_nn(MEM.SCENE_FLAGS),
-    // Simple approach: OR with (1 << scene_id)
-    // Since scene_id is 0-4, use a lookup
-    ld_r_r('c', 'a'), // C = current flags
-    ld_r_r('a', 'b'), // A = scene_id
-
-    cp_n(u8(0)),
-    jp_cc('nz', ref('flag_1')),
-    ld_r_n('a', u8(0x01)),
-    jp(ref('flag_set')),
-    label('flag_1'),
-    cp_n(u8(1)),
-    jp_cc('nz', ref('flag_2')),
-    ld_r_n('a', u8(0x02)),
-    jp(ref('flag_set')),
-    label('flag_2'),
-    cp_n(u8(2)),
-    jp_cc('nz', ref('flag_3')),
-    ld_r_n('a', u8(0x04)),
-    jp(ref('flag_set')),
-    label('flag_3'),
-    cp_n(u8(3)),
-    jp_cc('nz', ref('flag_4')),
-    ld_r_n('a', u8(0x08)),
-    jp(ref('flag_set')),
-    label('flag_4'),
-    ld_r_n('a', u8(0x10)),
-
-    label('flag_set'),
-    // OR with existing flags
-    // A = bit mask, C = old flags
-    // Need OR A, C — but there's no OR A, C directly. Use: LD B, A / LD A, C / OR B
-    ld_r_r('b', 'a'),
-    ld_r_r('a', 'c'),
-    // or_r('b') — need to import. Actually let me use a different approach.
-    // A = C (old flags), B = new bit. Use OR B via the opcode.
-    // Actually or_r exists but wasn't imported. Let me just use ld + or pattern.
-    // Hmm, let me restructure to avoid needing or_r since I didn't import it.
-    // Simplest: just set the flags byte directly with the combined value.
-    // Actually, let me just import or_r...
-
-    // For now, use a workaround: XOR trick won't work. Let me just use the fact
-    // that set(bit, r) can set a specific bit.
-    // Actually, I have bit() imported. And set() can be imported.
-    // But set() takes a BitIndex literal, not a register. So we still need the
-    // dispatch approach. Let me just set it in each branch above instead.
-
-    // Simpler approach: each branch above directly writes the OR'd flag.
-    // But that's even more code. The cleanest approach is to just OR the registers.
-
-    // I'll add an inline OR by encoding it directly as a raw byte via db().
-    // OR B = opcode 0xB0
-    db(new Uint8Array([0xb0])), // OR B (A = old_flags | new_bit)
-
+    or_r('b'),
     ld_nn_a(MEM.SCENE_FLAGS),
 
     // Advance to next scene
