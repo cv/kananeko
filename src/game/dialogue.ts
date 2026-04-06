@@ -366,29 +366,9 @@ export function buildDialogueEngine(): Op[] {
     ld_rr_nn('hl', u16(tilemapAddr(CHOICE_START_ROW + 2, 3))),
 
     label('dlg_choice_write'),
-    // DE = string pointer, HL = VRAM destination
-    // Copy tiles until null terminator
+    // DE = ROM string pointer, HL = VRAM destination
+    // Copy tiles until null terminator: ld_a_de reads [DE] without clobbering HL
     label('dlg_choice_char'),
-    ld_r_r('a', 'd'), // load [DE] manually
-    ld_r_r('h', 'a'), // Oops, this clobbers HL. Need different approach.
-    // Actually we need to swap between reading from DE and writing to HL.
-    // Use a push/pop approach.
-
-    // Let me use a simpler approach: save HL, load from [DE], restore HL, write.
-    // Actually the GB has no LD A,[DE] with auto-increment, so we manually do:
-    // Push HL, LD H,D / LD L,E / LD A,[HL] / INC HL / LD D,H / LD E,L / Pop HL
-    // This is clunky. Simpler: use [DE] read (ld_a_de exists) and manual inc.
-
-    // Reset HL for this choice (we clobbered it above, but the jump set it)
-    // Actually the issue is I jumped to dlg_choice_write with HL set, then
-    // the label dlg_choice_char tries to use both DE and HL.
-    // Let me restructure: the jumps above set HL correctly, then we fall into copy.
-
-    // OK let me just save/restore properly.
-    // For each character: read [DE], inc DE, check null, write to [HL+]
-
-    // Save VRAM position on stack during the character read
-    // Actually ld_a_de doesn't clobber HL. Let's just do it simply:
     ld_a_de(), // A = [DE] (tile index from ROM)
     inc_rr('de'), // advance source
     cp_n(u8(0)),
