@@ -33,7 +33,8 @@ import {
   call,
 } from '../asm/ops';
 import { HW, JOY, LCDC, MEM } from '../asm/hardware';
-import { buildTileData, textToTiles } from './font';
+import { buildTileData, textToTiles, CHAR_MAP } from './font';
+import { CAT_TILES } from './font-data';
 import { buildReadJoypad } from './joypad';
 import { buildDialogueEngine } from './dialogue';
 import { buildKanaEngine } from './kana';
@@ -67,9 +68,38 @@ function at<T>(arr: readonly T[], i: number): T {
 const TITLE = 'カナネコ';
 const SUBTITLE = 'はじめ';
 
+// Cat portrait tile indices
+const CAT_TL = CHAR_MAP[CAT_TILES.FACE_TL] ?? 0;
+const CAT_TR = CHAR_MAP[CAT_TILES.FACE_TR] ?? 0;
+const CAT_BL = CHAR_MAP[CAT_TILES.FACE_BL] ?? 0;
+const CAT_BR = CHAR_MAP[CAT_TILES.FACE_BR] ?? 0;
+
 // ---------------------------------------------------------------------------
 // Helper: write a row of tiles at a tilemap address
 // ---------------------------------------------------------------------------
+
+/** Draw a 2x2 tile portrait at the given tilemap position */
+function buildDrawPortrait(
+  row: number,
+  col: number,
+  tl: number,
+  tr: number,
+  bl: number,
+  br: number,
+): Op[] {
+  return [
+    ld_rr_nn('hl', u16(tilemapAddr(row, col))),
+    ld_r_n('a', u8(tl)),
+    ldi_hl_a(),
+    ld_r_n('a', u8(tr)),
+    ldi_hl_a(),
+    ld_rr_nn('hl', u16(tilemapAddr(row + 1, col))),
+    ld_r_n('a', u8(bl)),
+    ldi_hl_a(),
+    ld_r_n('a', u8(br)),
+    ldi_hl_a(),
+  ];
+}
 
 function buildWriteRow(row: number, tiles: number[]): Op[] {
   const ops: Op[] = [];
@@ -162,9 +192,12 @@ export function buildProgram(): Op[] {
     // Clear tilemap (LCD already off or we turn it off)
     ...buildClearTilemap(),
 
+    // Draw cat portrait centered above title
+    ...buildDrawPortrait(3, 9, CAT_TL, CAT_TR, CAT_BL, CAT_BR),
+
     // Draw title text
-    ...buildWriteRow(6, textToTiles(TITLE)),
-    ...buildWriteRow(10, textToTiles(SUBTITLE)),
+    ...buildWriteRow(7, textToTiles(TITLE)),
+    ...buildWriteRow(11, textToTiles(SUBTITLE)),
 
     // Turn on LCD
     ld_r_n('a', u8(LCDC.LCD_ON | LCDC.TILE_DATA_8000 | LCDC.BG_ON)),

@@ -216,10 +216,10 @@ describe('emulator', () => {
     expect(hasData).toBe(true);
   });
 
-  it('has instructions to write "カナネコ" to the tilemap at row 6', () => {
+  it('has instructions to write "カナネコ" to the tilemap at row 7', () => {
     // Verify the ROM contains LD HL followed by tile writes
     // serverboy doesn't expose tilemap via getMemory(), so we verify the ROM bytes
-    const titleAddr = 0x9800 + 6 * 32 + Math.floor((20 - 4) / 2); // centered 4-char title
+    const titleAddr = 0x9800 + 7 * 32 + Math.floor((20 - 4) / 2); // centered 4-char title
     const expectedTiles = textToTiles('カナネコ');
 
     // Find LD HL, $98C7 in ROM (0x21 0xC7 0x98)
@@ -242,8 +242,8 @@ describe('emulator', () => {
     }
   });
 
-  it('has instructions to write "はじめ" to the tilemap at row 10', () => {
-    const subAddr = 0x9800 + 10 * 32 + Math.floor((20 - 3) / 2); // $9948
+  it('has instructions to write "はじめ" to the tilemap at row 11', () => {
+    const subAddr = 0x9800 + 11 * 32 + Math.floor((20 - 3) / 2); // $9948
     const expectedTiles = textToTiles('はじめ');
 
     let found = -1;
