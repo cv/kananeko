@@ -24,8 +24,8 @@ repos:
         pass_filenames: false
         always_run: true
 
-      - id: block-co-authored-by
-        name: block Co-Authored-By trailers
+      - id: validate-commit-message
+        name: validate commit message format
         entry: bash scripts/check-commit-message.sh
         language: system
         stages: [commit-msg]
