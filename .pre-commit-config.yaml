@@ -1,22 +1,25 @@
+default_language_version:
+  node: system
+
 repos:
   - repo: local
     hooks:
       - id: prettier
         name: prettier
-        entry: node node_modules/.bin/prettier --check
+        entry: bash -c '. "$NVM_DIR/nvm.sh" && node node_modules/.bin/prettier --check "$@"' --
         language: system
         files: \.(ts|json|yaml|yml)$
         exclude: (^|/)vitest\.config\.ts$
 
       - id: eslint
         name: eslint
-        entry: node node_modules/.bin/eslint --max-warnings 0 --no-warn-ignored
+        entry: bash -c '. "$NVM_DIR/nvm.sh" && node node_modules/.bin/eslint --max-warnings 0 --no-warn-ignored "$@"' --
         language: system
         files: \.ts$
 
       - id: coverage-ratchet
         name: test coverage ratchet
-        entry: bash -c 'node node_modules/.bin/vitest run --coverage && npx tsx scripts/check-coverage.ts'
+        entry: bash -c '. "$NVM_DIR/nvm.sh" && node node_modules/.bin/vitest run --coverage && npx tsx scripts/check-coverage.ts'
         language: system
         pass_filenames: false
         always_run: true
