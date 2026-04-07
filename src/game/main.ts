@@ -249,8 +249,10 @@ export function buildProgram(): Op[] {
     ld_r_n('a', u8(LCDC.LCD_ON | LCDC.TILE_DATA_8000 | LCDC.BG_ON)),
     ldh_n_a(HW.LCDC),
 
-    // Note: VBlank interrupt handler at $0040 and IE register ($FFFF)
-    // are set directly by the assembler. EI enables the interrupt master flag.
+    // Enable VBlank interrupt — required for HALT on real hardware.
+    // Handler at $0040 (RETI) is placed by the assembler.
+    ld_r_n('a', u8(0x01)), // bit 0 = VBlank
+    ld_nn_a(MEM.IE),
     ei(),
 
     // Wait for all buttons to be released (debounce boot ROM START press)

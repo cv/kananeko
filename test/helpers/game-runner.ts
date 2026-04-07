@@ -38,7 +38,30 @@ export class GameRunner {
 
   constructor() {
     this.gb = new Gameboy();
-    this.gb.loadRom(Buffer.from(rom));
+    // Patch out the IE write for serverboy — it can't handle VBlank interrupts.
+    // The real build ROM has LD A,$01 / LD ($FFFF),A before EI.
+    // Replace with NOPs (00 00 00 00 00) so serverboy treats HALT as frame advance.
+    const patchedRom = Buffer.from(rom);
+    for (let i = 0x0150; i < 0x0300; i++) {
+      // Find: 3E 01 EA FF FF FB (LD A,$01; LD ($FFFF),A; EI)
+      if (
+        patchedRom[i] === 0x3e &&
+        patchedRom[i + 1] === 0x01 &&
+        patchedRom[i + 2] === 0xea &&
+        patchedRom[i + 3] === 0xff &&
+        patchedRom[i + 4] === 0xff &&
+        patchedRom[i + 5] === 0xfb
+      ) {
+        // NOP out the LD A,$01 and LD ($FFFF),A (5 bytes), keep the EI
+        patchedRom[i] = 0x00;
+        patchedRom[i + 1] = 0x00;
+        patchedRom[i + 2] = 0x00;
+        patchedRom[i + 3] = 0x00;
+        patchedRom[i + 4] = 0x00;
+        break;
+      }
+    }
+    this.gb.loadRom(patchedRom);
   }
 
   // ---------------------------------------------------------------------------
