@@ -5,6 +5,7 @@
  * consumed by the dialogue engine at runtime.
  */
 
+import { type TupleIndex } from './fixed';
 import { textToTiles } from './font';
 
 // ---------------------------------------------------------------------------
@@ -30,9 +31,6 @@ export interface DialogueNode<Next extends number | null = number | null> {
 
 export type DialogueTree = readonly DialogueNode[];
 
-type TupleKeys<T extends readonly unknown[]> = Exclude<keyof T, keyof (readonly unknown[])>;
-type TupleIndex<T extends readonly unknown[]> =
-  TupleKeys<T> extends infer K ? (K extends `${infer N extends number}` ? N : never) : never;
 type ValidNext<T extends readonly unknown[]> = TupleIndex<T> | null;
 
 type ValidateChoice<Choice, Next extends number | null> = Choice extends {

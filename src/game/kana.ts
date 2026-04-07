@@ -51,7 +51,7 @@ import {
 import { HW, JOY, LCDC, MEM } from '../asm/hardware';
 import { requireTile, textToTiles } from './font';
 import { CAT_TILES } from './font-data';
-import { type Quad, type Triple } from './fixed';
+import { type NonEmpty, type Quad, type Triple, type TupleIndex } from './fixed';
 import { tilePos, tilemapAddr } from './tilemap';
 import {
   buildAddScore,
@@ -80,6 +80,24 @@ export interface KanaQuestion {
   readonly correct: Kana;
   /** Three wrong kana (should be visually similar distractors) */
   readonly distractors: Triple<Kana>;
+}
+
+export function defineKanaQuestion<const Chars extends NonEmpty<Kana>>(
+  chars: Chars,
+  blankIndex: TupleIndex<Chars>,
+  ...distractors: Triple<Kana>
+): KanaQuestion {
+  const correct = chars[blankIndex];
+  if (correct === undefined) {
+    throw new RangeError(`Kana blank index out of range: ${String(blankIndex)}`);
+  }
+
+  return {
+    word: chars.join(''),
+    blankIndex,
+    correct,
+    distractors,
+  };
 }
 
 // ---------------------------------------------------------------------------

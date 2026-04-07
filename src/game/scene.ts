@@ -6,7 +6,7 @@
  */
 
 import { type DialogueNode, buildDialogueTree } from './dialogue';
-import { type KanaQuestion, buildKanaData } from './kana';
+import { type KanaQuestion, buildKanaData, defineKanaQuestion } from './kana';
 import { textToTiles } from './font';
 import { SCENE_ICON_TILES } from './font-data';
 import { type Pair, type Quad, type Quint } from './fixed';
@@ -47,6 +47,8 @@ export function defineScenes<const T extends SceneList>(scenes: T): T {
 // Scene assembly — metadata, palettes, icons, kana questions
 // ---------------------------------------------------------------------------
 
+const q = defineKanaQuestion;
+
 export const SCENES = defineScenes([
   {
     name: 'えき',
@@ -59,36 +61,11 @@ export const SCENES = defineScenes([
     ],
     dialogue: STATION_DIALOGUE,
     kanaQuestions: [
-      {
-        word: 'こんにちは',
-        blankIndex: 0,
-        correct: 'こ',
-        distractors: ['か', 'く', 'き'],
-      },
-      {
-        word: 'すみません',
-        blankIndex: 1,
-        correct: 'み',
-        distractors: ['む', 'ま', 'め'],
-      },
-      {
-        word: 'おげんき',
-        blankIndex: 2,
-        correct: 'ん',
-        distractors: ['な', 'に', 'ぬ'],
-      },
-      {
-        word: 'ありがとう',
-        blankIndex: 0,
-        correct: 'あ',
-        distractors: ['い', 'う', 'え'],
-      },
-      {
-        word: 'げんき',
-        blankIndex: 1,
-        correct: 'ん',
-        distractors: ['に', 'ね', 'な'],
-      },
+      q(['こ', 'ん', 'に', 'ち', 'は'], 0, 'か', 'く', 'き'),
+      q(['す', 'み', 'ま', 'せ', 'ん'], 1, 'む', 'ま', 'め'),
+      q(['お', 'げ', 'ん', 'き'], 2, 'な', 'に', 'ぬ'),
+      q(['あ', 'り', 'が', 'と', 'う'], 0, 'い', 'う', 'え'),
+      q(['げ', 'ん', 'き'], 1, 'に', 'ね', 'な'),
     ],
   },
   {
@@ -102,36 +79,11 @@ export const SCENES = defineScenes([
     ],
     dialogue: STREET_DIALOGUE,
     kanaQuestions: [
-      {
-        word: 'レストラン',
-        blankIndex: 4,
-        correct: 'ン',
-        distractors: ['ナ', 'ニ', 'ヌ'],
-      },
-      {
-        word: 'コンビニ',
-        blankIndex: 0,
-        correct: 'コ',
-        distractors: ['カ', 'キ', 'ク'],
-      },
-      {
-        word: 'あちら',
-        blankIndex: 1,
-        correct: 'ち',
-        distractors: ['た', 'つ', 'て'],
-      },
-      {
-        word: 'どこ',
-        blankIndex: 0,
-        correct: 'ど',
-        distractors: ['だ', 'で', 'づ'],
-      },
-      {
-        word: 'ありがとう',
-        blankIndex: 3,
-        correct: 'と',
-        distractors: ['た', 'つ', 'て'],
-      },
+      q(['レ', 'ス', 'ト', 'ラ', 'ン'], 4, 'ナ', 'ニ', 'ヌ'),
+      q(['コ', 'ン', 'ビ', 'ニ'], 0, 'カ', 'キ', 'ク'),
+      q(['あ', 'ち', 'ら'], 1, 'た', 'つ', 'て'),
+      q(['ど', 'こ'], 0, 'だ', 'で', 'づ'),
+      q(['あ', 'り', 'が', 'と', 'う'], 3, 'た', 'つ', 'て'),
     ],
   },
   {
@@ -145,36 +97,11 @@ export const SCENES = defineScenes([
     ],
     dialogue: RESTAURANT_DIALOGUE,
     kanaQuestions: [
-      {
-        word: 'ラーメン',
-        blankIndex: 0,
-        correct: 'ラ',
-        distractors: ['リ', 'ル', 'レ'],
-      },
-      {
-        word: 'おちゃ',
-        blankIndex: 1,
-        correct: 'ち',
-        distractors: ['た', 'つ', 'て'],
-      },
-      {
-        word: 'ください',
-        blankIndex: 2,
-        correct: 'さ',
-        distractors: ['だ', 'た', 'な'],
-      },
-      {
-        word: 'たべます',
-        blankIndex: 0,
-        correct: 'た',
-        distractors: ['な', 'だ', 'か'],
-      },
-      {
-        word: 'おいしい',
-        blankIndex: 2,
-        correct: 'し',
-        distractors: ['さ', 'す', 'せ'],
-      },
+      q(['ラ', 'ー', 'メ', 'ン'], 0, 'リ', 'ル', 'レ'),
+      q(['お', 'ち', 'ゃ'], 1, 'た', 'つ', 'て'),
+      q(['く', 'だ', 'さ', 'い'], 2, 'だ', 'た', 'な'),
+      q(['た', 'べ', 'ま', 'す'], 0, 'な', 'だ', 'か'),
+      q(['お', 'い', 'し', 'い'], 2, 'さ', 'す', 'せ'),
     ],
   },
   {
@@ -188,36 +115,11 @@ export const SCENES = defineScenes([
     ],
     dialogue: CONBINI_DIALOGUE,
     kanaQuestions: [
-      {
-        word: 'ください',
-        blankIndex: 0,
-        correct: 'く',
-        distractors: ['き', 'け', 'か'],
-      },
-      {
-        word: 'ありがとう',
-        blankIndex: 2,
-        correct: 'が',
-        distractors: ['き', 'ぎ', 'ぐ'],
-      },
-      {
-        word: 'いらっしゃい',
-        blankIndex: 0,
-        correct: 'い',
-        distractors: ['う', 'え', 'あ'],
-      },
-      {
-        word: 'ひゃくえん',
-        blankIndex: 3,
-        correct: 'え',
-        distractors: ['あ', 'い', 'お'],
-      },
-      {
-        word: 'どうぞ',
-        blankIndex: 2,
-        correct: 'ぞ',
-        distractors: ['ざ', 'ず', 'ぜ'],
-      },
+      q(['く', 'だ', 'さ', 'い'], 0, 'き', 'け', 'か'),
+      q(['あ', 'り', 'が', 'と', 'う'], 2, 'き', 'ぎ', 'ぐ'),
+      q(['い', 'ら', 'っ', 'し', 'ゃ', 'い'], 0, 'う', 'え', 'あ'),
+      q(['ひ', 'ゃ', 'く', 'え', 'ん'], 3, 'あ', 'い', 'お'),
+      q(['ど', 'う', 'ぞ'], 2, 'ざ', 'ず', 'ぜ'),
     ],
   },
   {
@@ -231,36 +133,11 @@ export const SCENES = defineScenes([
     ],
     dialogue: PARK_DIALOGUE,
     kanaQuestions: [
-      {
-        word: 'さようなら',
-        blankIndex: 3,
-        correct: 'な',
-        distractors: ['に', 'ぬ', 'ね'],
-      },
-      {
-        word: 'おはよう',
-        blankIndex: 0,
-        correct: 'お',
-        distractors: ['あ', 'い', 'う'],
-      },
-      {
-        word: 'こんばんは',
-        blankIndex: 2,
-        correct: 'ば',
-        distractors: ['ぱ', 'び', 'べ'],
-      },
-      {
-        word: 'おなまえ',
-        blankIndex: 1,
-        correct: 'な',
-        distractors: ['に', 'ぬ', 'ね'],
-      },
-      {
-        word: 'たのしい',
-        blankIndex: 1,
-        correct: 'の',
-        distractors: ['な', 'に', 'ぬ'],
-      },
+      q(['さ', 'よ', 'う', 'な', 'ら'], 3, 'に', 'ぬ', 'ね'),
+      q(['お', 'は', 'よ', 'う'], 0, 'あ', 'い', 'う'),
+      q(['こ', 'ん', 'ば', 'ん', 'は'], 2, 'ぱ', 'び', 'べ'),
+      q(['お', 'な', 'ま', 'え'], 1, 'に', 'ぬ', 'ね'),
+      q(['た', 'の', 'し', 'い'], 1, 'な', 'に', 'ぬ'),
     ],
   },
 ] as const);
