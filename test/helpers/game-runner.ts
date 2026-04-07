@@ -169,7 +169,7 @@ export class GameRunner {
   // ---------------------------------------------------------------------------
 
   private static readonly MAX_WAIT = 500; // safety limit for all waits
-  private static readonly INPUT_DEBOUNCE = 10; // frames for joypad edge detector to clear
+  private static readonly INPUT_DEBOUNCE = 3; // frames for joypad edge detector to clear
 
   /** Wait until a predicate on game state is true, or throw after MAX_WAIT frames */
   waitUntil(predicate: () => boolean, description: string): this {
