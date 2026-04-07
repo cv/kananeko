@@ -7,15 +7,11 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: Git ref (commit SHA, tag, or branch) to build
+        description: Single Git ref (commit SHA, tag, or branch) to build
         required: false
         type: string
-      tag:
-        description: Release tag to create or update
-        required: false
-        type: string
-      release_name:
-        description: Release title to create or update
+      range:
+        description: Optional git revision range to backfill (for example abc123..def456)
         required: false
         type: string
 
@@ -23,14 +19,70 @@ permissions:
   contents: write
 
 jobs:
-  build-and-release:
+  collect-commits:
     runs-on: ubuntu-latest
+    outputs:
+      commits: ${{ steps.collect.outputs.commits }}
 
     steps:
       - name: Check out source
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref || github.sha }}
+          fetch-depth: 0
+
+      - name: Resolve commits to build
+        id: collect
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          event_name="${{ github.event_name }}"
+          input_ref="${{ inputs.ref || '' }}"
+          input_range="${{ inputs.range || '' }}"
+
+          commits=()
+
+          if [[ -n "$input_range" ]]; then
+            while IFS= read -r sha; do
+              commits+=("$sha")
+            done < <(git rev-list --reverse "$input_range")
+          elif [[ -n "$input_ref" ]]; then
+            commits+=("$(git rev-parse "${input_ref}^{commit}")")
+          elif [[ "$event_name" == "push" ]]; then
+            before="${{ github.event.before }}"
+            after="${{ github.sha }}"
+            if [[ "$before" =~ ^0+$ ]]; then
+              commits+=("$(git rev-parse "${after}^{commit}")")
+            else
+              while IFS= read -r sha; do
+                commits+=("$sha")
+              done < <(git rev-list --reverse "${before}..${after}")
+            fi
+          else
+            commits+=("$(git rev-parse HEAD)")
+          fi
+
+          if ((${#commits[@]} == 0)); then
+            echo "ERROR: no commits resolved for this workflow run." >&2
+            exit 1
+          fi
+
+          json=$(printf '%s\n' "${commits[@]}" | jq -R . | jq -cs .)
+          echo "commits=$json" >> "$GITHUB_OUTPUT"
+
+  build-and-release:
+    runs-on: ubuntu-latest
+    needs: collect-commits
+    strategy:
+      fail-fast: false
+      matrix:
+        commit: ${{ fromJson(needs.collect-commits.outputs.commits) }}
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.commit }}
           fetch-depth: 0
 
       - name: Set up Node.js
@@ -53,16 +105,8 @@ jobs:
 
           commit_sha="$(git rev-parse HEAD)"
           short_sha="${commit_sha:0:12}"
-          tag="${{ inputs.tag || '' }}"
-          title="${{ inputs.release_name || '' }}"
-
-          if [[ -z "$tag" ]]; then
-            tag="rom-${short_sha}"
-          fi
-
-          if [[ -z "$title" ]]; then
-            title="ROM build ${short_sha}"
-          fi
+          tag="rom-${short_sha}"
+          title="ROM build ${short_sha}"
 
           {
             echo "commit_sha=$commit_sha"
