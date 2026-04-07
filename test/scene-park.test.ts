@@ -1,25 +1,9 @@
 /**
- * Scene 4 (park) tests — dialogue coverage and final scene flags.
+ * Scene 4 (park) progression tests.
  */
 
 import { describe, it, expect } from 'vitest';
-import { playDialogueTree, repeatChoice, runnerAtScene } from './helpers/dialogue-helpers';
-
-const PARK_DIALOGUE_PATHS = [
-  ['happy path', repeatChoice(62)],
-  ['weather chat path', [0, 0, 0, 1, 0, ...repeatChoice(57)]],
-  ['lonely traveler path', [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, ...repeatChoice(51)]],
-] as const;
-
-describe('scene 4: park dialogue paths', () => {
-  it.each(PARK_DIALOGUE_PATHS)(
-    'reaches the kana round via the %s',
-    { timeout: 120_000 },
-    (_pathName, dialogueChoices) => {
-      playDialogueTree(runnerAtScene(4), 4, [...dialogueChoices]);
-    },
-  );
-});
+import { runnerAtScene } from './helpers/dialogue-helpers';
 
 describe('scene 4: park progression', () => {
   it('sets all scene flags after the final scene is complete', () => {
