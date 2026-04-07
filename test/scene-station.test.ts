@@ -31,7 +31,7 @@ describe('scene 0: station', () => {
       0,
       2,
       0,
-      ...Array<number>(42).fill(0),
+      ...Array<number>(43).fill(0),
     ]);
 
     // Kana scoring

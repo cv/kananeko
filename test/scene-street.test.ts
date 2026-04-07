@@ -8,7 +8,7 @@ import { runnerAtScene, playDialogueTree } from './helpers/dialogue-helpers';
 describe('scene 1: street', () => {
   it('dialogue paths + advance', { timeout: 60_000 }, () => {
     // Happy path
-    playDialogueTree(runnerAtScene(1), 1, Array<number>(57).fill(0));
+    playDialogueTree(runnerAtScene(1), 1, Array<number>(58).fill(0));
 
     // Lost path
     playDialogueTree(runnerAtScene(1), 1, [0, 2, 0, ...Array<number>(54).fill(0)]);
@@ -34,7 +34,7 @@ describe('scene 1: street', () => {
       0,
       1,
       0,
-      ...Array<number>(38).fill(0),
+      ...Array<number>(39).fill(0),
     ]);
 
     // Advance

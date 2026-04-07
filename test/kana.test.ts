@@ -1,9 +1,14 @@
 /** Kana mini-game tests. */
 
 import { describe, it, expect } from 'vitest';
-import { GameRunner } from './helpers/game-runner';
 import { buildKanaData, type KanaQuestion } from '@game/kana';
 import { textToTiles } from '@game/font';
+import {
+  loseAllKanaLives,
+  loseOneKanaLife,
+  returnToTitleAfterGameOver,
+  runnerInKana,
+} from './helpers/dialogue-helpers';
 import {
   DELTA_MINUS_100,
   DELTA_PLUS_100,
@@ -23,20 +28,19 @@ describe('kana', () => {
   });
 
   it('enters the kana round after the player completes the dialogue tree', () => {
-    const runner = new GameRunner().boot().start().completeDialogueTree();
-    runner.waitForKanaInput();
+    const runner = runnerInKana(0);
     expect(runner.kanaState).toBe(KANA_AWAITING_INPUT);
   });
 
   it('awards 100 points when the first kana answer is correct', () => {
-    const runner = new GameRunner().boot().start().completeDialogueTree();
+    const runner = runnerInKana(0);
     const scoreBefore = runner.kanaScore;
     runner.answerKanaCorrectly();
     expect(runner.kanaScore - scoreBefore).toBe(100);
   });
 
   it('awards 10 points when the second kana answer is correct', () => {
-    const runner = new GameRunner().boot().start().completeDialogueTree();
+    const runner = runnerInKana(0);
     const scoreBefore = runner.kanaScore;
     runner.answerKanaWrong();
     runner.answerKanaCorrectly();
@@ -44,57 +48,42 @@ describe('kana', () => {
   });
 
   it('removes one life after three wrong answers on the same kana question', () => {
-    const runner = new GameRunner().boot().start().completeDialogueTree();
+    const runner = runnerInKana(0);
     expect(runner.kanaLives).toBe(3);
-    runner.answerKanaWrong();
-    runner.answerKanaWrong();
-    runner.answerKanaWrong();
+    loseOneKanaLife(runner);
     expect(runner.kanaLives).toBe(2);
   });
 
   it('ends the kana round when the player loses the last life', () => {
-    const runner = new GameRunner().boot().start().completeDialogueTree();
+    const runner = runnerInKana(0);
     expect(runner.kanaLives).toBe(3);
-    for (let death = 0; death < 3; death++) {
-      runner.answerKanaWrong();
-      runner.answerKanaWrong();
-      runner.answerKanaWrong();
-    }
+    loseAllKanaLives(runner);
     expect(runner.kanaLives).toBe(0);
     expect(runner.kanaState).toBe(KANA_IDLE);
   });
 
   it('returns to the title screen state after START on the game over screen', () => {
-    const runner = new GameRunner().boot().start().completeDialogueTree();
-    for (let death = 0; death < 3; death++) {
-      runner.answerKanaWrong();
-      runner.answerKanaWrong();
-      runner.answerKanaWrong();
-    }
-    expect(runner.kanaLives).toBe(0);
-    runner.frames(10).pressStart().frames(10);
-    expect(runner.kanaLives).toBe(3);
-    expect(runner.kanaScore).toBe(0);
+    const runner = runnerInKana(0);
+    loseAllKanaLives(runner);
+    returnToTitleAfterGameOver(runner);
   });
 
   it('advances to the next kana question after a correct answer', () => {
-    const runner = new GameRunner().boot().start().completeDialogueTree();
+    const runner = runnerInKana(0);
     runner.answerKanaCorrectly();
     expect(runner.kanaQuestionIdx).toBe(1);
     expect(runner.kanaState).toBe(KANA_AWAITING_INPUT);
   });
 
   it('shows the +100 delta flash after a correct first answer', () => {
-    const runner = new GameRunner().boot().start().completeDialogueTree();
+    const runner = runnerInKana(0);
     runner.answerKanaCorrectly();
     expect(runner.deltaType).toBe(DELTA_PLUS_100);
   });
 
   it('shows the -100 delta flash when a wrong answer costs a life', () => {
-    const runner = new GameRunner().boot().start().completeDialogueTree();
-    runner.answerKanaWrong();
-    runner.answerKanaWrong();
-    runner.answerKanaWrong();
+    const runner = runnerInKana(0);
+    loseOneKanaLife(runner);
     expect(runner.deltaType).toBe(DELTA_MINUS_100);
   });
 });

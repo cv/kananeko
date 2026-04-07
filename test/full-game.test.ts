@@ -9,7 +9,11 @@
 import { describe, it, expect } from 'vitest';
 import { GameRunner } from './helpers/game-runner';
 import { SCENES } from '@game/scene';
-import { runnerAtScene } from './helpers/dialogue-helpers';
+import {
+  loseAllKanaLives,
+  returnToTitleAfterGameOver,
+  runnerAtScene,
+} from './helpers/dialogue-helpers';
 import { KANA_AWAITING_INPUT } from './helpers/test-constants';
 
 // ---------------------------------------------------------------------------
@@ -86,13 +90,8 @@ describe('death paths', () => {
 
     runner.waitForKanaInput();
     expect(runner.kanaLives).toBe(1);
-    runner.answerKanaWrong();
-    runner.answerKanaWrong();
-    runner.answerKanaWrong();
-
-    runner.frames(10).pressStart().frames(10);
-    expect(runner.kanaLives).toBe(3);
-    expect(runner.kanaScore).toBe(0);
+    loseAllKanaLives(runner);
+    returnToTitleAfterGameOver(runner);
   });
 
   it('returns to the title flow after a mid-game kana game over', () => {
@@ -100,16 +99,8 @@ describe('death paths', () => {
     runner.completeDialogueTree();
     expect(runner.kanaLives).toBe(3);
 
-    for (let death = 0; death < 3; death++) {
-      runner.answerKanaWrong();
-      runner.answerKanaWrong();
-      runner.answerKanaWrong();
-    }
-    expect(runner.kanaLives).toBe(0);
-
-    runner.frames(10).pressStart().frames(10);
-    expect(runner.kanaLives).toBe(3);
-    expect(runner.kanaScore).toBe(0);
+    loseAllKanaLives(runner);
+    returnToTitleAfterGameOver(runner);
 
     runner.start();
     expect(runner.sceneId).toBe(0);
