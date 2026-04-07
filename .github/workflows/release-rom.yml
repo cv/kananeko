@@ -130,8 +130,8 @@ jobs:
         with:
           name: kananeko-${{ steps.meta.outputs.short_sha }}
           path: |
-            build/kananeko.gb
-            build/kananeko.sym
+            build/*.gb
+            build/*.sym
           if-no-files-found: error
 
       - name: Create or update GitHub release
@@ -143,19 +143,17 @@ jobs:
         run: |
           set -euo pipefail
 
+          assets=(build/*.gb build/*.sym)
+
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             gh release edit "$RELEASE_TAG" \
               --title "$RELEASE_TITLE" \
               --notes-file release-notes.md \
               --prerelease
-            gh release upload "$RELEASE_TAG" \
-              build/kananeko.gb \
-              build/kananeko.sym \
-              --clobber
+            gh release upload "$RELEASE_TAG" "${assets[@]}" --clobber
           else
             gh release create "$RELEASE_TAG" \
-              build/kananeko.gb \
-              build/kananeko.sym \
+              "${assets[@]}" \
               --title "$RELEASE_TITLE" \
               --notes-file release-notes.md \
               --prerelease
