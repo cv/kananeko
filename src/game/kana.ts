@@ -51,6 +51,7 @@ import {
 import { HW, JOY, LCDC, MEM } from '../asm/hardware';
 import { requireTile, textToTiles } from './font';
 import { CAT_TILES } from './font-data';
+import { type Quad, type Triple } from './fixed';
 import { tilePos, tilemapAddr } from './tilemap';
 import {
   buildAddScore,
@@ -78,7 +79,7 @@ export interface KanaQuestion {
   /** The correct kana for the blank */
   readonly correct: Kana;
   /** Three wrong kana (should be visually similar distractors) */
-  readonly distractors: readonly [Kana, Kana, Kana];
+  readonly distractors: Triple<Kana>;
 }
 
 // ---------------------------------------------------------------------------
@@ -114,7 +115,7 @@ const DIR_LEFT = 2;
 const DIR_RIGHT = 3;
 
 type ShuffleSlot = 0 | 1 | 2 | 3;
-type AnswerLayout = readonly [ShuffleSlot, ShuffleSlot, ShuffleSlot, ShuffleSlot];
+type AnswerLayout = Quad<ShuffleSlot>;
 
 const SHUFFLE_MEM = [
   MEM.KANA_SHUFFLE,
@@ -137,10 +138,7 @@ function buildAnswerLayout(layout: AnswerLayout): Op[] {
   return ANSWER_SLOT_ORDER.flatMap((optionIndex) => {
     const position = OPTION_POSITIONS[optionIndex];
     const shuffleSlot = layout[optionIndex];
-    return [
-      ld_a_nn(SHUFFLE_MEM[shuffleSlot]),
-      ...buildDrawTileAt(position.row, position.col, 'from_a'),
-    ];
+    return [ld_a_nn(SHUFFLE_MEM[shuffleSlot]), ...buildDrawTileAt(position, 'from_a')];
   });
 }
 

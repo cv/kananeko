@@ -50,7 +50,8 @@ import {
 } from '../asm/ops';
 import { HW, JOY, LCDC, MEM } from '../asm/hardware';
 import { requireTile } from './font';
-import { SCREEN_COLS, tilemapAddr } from './tilemap';
+import { type Triple } from './fixed';
+import { SCREEN_COLS, tilePos, tilemapAddr, type TilePosition } from './tilemap';
 import {
   buildAddScore,
   buildSubScore,
@@ -73,6 +74,18 @@ const TEXT_ROW_1 = 12;
 const CHOICE_START_ROW = 14;
 const REVEAL_DELAY = 3; // frames between each character reveal
 
+const TEXT_START = tilePos(TEXT_ROW_1, 2);
+const CHOICE_TEXT_POSITIONS: Triple<TilePosition> = [
+  tilePos(CHOICE_START_ROW, 3),
+  tilePos(CHOICE_START_ROW + 1, 3),
+  tilePos(CHOICE_START_ROW + 2, 3),
+];
+const CHOICE_CURSOR_POSITIONS: Triple<TilePosition> = [
+  tilePos(CHOICE_START_ROW, 2),
+  tilePos(CHOICE_START_ROW + 1, 2),
+  tilePos(CHOICE_START_ROW + 2, 2),
+];
+
 // Tile indices for border characters
 const BORDER_TL = requireTile('┌');
 const BORDER_TR = requireTile('┐');
@@ -85,6 +98,26 @@ const CURSOR_TILE = requireTile('▶');
 // ---------------------------------------------------------------------------
 // Assembly: text box border (drawn with LCD off)
 // ---------------------------------------------------------------------------
+
+let choicePositionCounter = 0;
+
+function buildLoadChoicePosition(positions: Triple<TilePosition>, labelPrefix: string): Op[] {
+  const id = `${labelPrefix}_${String(choicePositionCounter++)}`;
+  return [
+    cp_n(u8(0)),
+    jr_cc('nz', ref(`${id}_1`)),
+    ld_rr_nn('hl', u16(tilemapAddr(positions[0]))),
+    jr(ref(`${id}_done`)),
+    label(`${id}_1`),
+    cp_n(u8(1)),
+    jr_cc('nz', ref(`${id}_2`)),
+    ld_rr_nn('hl', u16(tilemapAddr(positions[1]))),
+    jr(ref(`${id}_done`)),
+    label(`${id}_2`),
+    ld_rr_nn('hl', u16(tilemapAddr(positions[2]))),
+    label(`${id}_done`),
+  ];
+}
 
 function buildDrawTextbox(): Op[] {
   const ops: Op[] = [];
@@ -171,9 +204,9 @@ export function buildDialogueEngine(): Op[] {
     ld_nn_a(MEM.DLG_STR_HI),
 
     // Set VRAM write position to start of text row 1, col 2 (inside border)
-    ld_r_n('a', u8(tilemapAddr(TEXT_ROW_1, 2) & 0xff)),
+    ld_r_n('a', u8(tilemapAddr(TEXT_START) & 0xff)),
     ld_nn_a(MEM.DLG_VRAM_LO),
-    ld_r_n('a', u8((tilemapAddr(TEXT_ROW_1, 2) >> 8) & 0xff)),
+    ld_r_n('a', u8((tilemapAddr(TEXT_START) >> 8) & 0xff)),
     ld_nn_a(MEM.DLG_VRAM_HI),
 
     // Init state
@@ -332,20 +365,7 @@ export function buildDialogueEngine(): Op[] {
     ld_r_r('a', 'b'), // choice index
 
     // VRAM = 0x9800 + (CHOICE_START_ROW + index) * 32 + 3
-    // We compute using a simple add chain since we only have 3 choices max
-    cp_n(u8(0)),
-    jr_cc('nz', ref('dlg_choice_row1')),
-    ld_rr_nn('hl', u16(tilemapAddr(CHOICE_START_ROW, 3))),
-    jr(ref('dlg_choice_write')),
-
-    label('dlg_choice_row1'),
-    cp_n(u8(1)),
-    jr_cc('nz', ref('dlg_choice_row2')),
-    ld_rr_nn('hl', u16(tilemapAddr(CHOICE_START_ROW + 1, 3))),
-    jr(ref('dlg_choice_write')),
-
-    label('dlg_choice_row2'),
-    ld_rr_nn('hl', u16(tilemapAddr(CHOICE_START_ROW + 2, 3))),
+    ...buildLoadChoicePosition(CHOICE_TEXT_POSITIONS, 'dlg_choice_pos'),
 
     label('dlg_choice_write'),
     // DE = ROM string pointer, HL = VRAM destination
@@ -365,7 +385,7 @@ export function buildDialogueEngine(): Op[] {
     jr_cc('nz', ref('dlg_draw_choice_loop')),
 
     // Draw cursor at first choice
-    ld_rr_nn('hl', u16(tilemapAddr(CHOICE_START_ROW, 2))),
+    ld_rr_nn('hl', u16(tilemapAddr(CHOICE_CURSOR_POSITIONS[0]))),
     ld_r_n('a', u8(CURSOR_TILE)),
     ldi_hl_a(),
 
@@ -523,17 +543,7 @@ export function buildDialogueEngine(): Op[] {
     label('dlg_erase_cursor'),
     ld_a_nn(MEM.DLG_CURSOR),
     // Compute VRAM address: 0x9800 + (CHOICE_START_ROW + cursor) * 32 + 2
-    cp_n(u8(0)),
-    jr_cc('nz', ref('dlg_erase_r1')),
-    ld_rr_nn('hl', u16(tilemapAddr(CHOICE_START_ROW, 2))),
-    jr(ref('dlg_erase_write')),
-    label('dlg_erase_r1'),
-    cp_n(u8(1)),
-    jr_cc('nz', ref('dlg_erase_r2')),
-    ld_rr_nn('hl', u16(tilemapAddr(CHOICE_START_ROW + 1, 2))),
-    jr(ref('dlg_erase_write')),
-    label('dlg_erase_r2'),
-    ld_rr_nn('hl', u16(tilemapAddr(CHOICE_START_ROW + 2, 2))),
+    ...buildLoadChoicePosition(CHOICE_CURSOR_POSITIONS, 'dlg_erase_pos'),
     label('dlg_erase_write'),
     xor_r('a'),
     ldi_hl_a(), // write blank tile
@@ -544,17 +554,7 @@ export function buildDialogueEngine(): Op[] {
     // =================================================================
     label('dlg_draw_cursor'),
     ld_a_nn(MEM.DLG_CURSOR),
-    cp_n(u8(0)),
-    jr_cc('nz', ref('dlg_draw_r1')),
-    ld_rr_nn('hl', u16(tilemapAddr(CHOICE_START_ROW, 2))),
-    jr(ref('dlg_draw_write')),
-    label('dlg_draw_r1'),
-    cp_n(u8(1)),
-    jr_cc('nz', ref('dlg_draw_r2')),
-    ld_rr_nn('hl', u16(tilemapAddr(CHOICE_START_ROW + 1, 2))),
-    jr(ref('dlg_draw_write')),
-    label('dlg_draw_r2'),
-    ld_rr_nn('hl', u16(tilemapAddr(CHOICE_START_ROW + 2, 2))),
+    ...buildLoadChoicePosition(CHOICE_CURSOR_POSITIONS, 'dlg_draw_pos'),
     label('dlg_draw_write'),
     ld_r_n('a', u8(CURSOR_TILE)),
     ldi_hl_a(),

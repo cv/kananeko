@@ -9,7 +9,8 @@ import { type DialogueNode, buildDialogueTree } from './dialogue';
 import { type KanaQuestion, buildKanaData } from './kana';
 import { textToTiles } from './font';
 import { SCENE_ICON_TILES } from './font-data';
-import { SCREEN_COLS } from './tilemap';
+import { type Pair, type Quad, type Quint } from './fixed';
+import { centerStartCol } from './tilemap';
 import { STATION_DIALOGUE } from './scenes/station';
 import { STREET_DIALOGUE } from './scenes/street';
 import { RESTAURANT_DIALOGUE } from './scenes/restaurant';
@@ -25,30 +26,28 @@ export function rgb(r: number, g: number, b: number): number {
   return ((r >> 3) & 0x1f) | (((g >> 3) & 0x1f) << 5) | (((b >> 3) & 0x1f) << 10);
 }
 
-export type Palette = readonly [number, number, number, number];
-export type KanaRound = readonly [
-  KanaQuestion,
-  KanaQuestion,
-  KanaQuestion,
-  KanaQuestion,
-  KanaQuestion,
-];
+export type Palette = Quad<number>;
+export type KanaRound = Quint<KanaQuestion>;
 
 export interface Scene {
   readonly name: string;
-  readonly icon: readonly [string, string];
+  readonly icon: Pair<string>;
   readonly dialogue: readonly DialogueNode[];
   readonly kanaQuestions: KanaRound;
   readonly palette: Palette;
 }
 
-type SceneList = readonly [Scene, Scene, Scene, Scene, Scene];
+export type SceneList = Quint<Scene>;
+
+export function defineScenes<const T extends SceneList>(scenes: T): T {
+  return scenes;
+}
 
 // ---------------------------------------------------------------------------
 // Scene assembly — metadata, palettes, icons, kana questions
 // ---------------------------------------------------------------------------
 
-export const SCENES = [
+export const SCENES = defineScenes([
   {
     name: 'えき',
     icon: SCENE_ICON_TILES.TRAIN,
@@ -264,7 +263,7 @@ export const SCENES = [
       },
     ],
   },
-] as const satisfies SceneList;
+] as const);
 
 // ---------------------------------------------------------------------------
 // Build packed scene data for ROM
@@ -282,7 +281,7 @@ export function buildSceneData(): PackedSceneData {
   return {
     scenes: SCENES.map((scene) => {
       const nameTiles = textToTiles(scene.name);
-      const pad = Math.floor((SCREEN_COLS - nameTiles.length) / 2);
+      const pad = centerStartCol(nameTiles.length);
       const nameRow = [...Array<number>(pad).fill(0), ...nameTiles];
 
       const dialogueData = buildDialogueTree(scene.dialogue);

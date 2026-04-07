@@ -38,7 +38,8 @@ import {
 import { MEM } from '../asm/hardware';
 import { requireTile, requireTiles } from './font';
 import { CAT_TILES } from './font-data';
-import { tilemapAddr } from './tilemap';
+import { type Quad } from './fixed';
+import { tilemapAddr, type TilePosition } from './tilemap';
 
 // ---------------------------------------------------------------------------
 // Layout & tile constants
@@ -66,7 +67,7 @@ export type DeltaType =
 export type ScoreDelta = 5 | 10 | 100;
 
 type HudTileExpr = TileIndex | 'from_a';
-type HudTileRun = readonly [TileIndex, TileIndex, TileIndex, TileIndex];
+type HudTileRun = Quad<TileIndex>;
 
 const HEART_FULL: TileIndex = requireTile(CAT_TILES.HEART_FULL);
 const HEART_EMPTY: TileIndex = requireTile(CAT_TILES.HEART_EMPTY);
@@ -146,8 +147,24 @@ function buildHeartAtCol(col: number, minLives: number): Op[] {
 }
 
 /** Draw a single tile at a fixed tilemap address (VRAM must be accessible) */
-export function buildDrawTileAt(row: number, col: number, tileExpr: HudTileExpr): Op[] {
-  const ops: Op[] = [ld_rr_nn('hl', u16(tilemapAddr(row, col)))];
+export function buildDrawTileAt(position: TilePosition, tileExpr: HudTileExpr): Op[];
+export function buildDrawTileAt(row: number, col: number, tileExpr: HudTileExpr): Op[];
+export function buildDrawTileAt(
+  rowOrPosition: number | TilePosition,
+  colOrTileExpr: number | HudTileExpr,
+  maybeTileExpr?: HudTileExpr,
+): Op[] {
+  const position =
+    typeof rowOrPosition === 'number'
+      ? tilemapAddr(rowOrPosition, colOrTileExpr as number)
+      : tilemapAddr(rowOrPosition);
+  const tileExpr =
+    typeof rowOrPosition === 'number' ? maybeTileExpr : (colOrTileExpr as HudTileExpr);
+  if (tileExpr === undefined) {
+    throw new TypeError('buildDrawTileAt(row, col, tile) requires a tile expression');
+  }
+
+  const ops: Op[] = [ld_rr_nn('hl', u16(position))];
   if (tileExpr !== 'from_a') {
     ops.push(ld_r_n('a', u8(tileExpr)));
   }

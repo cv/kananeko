@@ -40,7 +40,7 @@ import { buildReadJoypad } from './joypad';
 import { buildDialogueEngine } from './dialogue';
 import { buildKanaEngine } from './kana';
 import { buildSceneData, rgb, SCENES, type Palette } from './scene';
-import { SCREEN_COLS, tilemapAddr } from './tilemap';
+import { centerStartCol, tilemapAddr, tileRow } from './tilemap';
 
 // ---------------------------------------------------------------------------
 // Data
@@ -100,8 +100,8 @@ function buildSetPalette(palette: Palette): Op[] {
 
 function buildWriteRow(row: number, tiles: readonly number[]): Op[] {
   const ops: Op[] = [];
-  const col = Math.floor((SCREEN_COLS - tiles.length) / 2);
-  ops.push(ld_rr_nn('hl', u16(tilemapAddr(row, col))));
+  const col = centerStartCol(tiles.length);
+  ops.push(ld_rr_nn('hl', u16(tilemapAddr(tileRow(row), col))));
   for (const tile of tiles) {
     ops.push(ld_r_n('a', u8(tile)));
     ops.push(ldi_hl_a());
