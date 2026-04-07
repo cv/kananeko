@@ -108,6 +108,7 @@ export const MEM = {
   SCENE_ID: u16(0xc050), // Current scene index (0-4, 0xFF = title)
   SCENE_FLAGS: u16(0xc051), // Per-scene completion bitfield
   GAME_MODE: u16(0xc052), // 0=title, 1=dialogue, 2=kana, 3=transition
+  TITLE_TIMER: u16(0xc053), // Title-screen animation timer (1 tick per frame)
 } as const satisfies Record<string, U16>;
 
 // Joypad bit flags (active-high after our read routine)

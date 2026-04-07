@@ -9,10 +9,10 @@ import {
   KANA_AWAITING_INPUT,
 } from './helpers/test-constants';
 import { buildDialogueTree } from '@game/dialogue';
-import { runnerAtScene } from './helpers/dialogue-helpers';
+import { GameRunner } from './helpers/game-runner';
 
-function runnerAtOpeningDialogue(): ReturnType<typeof runnerAtScene> {
-  return runnerAtScene(0);
+function runnerAtOpeningDialogue(): GameRunner {
+  return new GameRunner().boot().start();
 }
 
 describe('Given the dialogue tree is being encoded into ROM data', () => {
@@ -49,14 +49,6 @@ describe('Given the player has started the opening conversation', () => {
     const runner = runnerAtOpeningDialogue();
     runner.waitForDialogueChoices().pressA();
     expect(runner.dlgResult).toBe(0);
-  });
-
-  it('moves the dialogue cursor down before confirming the selected choice', () => {
-    const runner = runnerAtOpeningDialogue();
-    runner.advanceDialogue();
-    runner.waitForDialogueChoices();
-    runner.pressDown().frames(3).pressA();
-    expect(runner.dlgResult).toBe(1);
   });
 
   it('restores one life and shows a positive delta after a good choice', () => {

@@ -61,18 +61,22 @@ function at<T>(arr: readonly T[], i: number): T {
 
 // Title screen text & palette
 const TITLE = 'カナネコ';
-const SUBTITLE = 'はじめ';
+const SUBTITLE = 'はじめよう!';
 const TITLE_PALETTE: Palette = [
-  rgb(0xe0, 0xf0, 0xe0),
-  rgb(0xa0, 0xc0, 0xa0),
-  rgb(0x50, 0x70, 0x50),
-  rgb(0x10, 0x20, 0x10),
+  rgb(0xff, 0xf3, 0xdb),
+  rgb(0xff, 0xc8, 0x8a),
+  rgb(0xc6, 0x7a, 0x3d),
+  rgb(0x4a, 0x28, 0x18),
 ];
 
 // Cat portrait tile rows (4x3 grid)
 const CAT_ROW0 = requireTiles(CAT_TILES.ROW0);
 const CAT_ROW1 = requireTiles(CAT_TILES.ROW1);
 const CAT_ROW2 = requireTiles(CAT_TILES.ROW2);
+const START_BOX_TOP = textToTiles('┌─────────────┐');
+const START_BOX_ON = textToTiles('│ PRESS START │');
+const START_BOX_OFF = textToTiles('│             │');
+const START_BOX_BOTTOM = textToTiles('└─────────────┘');
 
 // ---------------------------------------------------------------------------
 // Helper: write a row of tiles at a tilemap address
@@ -193,6 +197,7 @@ export function buildProgram(): Op[] {
     ld_nn_a(MEM.SCENE_ID),
     ld_nn_a(MEM.SCENE_FLAGS),
     ld_nn_a(MEM.GAME_MODE),
+    ld_nn_a(MEM.TITLE_TIMER),
     ld_nn_a(MEM.KANA_SCORE_LO),
     ld_nn_a(MEM.KANA_SCORE_HI),
     ld_nn_a(MEM.DELTA_TYPE),
@@ -236,6 +241,10 @@ export function buildProgram(): Op[] {
     // Clear tilemap (LCD already off or we turn it off)
     ...buildClearTilemap(),
 
+    // Reset title animation state so the prompt always starts visible.
+    xor_r('a'),
+    ld_nn_a(MEM.TITLE_TIMER),
+
     // Draw score HUD on row 0
     call(ref('kana_draw_hud')),
 
@@ -244,9 +253,12 @@ export function buildProgram(): Op[] {
     ...buildWriteRow(3, CAT_ROW1),
     ...buildWriteRow(4, CAT_ROW2),
 
-    // Draw title text
+    // Draw title card + prompt frame
     ...buildWriteRow(7, textToTiles(TITLE)),
     ...buildWriteRow(10, textToTiles(SUBTITLE)),
+    ...buildWriteRow(12, START_BOX_TOP),
+    ...buildWriteRow(13, START_BOX_ON),
+    ...buildWriteRow(14, START_BOX_BOTTOM),
 
     // Turn on LCD
     ld_r_n('a', u8(LCDC.LCD_ON | LCDC.TILE_DATA_8000 | LCDC.BG_ON)),
@@ -272,12 +284,26 @@ export function buildProgram(): Op[] {
     halt(),
     nop(),
     call(ref('joy_read')),
+
+    // Blink the START prompt at a gentler pace.
+    ld_a_nn(MEM.TITLE_TIMER),
+    inc_r('a'),
+    ld_nn_a(MEM.TITLE_TIMER),
+    and_n(u8(0x20)),
+    jr_cc('z', ref('title_prompt_on')),
+    ...buildWriteRow(13, START_BOX_OFF),
+    jr(ref('title_prompt_done')),
+    label('title_prompt_on'),
+    ...buildWriteRow(13, START_BOX_ON),
+    label('title_prompt_done'),
+
     ld_a_nn(MEM.JOYPAD_NEW),
     and_n(u8(JOY.START)),
     jr_cc('z', ref('title_loop')),
 
     // START pressed — begin scene 0
     xor_r('a'),
+    ldh_n_a(HW.DIV), // reset entropy timing so gameplay remains deterministic after title idling
     ld_nn_a(MEM.SCENE_ID),
 
     // ==== Scene dispatch ====
