@@ -328,9 +328,9 @@ export function buildProgram(): Op[] {
     label('scene_dlg_loop'),
     halt(),
     nop(),
+    call(ref('hud_update')), // refresh HUD early in VBlank window
     call(ref('joy_read')),
     call(ref('dlg_update')),
-    call(ref('hud_update')),
     ld_a_nn(MEM.DLG_STATE),
     cp_n(u8(0)),
     jr_cc('nz', ref('scene_dlg_loop')),
@@ -354,9 +354,9 @@ export function buildProgram(): Op[] {
     label('scene_kana_loop'),
     halt(),
     nop(),
+    call(ref('hud_update')), // refresh HUD early in VBlank window
     call(ref('joy_read')),
     call(ref('kana_update')),
-    call(ref('hud_update')),
     ld_a_nn(MEM.KANA_STATE),
     cp_n(u8(0)),
     jr_cc('nz', ref('scene_kana_loop')),
