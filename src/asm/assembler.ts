@@ -46,6 +46,11 @@ export function assemble(program: Op[], header: ROMHeader): AssembleResult {
   // Write header ($0100 – $014F)
   // -----------------------------------------------------------------------
 
+  // VBlank interrupt handler at $0040 — just RETI so HALT wakes up.
+  // The GB boot ROM enables VBlank in IE ($FFFF) before jumping to $0100,
+  // so we don't need to set IE ourselves — just provide the handler.
+  rom[0x0040] = 0xd9; // RETI
+
   // Entry point: NOP + JP $0150
   rom[0x0100] = 0x00; // NOP
   rom[0x0101] = 0xc3; // JP
