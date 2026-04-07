@@ -199,6 +199,10 @@ export function buildProgram(): Op[] {
     ld_nn_a(MEM.SCENE_ID),
     ld_nn_a(MEM.SCENE_FLAGS),
     ld_nn_a(MEM.GAME_MODE),
+    ld_nn_a(MEM.KANA_SCORE_LO),
+    ld_nn_a(MEM.KANA_SCORE_HI),
+    ld_r_n('a', u8(3)),
+    ld_nn_a(MEM.KANA_LIVES),
 
     // Wait for VBlank
     label('init_vblank'),
@@ -235,6 +239,9 @@ export function buildProgram(): Op[] {
 
     // Clear tilemap (LCD already off or we turn it off)
     ...buildClearTilemap(),
+
+    // Draw score HUD on row 0
+    call(ref('kana_draw_hud')),
 
     // Draw cat portrait (4x3 tiles, centered)
     ...buildWriteRow(2, CAT_ROW0),
@@ -303,6 +310,9 @@ export function buildProgram(): Op[] {
 
     // Set scene palette (dispatched by scene_id)
     ...buildSceneDispatch((i) => buildSetPalette(at(SCENES, i).palette)),
+
+    // Draw score HUD on row 0 (hearts + 4-digit score)
+    call(ref('kana_draw_hud')),
 
     // Turn LCD back on
     ld_r_n('a', u8(LCDC.LCD_ON | LCDC.TILE_DATA_8000 | LCDC.BG_ON)),
