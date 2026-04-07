@@ -34,7 +34,7 @@ describe('dialogue', () => {
 
   it('confirms choice and stores result', () => {
     const runner = new GameRunner().boot().start();
-    runner.waitForDialogueChoices().press('A');
+    runner.waitForDialogueChoices().pressA();
     expect(runner.dlgResult).toBe(0);
   });
 
@@ -42,7 +42,7 @@ describe('dialogue', () => {
     const runner = new GameRunner().boot().start();
     runner.advanceDialogue(); // node 0 → node 1
     runner.waitForDialogueChoices();
-    runner.press('DOWN').frames(3).press('A');
+    runner.pressDown().frames(3).pressA();
     expect(runner.dlgResult).toBe(1);
   });
 
@@ -50,10 +50,10 @@ describe('dialogue', () => {
     const runner = new GameRunner().boot().start();
     // Lose a life first via bad choice
     runner.waitForDialogueChoices();
-    runner.press('DOWN').frames(3).press('A').frames(3);
+    runner.pressDown().frames(3).pressA().frames(3);
     expect(runner.kanaLives).toBe(2);
     // Now good choice should restore the life
-    runner.waitForDialogueChoices().press('A').frames(3);
+    runner.waitForDialogueChoices().pressA().frames(3);
     expect(runner.kanaLives).toBe(3); // restored
     expect(runner.deltaType).toBe(2); // DELTA_PLUS_10
   });
@@ -61,7 +61,7 @@ describe('dialogue', () => {
   it('good choice: lives capped at 3', () => {
     const runner = new GameRunner().boot().start();
     expect(runner.kanaLives).toBe(3);
-    runner.waitForDialogueChoices().press('A').frames(3);
+    runner.waitForDialogueChoices().pressA().frames(3);
     expect(runner.kanaLives).toBe(3); // still 3, not 4
   });
 
@@ -69,7 +69,7 @@ describe('dialogue', () => {
     const runner = new GameRunner().boot().start();
     expect(runner.kanaLives).toBe(3);
     runner.waitForDialogueChoices();
-    runner.press('DOWN').frames(3).press('A').frames(3);
+    runner.pressDown().frames(3).pressA().frames(3);
     expect(runner.kanaLives).toBe(2);
     expect(runner.deltaType).toBe(3); // DELTA_MINUS_5
   });
@@ -80,7 +80,7 @@ describe('dialogue', () => {
     // Pick bad choice 3 times in a row
     for (let i = 0; i < 3; i++) {
       runner.waitForDialogueChoices();
-      runner.press('DOWN').frames(3).press('A').frames(5);
+      runner.pressDown().frames(3).pressA().frames(5);
     }
     // Dialogue ended — kana starts with 1 restocked life
     runner.waitForKanaInput();

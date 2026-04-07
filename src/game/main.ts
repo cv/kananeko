@@ -361,6 +361,11 @@ export function buildProgram(): Op[] {
     cp_n(u8(0)),
     jr_cc('nz', ref('scene_kana_loop')),
 
+    // Check if player died (lives == 0) → game over
+    ld_a_nn(MEM.KANA_LIVES),
+    cp_n(u8(0)),
+    jp_cc('z', ref('game_over')),
+
     // ==== Scene complete — set completion flag and advance ====
     ...buildSceneDispatch((i) => [ld_r_n('b', u8(1 << i))]),
     ld_a_nn(MEM.SCENE_FLAGS),
@@ -382,6 +387,54 @@ export function buildProgram(): Op[] {
     ldh_a_n(HW.LY),
     cp_n(u8(144)),
     jr_cc('nz', ref('game_complete_vblank')),
+    xor_r('a'),
+    ldh_n_a(HW.LCDC),
+
+    jp(ref('title_screen')),
+
+    // ==== Game Over ====
+    label('game_over'),
+
+    // Turn LCD off
+    label('gameover_vblank'),
+    ldh_a_n(HW.LY),
+    cp_n(u8(144)),
+    jr_cc('nz', ref('gameover_vblank')),
+    xor_r('a'),
+    ldh_n_a(HW.LCDC),
+
+    // Clear tilemap and draw game over screen
+    ...buildClearTilemap(),
+    ...buildWriteRow(6, textToTiles('GAME OVER')),
+    call(ref('kana_draw_hud')), // show final score + empty hearts
+
+    // Turn LCD on
+    ld_r_n('a', u8(LCDC.LCD_ON | LCDC.TILE_DATA_8000 | LCDC.BG_ON)),
+    ldh_n_a(HW.LCDC),
+
+    // Wait for START
+    label('gameover_loop'),
+    halt(),
+    nop(),
+    call(ref('joy_read')),
+    ld_a_nn(MEM.JOYPAD_NEW),
+    and_n(u8(JOY.START)),
+    jr_cc('z', ref('gameover_loop')),
+
+    // Reset score and lives, back to title
+    xor_r('a'),
+    ld_nn_a(MEM.KANA_SCORE_LO),
+    ld_nn_a(MEM.KANA_SCORE_HI),
+    ld_nn_a(MEM.DELTA_TYPE),
+    ld_nn_a(MEM.DELTA_TIMER),
+    ld_r_n('a', u8(3)),
+    ld_nn_a(MEM.KANA_LIVES),
+
+    // Turn LCD off for title redraw
+    label('gameover_to_title'),
+    ldh_a_n(HW.LY),
+    cp_n(u8(144)),
+    jr_cc('nz', ref('gameover_to_title')),
     xor_r('a'),
     ldh_n_a(HW.LCDC),
 

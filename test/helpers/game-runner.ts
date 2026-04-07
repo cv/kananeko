@@ -75,22 +75,23 @@ export class GameRunner {
   }
 
   /** Press a key for one frame */
-  press(key: string): this {
-    const keyMap: Record<string, number> = {
-      A: Gameboy.KEYMAP.A as number,
-      B: Gameboy.KEYMAP.B as number,
-      START: Gameboy.KEYMAP.START as number,
-      SELECT: Gameboy.KEYMAP.SELECT as number,
-      UP: Gameboy.KEYMAP.UP as number,
-      DOWN: Gameboy.KEYMAP.DOWN as number,
-      LEFT: Gameboy.KEYMAP.LEFT as number,
-      RIGHT: Gameboy.KEYMAP.RIGHT as number,
-    };
-    const k = keyMap[key];
-    if (k === undefined) throw new Error(`Unknown key: ${key}`);
-    this.gb.pressKey(k);
+  private pressKey(key: number): this {
+    this.gb.pressKey(key);
     this.gb.doFrame();
     return this;
+  }
+
+  pressA(): this {
+    return this.pressKey(Gameboy.KEYMAP.A as number);
+  }
+  pressStart(): this {
+    return this.pressKey(Gameboy.KEYMAP.START as number);
+  }
+  pressUp(): this {
+    return this.pressKey(Gameboy.KEYMAP.UP as number);
+  }
+  pressDown(): this {
+    return this.pressKey(Gameboy.KEYMAP.DOWN as number);
   }
 
   /** Read a WRAM byte by its MEM constant */
@@ -214,12 +215,21 @@ export class GameRunner {
 
   /** Press START to begin the game from the title screen */
   start(): this {
-    return this.press('START').frames(GameRunner.INPUT_DEBOUNCE);
+    return this.pressStart().frames(GameRunner.INPUT_DEBOUNCE);
   }
 
-  /** Wait for dialogue choices to appear, then pick first choice */
+  /** Wait for dialogue choices to appear, then pick first choice (good) */
   advanceDialogue(): this {
-    return this.waitForDialogueChoices().press('A').frames(GameRunner.INPUT_DEBOUNCE);
+    return this.waitForDialogueChoices().pressA().frames(GameRunner.INPUT_DEBOUNCE);
+  }
+
+  /** Wait for dialogue choices to appear, then pick second choice (bad) */
+  advanceDialogueBad(): this {
+    return this.waitForDialogueChoices()
+      .pressDown()
+      .frames(GameRunner.INPUT_DEBOUNCE)
+      .pressA()
+      .frames(GameRunner.INPUT_DEBOUNCE);
   }
 
   /** Complete an entire dialogue tree (always choosing first option until conversation ends) */

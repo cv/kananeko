@@ -59,6 +59,22 @@ describe('kana', () => {
     expect(runner.kanaState).toBe(0); // kana round ended
   });
 
+  it('shows game over and returns to title on START', () => {
+    const runner = new GameRunner().boot().start().completeDialogueTree(0);
+    // Die 3 times to lose all lives
+    for (let death = 0; death < 3; death++) {
+      runner.answerKanaWrong();
+      runner.answerKanaWrong();
+      runner.answerKanaWrong();
+    }
+    expect(runner.kanaLives).toBe(0);
+    // Game over screen — press START to return to title
+    runner.frames(10).pressStart().frames(10);
+    // Should be back at title with reset state
+    expect(runner.kanaLives).toBe(3);
+    expect(runner.kanaScore).toBe(0);
+  });
+
   it('advances to next question after correct answer', () => {
     const runner = new GameRunner().boot().start().completeDialogueTree(0);
     runner.answerKanaCorrectly();

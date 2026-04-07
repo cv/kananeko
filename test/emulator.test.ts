@@ -41,22 +41,22 @@ describe('emulator', () => {
 
 describe('joypad', () => {
   it('detects START press', () => {
-    const runner = new GameRunner().boot().press('START');
+    const runner = new GameRunner().boot().pressStart();
     expect(runner.joypadCurrent & JOY.START).toBe(JOY.START);
     expect(runner.joypadNew & JOY.START).toBe(JOY.START);
   });
 
   it('edge-detects: newly pressed clears on sustained hold', () => {
     const runner = new GameRunner().boot();
-    runner.press('A');
+    runner.pressA();
     expect(runner.joypadNew & JOY.A).toBe(JOY.A);
-    runner.press('A');
+    runner.pressA();
     expect(runner.joypadCurrent & JOY.A).toBe(JOY.A);
     expect(runner.joypadNew & JOY.A).toBe(0);
   });
 
   it('detects d-pad UP', () => {
-    const runner = new GameRunner().boot().press('UP');
+    const runner = new GameRunner().boot().pressUp();
     expect(runner.joypadCurrent & JOY.UP).toBe(JOY.UP);
   });
 });
