@@ -11,7 +11,7 @@
     "lint": "eslint --max-warnings 0 .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "hooks:install": "npx @j178/prek install"
+    "hooks:install": "npx @j178/prek install -t pre-commit -t commit-msg"
   },
   "keywords": [],
   "author": "",

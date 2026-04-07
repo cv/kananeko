@@ -23,3 +23,11 @@ repos:
         language: system
         pass_filenames: false
         always_run: true
+
+      - id: block-co-authored-by
+        name: block Co-Authored-By trailers
+        entry: bash scripts/check-commit-message.sh
+        language: system
+        stages: [commit-msg]
+        pass_filenames: true
+        always_run: true
