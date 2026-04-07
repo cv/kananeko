@@ -63,9 +63,9 @@ export function buildDialogueTree(tree: DialogueTree): Uint8Array {
       chunk.push(choice.next ?? END_MARKER);
     }
 
-    // Good-answer flags (1 = no hint = good, 0 = has hint = bad)
-    for (const choice of node.choices) {
-      chunk.push(choice.hint === undefined ? 1 : 0);
+    // Good-answer flags (first choice = good, rest = bad)
+    for (let ci = 0; ci < node.choices.length; ci++) {
+      chunk.push(ci === 0 ? 1 : 0);
     }
 
     // Choice texts, each null-terminated

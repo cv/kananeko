@@ -35,10 +35,6 @@ import {
   cp_n,
   cp_r,
   add_r,
-  add_n,
-  adc_n,
-  sub_n,
-  sbc_n,
   adc_r,
   add_hl_rr,
   inc_r,
@@ -54,6 +50,13 @@ import {
 } from '../asm/ops';
 import { HW, JOY, LCDC, MEM } from '../asm/hardware';
 import { requireTile } from './font';
+import {
+  buildAddScore,
+  buildSubScore,
+  buildSetDelta,
+  DELTA_PLUS_10,
+  DELTA_MINUS_5,
+} from './kana-hud';
 
 // Re-export data types and encoder from dialogue-data.ts
 export { buildDialogueTree } from './dialogue-data';
@@ -488,23 +491,15 @@ export function buildDialogueEngine(): Op[] {
     // Score: +10 if good, -5 if bad
     cp_n(u8(1)),
     jr_cc('nz', ref('dlg_bad_choice')),
-    // Good: +10 to kana score
-    ld_a_nn(MEM.KANA_SCORE_LO),
-    add_n(u8(10)),
-    ld_nn_a(MEM.KANA_SCORE_LO),
-    ld_a_nn(MEM.KANA_SCORE_HI),
-    adc_n(u8(0)),
-    ld_nn_a(MEM.KANA_SCORE_HI),
+    // Good: +10
+    ...buildAddScore(10),
+    ...buildSetDelta(DELTA_PLUS_10),
     jr(ref('dlg_score_done')),
 
     label('dlg_bad_choice'),
-    // Bad: -5 from kana score
-    ld_a_nn(MEM.KANA_SCORE_LO),
-    sub_n(u8(5)),
-    ld_nn_a(MEM.KANA_SCORE_LO),
-    ld_a_nn(MEM.KANA_SCORE_HI),
-    sbc_n(u8(0)),
-    ld_nn_a(MEM.KANA_SCORE_HI),
+    // Bad: -5
+    ...buildSubScore(5),
+    ...buildSetDelta(DELTA_MINUS_5),
 
     label('dlg_score_done'),
     // Set state = idle

@@ -156,6 +156,10 @@ export class GameRunner {
     return this.readMem(MEM.KANA_Q_IDX);
   }
 
+  get deltaType(): number {
+    return this.readMem(MEM.DELTA_TYPE);
+  }
+
   get sceneId(): number {
     return this.readMem(MEM.SCENE_ID);
   }

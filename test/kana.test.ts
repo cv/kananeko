@@ -65,4 +65,18 @@ describe('kana', () => {
     expect(runner.kanaQuestionIdx).toBe(1);
     expect(runner.kanaState).toBe(2); // awaiting next
   });
+
+  it('sets delta flash +100 on correct first try', () => {
+    const runner = new GameRunner().boot().start().completeDialogueTree(0);
+    runner.answerKanaCorrectly();
+    expect(runner.deltaType).toBe(1); // DELTA_PLUS_100
+  });
+
+  it('sets delta flash -100 on death', () => {
+    const runner = new GameRunner().boot().start().completeDialogueTree(0);
+    runner.answerKanaWrong();
+    runner.answerKanaWrong();
+    runner.answerKanaWrong(); // death
+    expect(runner.deltaType).toBe(4); // DELTA_MINUS_100
+  });
 });

@@ -51,7 +51,16 @@ import {
 import { HW, JOY, LCDC, MEM } from '../asm/hardware';
 import { requireTile, textToTiles } from './font';
 import { CAT_TILES } from './font-data';
-import { buildAddScore, buildSubScore, buildDrawTileAt, buildDrawHudOps } from './kana-hud';
+import {
+  buildAddScore,
+  buildSubScore,
+  buildSetDelta,
+  buildDrawTileAt,
+  buildDrawHudOps,
+  DELTA_PLUS_100,
+  DELTA_PLUS_10,
+  DELTA_MINUS_100,
+} from './kana-hud';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -407,12 +416,14 @@ export function buildKanaEngine(): Op[] {
     cp_n(u8(0)),
     jr_cc('nz', ref('kana_score_attempt1')),
     ...buildAddScore(SCORE_FIRST_TRY),
+    ...buildSetDelta(DELTA_PLUS_100),
     jr(ref('kana_correct_done')),
 
     label('kana_score_attempt1'),
     cp_n(u8(1)),
     jr_cc('nz', ref('kana_correct_done')),
     ...buildAddScore(SCORE_SECOND_TRY),
+    ...buildSetDelta(DELTA_PLUS_10),
     // Attempt 2: +0 (fall through)
 
     label('kana_correct_done'),
@@ -440,6 +451,7 @@ export function buildKanaEngine(): Op[] {
     // === DEATH (3rd wrong) ===
     label('kana_death'),
     ...buildSubScore(SCORE_DEATH_PENALTY),
+    ...buildSetDelta(DELTA_MINUS_100),
 
     // Lose a life
     ld_a_nn(MEM.KANA_LIVES),

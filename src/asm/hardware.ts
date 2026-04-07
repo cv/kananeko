@@ -101,6 +101,10 @@ export const MEM = {
   KANA_SHUFFLE2: u16(0xc04a), // shuffle buffer[2]
   KANA_SHUFFLE3: u16(0xc04b), // shuffle buffer[3]
 
+  // WRAM — HUD delta flash
+  DELTA_TYPE: u16(0xc04c), // 0=none, 1=+100, 2=+10, 3=-5, 4=-100
+  DELTA_TIMER: u16(0xc04d), // Frames remaining for flash display
+
   // WRAM — scene system
   SCENE_ID: u16(0xc050), // Current scene index (0-4, 0xFF = title)
   SCENE_FLAGS: u16(0xc051), // Per-scene completion bitfield
