@@ -10,6 +10,8 @@ export default defineConfig({
   },
   test: {
     testTimeout: 30000,
+    maxWorkers: '100%',
+    slowTestThreshold: 1000,
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],

@@ -6,6 +6,7 @@
   "scripts": {
     "build": "tsx src/build.ts",
     "test": "vitest run",
+    "test:slow": "vitest run --reporter=verbose --slowTestThreshold=1000",
     "test:coverage": "vitest run --coverage",
     "test:coverage:check": "vitest run --coverage && tsx scripts/check-coverage.ts",
     "lint": "eslint --max-warnings 0 .",
