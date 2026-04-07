@@ -38,12 +38,11 @@ import {
 import { MEM } from '../asm/hardware';
 import { requireTile, requireTiles } from './font';
 import { CAT_TILES } from './font-data';
+import { tilemapAddr } from './tilemap';
 
 // ---------------------------------------------------------------------------
 // Layout & tile constants
 // ---------------------------------------------------------------------------
-
-const MAP_COLS = 32;
 
 // Row 0 column positions
 const HEART_COL = 1; // Hearts at cols 1, 2, 3
@@ -85,10 +84,6 @@ const DELTA_TILE_RUNS: Record<DeltaType, HudTileRun> = {
   [DELTA_MINUS_5]: [SPACE_TILE, SPACE_TILE, MINUS_TILE, d5],
   [DELTA_MINUS_100]: [MINUS_TILE, d1, d0, d0],
 };
-
-function tilemapAddr(row: number, col: number): number {
-  return 0x9800 + row * MAP_COLS + col;
-}
 
 // ---------------------------------------------------------------------------
 // Score arithmetic helpers

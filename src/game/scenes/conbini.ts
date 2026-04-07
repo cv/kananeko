@@ -1,8 +1,8 @@
-import { type DialogueNode } from '../dialogue';
+import { defineDialogueTree } from '../dialogue';
 
 // ---------------------------------------------------------------------------
 
-export const CONBINI_DIALOGUE: DialogueNode[] = [
+export const CONBINI_DIALOGUE = defineDialogueTree([
   // --- NPC 1: Store clerk ---
   {
     // 0
@@ -727,4 +727,4 @@ export const CONBINI_DIALOGUE: DialogueNode[] = [
       { text: 'やった!', next: null },
     ],
   },
-];
+] as const);

@@ -1,8 +1,8 @@
-import { type DialogueNode } from '../dialogue';
+import { defineDialogueTree } from '../dialogue';
 
 // ---------------------------------------------------------------------------
 
-export const PARK_DIALOGUE: DialogueNode[] = [
+export const PARK_DIALOGUE = defineDialogueTree([
   // --- NPC 1: Stranger ゆき ---
   {
     // 0
@@ -727,4 +727,4 @@ export const PARK_DIALOGUE: DialogueNode[] = [
       { text: 'だいすき にほん!', next: null },
     ],
   },
-];
+] as const);

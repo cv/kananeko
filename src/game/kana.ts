@@ -51,6 +51,7 @@ import {
 import { HW, JOY, LCDC, MEM } from '../asm/hardware';
 import { requireTile, textToTiles } from './font';
 import { CAT_TILES } from './font-data';
+import { tilePos, tilemapAddr } from './tilemap';
 import {
   buildAddScore,
   buildSubScore,
@@ -84,13 +85,12 @@ export interface KanaQuestion {
 // Layout
 // ---------------------------------------------------------------------------
 
-const MAP_COLS = 32;
 const WORD_ROW = 6;
 
-const OPT_UP = { row: 3, col: 10 };
-const OPT_DOWN = { row: 9, col: 10 };
-const OPT_LEFT = { row: 6, col: 2 };
-const OPT_RIGHT = { row: 6, col: 17 };
+const OPT_UP = tilePos(3, 10);
+const OPT_DOWN = tilePos(9, 10);
+const OPT_LEFT = tilePos(6, 2);
+const OPT_RIGHT = tilePos(6, 17);
 const OPTION_POSITIONS = [OPT_UP, OPT_DOWN, OPT_LEFT, OPT_RIGHT] as const;
 // Positions ordered: 0=UP, 1=DOWN, 2=LEFT, 3=RIGHT (matches direction encoding)
 
@@ -129,10 +129,6 @@ const ANSWER_LAYOUTS = [
   [2, 3, 0, 1],
   [1, 2, 3, 0],
 ] as const satisfies readonly [AnswerLayout, AnswerLayout, AnswerLayout, AnswerLayout];
-
-function tilemapAddr(row: number, col: number): number {
-  return 0x9800 + row * MAP_COLS + col;
-}
 
 // Tile constants
 const BLANK_TILE: TileIndex = requireTile(CAT_TILES.BLANK);

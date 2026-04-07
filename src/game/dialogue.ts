@@ -50,6 +50,7 @@ import {
 } from '../asm/ops';
 import { HW, JOY, LCDC, MEM } from '../asm/hardware';
 import { requireTile } from './font';
+import { SCREEN_COLS, tilemapAddr } from './tilemap';
 import {
   buildAddScore,
   buildSubScore,
@@ -59,7 +60,7 @@ import {
 } from './kana-hud';
 
 // Re-export data types and encoder from dialogue-data.ts
-export { buildDialogueTree } from './dialogue-data';
+export { buildDialogueTree, defineDialogueTree } from './dialogue-data';
 export type { DialogueNode, DialogueTree } from './dialogue-data';
 
 // ---------------------------------------------------------------------------
@@ -70,8 +71,6 @@ const BOX_TOP_ROW = 11;
 const BOX_ROWS = 7; // rows 11-17
 const TEXT_ROW_1 = 12;
 const CHOICE_START_ROW = 14;
-const MAP_COLS = 32;
-const SCREEN_COLS = 20;
 const REVEAL_DELAY = 3; // frames between each character reveal
 
 // Tile indices for border characters
@@ -82,10 +81,6 @@ const BORDER_BR = requireTile('┘');
 const BORDER_H = requireTile('─');
 const BORDER_V = requireTile('│');
 const CURSOR_TILE = requireTile('▶');
-
-function tilemapAddr(row: number, col: number): number {
-  return 0x9800 + row * MAP_COLS + col;
-}
 
 // ---------------------------------------------------------------------------
 // Assembly: text box border (drawn with LCD off)

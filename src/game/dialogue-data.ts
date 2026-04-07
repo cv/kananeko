@@ -11,24 +11,74 @@ import { textToTiles } from './font';
 // Types
 // ---------------------------------------------------------------------------
 
-export interface DialogueChoice {
+export interface DialogueChoice<Next extends number | null = number | null> {
   readonly text: string;
-  readonly next: number | null; // next node index, null = end conversation
+  readonly next: Next; // next node index, null = end conversation
   readonly hint?: string; // shown briefly if this isn't the ideal response
 }
 
-export type DialogueChoices =
+export type DialogueChoices<Next extends number | null = number | null> =
   | readonly []
-  | readonly [DialogueChoice]
-  | readonly [DialogueChoice, DialogueChoice]
-  | readonly [DialogueChoice, DialogueChoice, DialogueChoice];
+  | readonly [DialogueChoice<Next>]
+  | readonly [DialogueChoice<Next>, DialogueChoice<Next>]
+  | readonly [DialogueChoice<Next>, DialogueChoice<Next>, DialogueChoice<Next>];
 
-export interface DialogueNode {
+export interface DialogueNode<Next extends number | null = number | null> {
   readonly text: string;
-  readonly choices: DialogueChoices;
+  readonly choices: DialogueChoices<Next>;
 }
 
 export type DialogueTree = readonly DialogueNode[];
+
+type TupleKeys<T extends readonly unknown[]> = Exclude<keyof T, keyof (readonly unknown[])>;
+type TupleIndex<T extends readonly unknown[]> =
+  TupleKeys<T> extends infer K ? (K extends `${infer N extends number}` ? N : never) : never;
+type ValidNext<T extends readonly unknown[]> = TupleIndex<T> | null;
+
+type ValidateChoice<Choice, Next extends number | null> = Choice extends {
+  readonly text: infer Text extends string;
+  readonly next: infer ChoiceNext extends number | null;
+  readonly hint?: infer Hint extends string | undefined;
+}
+  ? {
+      readonly text: Text;
+      readonly next: ChoiceNext extends Next ? ChoiceNext : Next;
+      readonly hint?: Hint;
+    }
+  : DialogueChoice<Next>;
+
+type ValidateChoices<
+  Choices extends readonly unknown[],
+  Next extends number | null,
+> = Choices extends readonly []
+  ? readonly []
+  : Choices extends readonly [infer A]
+    ? readonly [ValidateChoice<A, Next>]
+    : Choices extends readonly [infer A, infer B]
+      ? readonly [ValidateChoice<A, Next>, ValidateChoice<B, Next>]
+      : Choices extends readonly [infer A, infer B, infer C]
+        ? readonly [ValidateChoice<A, Next>, ValidateChoice<B, Next>, ValidateChoice<C, Next>]
+        : DialogueChoices<Next>;
+
+type ValidateNode<Node, Next extends number | null> = Node extends {
+  readonly text: infer Text extends string;
+  readonly choices: infer Choices extends readonly unknown[];
+}
+  ? {
+      readonly text: Text;
+      readonly choices: ValidateChoices<Choices, Next>;
+    }
+  : DialogueNode<Next>;
+
+type ValidateDialogueTree<T extends readonly unknown[]> = {
+  readonly [K in keyof T]: ValidateNode<T[K], ValidNext<T>>;
+};
+
+export function defineDialogueTree<const T extends readonly DialogueNode[]>(
+  tree: T & ValidateDialogueTree<T>,
+): T & ValidateDialogueTree<T> {
+  return tree;
+}
 
 // ---------------------------------------------------------------------------
 // Encoder

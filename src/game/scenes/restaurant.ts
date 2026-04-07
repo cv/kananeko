@@ -1,8 +1,8 @@
-import { type DialogueNode } from '../dialogue';
+import { defineDialogueTree } from '../dialogue';
 
 // ---------------------------------------------------------------------------
 
-export const RESTAURANT_DIALOGUE: DialogueNode[] = [
+export const RESTAURANT_DIALOGUE = defineDialogueTree([
   // --- NPC 1: Waiter ---
   {
     // 0
@@ -727,4 +727,4 @@ export const RESTAURANT_DIALOGUE: DialogueNode[] = [
       { text: 'ばいばい!', next: null },
     ],
   },
-];
+] as const);

@@ -9,6 +9,7 @@ import { type DialogueNode, buildDialogueTree } from './dialogue';
 import { type KanaQuestion, buildKanaData } from './kana';
 import { textToTiles } from './font';
 import { SCENE_ICON_TILES } from './font-data';
+import { SCREEN_COLS } from './tilemap';
 import { STATION_DIALOGUE } from './scenes/station';
 import { STREET_DIALOGUE } from './scenes/street';
 import { RESTAURANT_DIALOGUE } from './scenes/restaurant';
@@ -281,7 +282,7 @@ export function buildSceneData(): PackedSceneData {
   return {
     scenes: SCENES.map((scene) => {
       const nameTiles = textToTiles(scene.name);
-      const pad = Math.floor((20 - nameTiles.length) / 2);
+      const pad = Math.floor((SCREEN_COLS - nameTiles.length) / 2);
       const nameRow = [...Array<number>(pad).fill(0), ...nameTiles];
 
       const dialogueData = buildDialogueTree(scene.dialogue);

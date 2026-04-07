@@ -40,6 +40,7 @@ import { buildReadJoypad } from './joypad';
 import { buildDialogueEngine } from './dialogue';
 import { buildKanaEngine } from './kana';
 import { buildSceneData, rgb, SCENES, type Palette } from './scene';
+import { SCREEN_COLS, tilemapAddr } from './tilemap';
 
 // ---------------------------------------------------------------------------
 // Data
@@ -48,13 +49,6 @@ import { buildSceneData, rgb, SCENES, type Palette } from './scene';
 const tileData = buildTileData();
 const tileDataSize = tileData.length;
 const sceneData = buildSceneData();
-
-const MAP_COLS = 32;
-const SCREEN_COLS = 20;
-
-function tilemapAddr(row: number, col: number): number {
-  return 0x9800 + row * MAP_COLS + col;
-}
 
 /** Safe array access — throws instead of returning undefined */
 function at<T>(arr: readonly T[], i: number): T {

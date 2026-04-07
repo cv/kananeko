@@ -1,8 +1,8 @@
-import { type DialogueNode } from '../dialogue';
+import { defineDialogueTree } from '../dialogue';
 
 // ---------------------------------------------------------------------------
 
-export const STREET_DIALOGUE: DialogueNode[] = [
+export const STREET_DIALOGUE = defineDialogueTree([
   // --- NPC 1: Lost tourist ---
   {
     // 0
@@ -727,4 +727,4 @@ export const STREET_DIALOGUE: DialogueNode[] = [
       { text: 'さようなら!', next: null },
     ],
   },
-];
+] as const);
