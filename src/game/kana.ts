@@ -638,6 +638,10 @@ export function buildKanaEngine(): Op[] {
     dec_r('a'),
     ld_nn_a(MEM.KANA_LIVES),
 
+    // If no lives left, end kana round immediately
+    cp_n(u8(0)),
+    jp_cc('z', ref('kana_all_done')),
+
     // Show wrong feedback then advance (don't re-prompt)
     ld_r_n('a', u8(STATE_CORRECT_FB)),
     ld_nn_a(MEM.KANA_STATE),

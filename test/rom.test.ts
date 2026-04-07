@@ -308,6 +308,19 @@ describe('kana', () => {
     expect(runner.kanaLives).toBe(2);
   });
 
+  it('ends kana round when lives reach 0', () => {
+    const runner = new GameRunner().boot().start().completeDialogueTree(0);
+    expect(runner.kanaLives).toBe(3);
+    // Die 3 times (each death = 3 wrong answers)
+    for (let death = 0; death < 3; death++) {
+      runner.answerKanaWrong();
+      runner.answerKanaWrong();
+      runner.answerKanaWrong();
+    }
+    expect(runner.kanaLives).toBe(0);
+    expect(runner.kanaState).toBe(0); // kana round ended
+  });
+
   it('advances to next question after correct answer', () => {
     const runner = new GameRunner().boot().start().completeDialogueTree(0);
     runner.answerKanaCorrectly();
