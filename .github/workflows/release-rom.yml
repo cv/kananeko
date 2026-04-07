@@ -1,0 +1,118 @@
+name: release-rom
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref (commit SHA, tag, or branch) to build
+        required: false
+        type: string
+      tag:
+        description: Release tag to create or update
+        required: false
+        type: string
+      release_name:
+        description: Release title to create or update
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build ROM
+        run: npm run build
+
+      - name: Compute release metadata
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          commit_sha="$(git rev-parse HEAD)"
+          short_sha="${commit_sha:0:12}"
+          tag="${{ inputs.tag || '' }}"
+          title="${{ inputs.release_name || '' }}"
+
+          if [[ -z "$tag" ]]; then
+            tag="rom-${short_sha}"
+          fi
+
+          if [[ -z "$title" ]]; then
+            title="ROM build ${short_sha}"
+          fi
+
+          {
+            echo "commit_sha=$commit_sha"
+            echo "short_sha=$short_sha"
+            echo "tag=$tag"
+            echo "title=$title"
+          } >> "$GITHUB_OUTPUT"
+
+          cat > release-notes.md <<EOF
+          Automated ROM build for commit [\`${short_sha}\`](https://github.com/${{ github.repository }}/commit/${commit_sha}).
+
+          Assets:
+          - \`kananeko.gb\` — playable Game Boy ROM
+          - \`kananeko.sym\` — symbol file for debuggers/emulators
+
+          Triggered by: \`${{ github.event_name }}\`
+          EOF
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kananeko-${{ steps.meta.outputs.short_sha }}
+          path: |
+            build/kananeko.gb
+            build/kananeko.sym
+          if-no-files-found: error
+
+      - name: Create or update GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.meta.outputs.tag }}
+          RELEASE_TITLE: ${{ steps.meta.outputs.title }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" \
+              --title "$RELEASE_TITLE" \
+              --notes-file release-notes.md \
+              --prerelease
+            gh release upload "$RELEASE_TAG" \
+              build/kananeko.gb \
+              build/kananeko.sym \
+              --clobber
+          else
+            gh release create "$RELEASE_TAG" \
+              build/kananeko.gb \
+              build/kananeko.sym \
+              --title "$RELEASE_TITLE" \
+              --notes-file release-notes.md \
+              --prerelease
+          fi
