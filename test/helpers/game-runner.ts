@@ -233,7 +233,7 @@ export class GameRunner {
   }
 
   /** Complete an entire dialogue tree (always choosing first option until conversation ends) */
-  completeDialogueTree(_sceneIndex: number): this {
+  completeDialogueTree(): this {
     for (let safety = 0; safety < 100; safety++) {
       this.advanceDialogue();
       if (this.dlgNodeId === 0xff && this.dlgState === 0) break;
@@ -278,6 +278,6 @@ export class GameRunner {
 
   /** Play through an entire scene: dialogue tree + kana questions */
   completeScene(sceneIndex: number): this {
-    return this.completeDialogueTree(sceneIndex).completeKanaQuestions(sceneIndex);
+    return this.completeDialogueTree().completeKanaQuestions(sceneIndex);
   }
 }

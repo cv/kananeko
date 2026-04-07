@@ -10,20 +10,21 @@ import { describe, it, expect } from 'vitest';
 import { GameRunner } from './helpers/game-runner';
 import { SCENES } from '@game/scene';
 import { runnerAtScene } from './helpers/dialogue-helpers';
+import { KANA_AWAITING_INPUT } from './helpers/test-constants';
 
 // ---------------------------------------------------------------------------
 // Title screen
 // ---------------------------------------------------------------------------
 
 describe('title screen', () => {
-  it('boots idle', () => {
+  it('stays idle after boot until the player presses START', () => {
     expect(new GameRunner().boot().dlgState).toBe(0);
   });
 
-  it('transitions on START', () => {
-    const r = new GameRunner().boot().start();
-    expect(r.sceneId).toBe(0);
-    expect(r.dlgState).toBeGreaterThan(0);
+  it('starts the first scene when the player presses START', () => {
+    const runner = new GameRunner().boot().start();
+    expect(runner.sceneId).toBe(0);
+    expect(runner.dlgState).toBeGreaterThan(0);
   });
 });
 
@@ -32,27 +33,27 @@ describe('title screen', () => {
 // ---------------------------------------------------------------------------
 
 describe('full game', () => {
-  it('plays all 5 scenes to completion', () => {
-    const r = new GameRunner().boot().start();
+  it('plays all five scenes to completion in order', () => {
+    const runner = new GameRunner().boot().start();
     for (let i = 0; i < SCENES.length; i++) {
-      expect(r.sceneId).toBe(i);
-      r.completeScene(i);
+      expect(runner.sceneId).toBe(i);
+      runner.completeScene(i);
     }
-    expect(r.sceneFlags).toBe(0x1f);
+    expect(runner.sceneFlags).toBe(0x1f);
   });
 
-  it('perfect kana — score increases with each correct answer', () => {
-    const r = new GameRunner().boot().start();
+  it('adds 100 points for every first-try kana answer in a perfect run', () => {
+    const runner = new GameRunner().boot().start();
     for (let i = 0; i < SCENES.length; i++) {
-      r.completeDialogueTree(i);
+      runner.completeDialogueTree();
       for (let j = 0; j < SCENES[i]!.kanaQuestions.length; j++) {
-        const before = r.kanaScore;
-        r.answerKanaCorrectly();
-        expect(r.kanaScore - before).toBe(100);
+        const before = runner.kanaScore;
+        runner.answerKanaCorrectly();
+        expect(runner.kanaScore - before).toBe(100);
       }
-      r.frames(10);
+      runner.frames(10);
     }
-    expect(r.kanaScore).toBeGreaterThanOrEqual(2500);
+    expect(runner.kanaScore).toBeGreaterThanOrEqual(2500);
   });
 });
 
@@ -61,74 +62,74 @@ describe('full game', () => {
 // ---------------------------------------------------------------------------
 
 describe('death paths', () => {
-  it('dialogue death → kana with 1 life → survive → next scene', () => {
-    const r = new GameRunner().boot().start();
-    expect(r.kanaLives).toBe(3);
+  it('enters kana with one restocked life after three bad dialogue choices', () => {
+    const runner = new GameRunner().boot().start();
+    expect(runner.kanaLives).toBe(3);
 
-    r.advanceDialogueBad();
-    expect(r.kanaLives).toBe(2);
-    r.advanceDialogueBad();
-    expect(r.kanaLives).toBe(1);
-    r.advanceDialogueBad();
-    r.waitForKanaInput();
-    expect(r.kanaLives).toBe(1);
-    expect(r.kanaState).toBe(2);
+    runner.advanceDialogueBad();
+    expect(runner.kanaLives).toBe(2);
+    runner.advanceDialogueBad();
+    expect(runner.kanaLives).toBe(1);
+    runner.advanceDialogueBad();
+    runner.waitForKanaInput();
+    expect(runner.kanaLives).toBe(1);
+    expect(runner.kanaState).toBe(KANA_AWAITING_INPUT);
 
-    r.completeKanaQuestions(0);
-    expect(r.sceneId).toBe(1);
+    runner.completeKanaQuestions(0);
+    expect(runner.sceneId).toBe(1);
   });
 
-  it('dialogue death → kana death → game over → title', () => {
-    const r = new GameRunner().boot().start();
+  it('returns to title-state values after dialogue death leads to kana death', () => {
+    const runner = new GameRunner().boot().start();
 
-    for (let i = 0; i < 3; i++) r.advanceDialogueBad();
+    for (let i = 0; i < 3; i++) runner.advanceDialogueBad();
 
-    r.waitForKanaInput();
-    expect(r.kanaLives).toBe(1);
-    r.answerKanaWrong();
-    r.answerKanaWrong();
-    r.answerKanaWrong();
+    runner.waitForKanaInput();
+    expect(runner.kanaLives).toBe(1);
+    runner.answerKanaWrong();
+    runner.answerKanaWrong();
+    runner.answerKanaWrong();
 
-    r.frames(10).pressStart().frames(10);
-    expect(r.kanaLives).toBe(3);
-    expect(r.kanaScore).toBe(0);
+    runner.frames(10).pressStart().frames(10);
+    expect(runner.kanaLives).toBe(3);
+    expect(runner.kanaScore).toBe(0);
   });
 
-  it('kana death mid-game → game over → title', () => {
-    const r = runnerAtScene(0);
-    r.completeDialogueTree(0);
-    expect(r.kanaLives).toBe(3);
+  it('returns to the title flow after a mid-game kana game over', () => {
+    const runner = runnerAtScene(0);
+    runner.completeDialogueTree();
+    expect(runner.kanaLives).toBe(3);
 
     for (let death = 0; death < 3; death++) {
-      r.answerKanaWrong();
-      r.answerKanaWrong();
-      r.answerKanaWrong();
+      runner.answerKanaWrong();
+      runner.answerKanaWrong();
+      runner.answerKanaWrong();
     }
-    expect(r.kanaLives).toBe(0);
+    expect(runner.kanaLives).toBe(0);
 
-    r.frames(10).pressStart().frames(10);
-    expect(r.kanaLives).toBe(3);
-    expect(r.kanaScore).toBe(0);
+    runner.frames(10).pressStart().frames(10);
+    expect(runner.kanaLives).toBe(3);
+    expect(runner.kanaScore).toBe(0);
 
-    r.start();
-    expect(r.sceneId).toBe(0);
-    expect(r.dlgState).toBeGreaterThan(0);
+    runner.start();
+    expect(runner.sceneId).toBe(0);
+    expect(runner.dlgState).toBeGreaterThan(0);
   });
 
-  it('bad choices drain lives, good choices restore them', () => {
-    const r = runnerAtScene(0);
-    expect(r.kanaLives).toBe(3);
+  it('lets good dialogue choices recover lives lost to bad choices', () => {
+    const runner = runnerAtScene(0);
+    expect(runner.kanaLives).toBe(3);
 
-    r.advanceDialogueBad();
-    expect(r.kanaLives).toBe(2);
+    runner.advanceDialogueBad();
+    expect(runner.kanaLives).toBe(2);
 
-    r.advanceDialogue();
-    expect(r.kanaLives).toBe(3);
+    runner.advanceDialogue();
+    expect(runner.kanaLives).toBe(3);
 
-    r.advanceDialogueBad();
-    r.advanceDialogueBad();
-    expect(r.kanaLives).toBe(1);
-    r.advanceDialogue();
-    expect(r.kanaLives).toBe(2);
+    runner.advanceDialogueBad();
+    runner.advanceDialogueBad();
+    expect(runner.kanaLives).toBe(1);
+    runner.advanceDialogue();
+    expect(runner.kanaLives).toBe(2);
   });
 });

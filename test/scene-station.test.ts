@@ -35,7 +35,7 @@ describe('scene 0: station', () => {
     ]);
 
     // Kana scoring
-    r.completeDialogueTree(0);
+    r.completeDialogueTree();
     answerKanaAndCheckDelta(r, 100);
     answerKanaAndCheckDelta(r, 100);
   });
