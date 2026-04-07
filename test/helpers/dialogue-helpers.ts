@@ -9,6 +9,11 @@ import { DIALOGUE_CHOOSING, DIALOGUE_END_NODE, KANA_AWAITING_INPUT } from './tes
 
 const GAME_OVER_RESET_FRAMES = 10;
 
+/** Repeat the same dialogue choice index N times. */
+export function repeatChoice(count: number, choiceIdx = 0): number[] {
+  return Array<number>(count).fill(choiceIdx);
+}
+
 /** Advance runner to the start of the given scene (completes all prior scenes). */
 export function runnerAtScene(sceneIdx: number): GameRunner {
   const runner = new GameRunner().boot().start();
