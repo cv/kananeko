@@ -13,7 +13,7 @@
  *   buildSetDelta  — set delta type + timer after score changes
  */
 
-import { type Op, ref, u8, u16 } from '../asm/types';
+import { type Op, type TileIndex, ref, u8, u16 } from '../asm/types';
 import {
   label,
   ld_r_n,
@@ -36,8 +36,7 @@ import {
   ret,
 } from '../asm/ops';
 import { MEM } from '../asm/hardware';
-import { type TileIndex } from '../asm/types';
-import { requireTile } from './font';
+import { requireTile, requireTiles } from './font';
 import { CAT_TILES } from './font-data';
 
 // ---------------------------------------------------------------------------
@@ -59,19 +58,33 @@ export const DELTA_PLUS_10 = 2;
 export const DELTA_MINUS_5 = 3;
 export const DELTA_MINUS_100 = 4;
 
+export type DeltaType =
+  | typeof DELTA_PLUS_100
+  | typeof DELTA_PLUS_10
+  | typeof DELTA_MINUS_5
+  | typeof DELTA_MINUS_100;
+
+export type ScoreDelta = 5 | 10 | 100;
+
+type HudTileExpr = TileIndex | 'from_a';
+type HudTileRun = readonly [TileIndex, TileIndex, TileIndex, TileIndex];
+
 const HEART_FULL: TileIndex = requireTile(CAT_TILES.HEART_FULL);
 const HEART_EMPTY: TileIndex = requireTile(CAT_TILES.HEART_EMPTY);
-const DIGIT_TILES: TileIndex[] = '0123456789'.split('').map((ch) => requireTile(ch));
+const DIGIT_TILES = requireTiles(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'] as const);
 const PLUS_TILE: TileIndex = requireTile('+');
 const MINUS_TILE: TileIndex = requireTile('-');
 const SPACE_TILE: TileIndex = requireTile(' ');
 
-const d0 = DIGIT_TILES[0];
-const d1 = DIGIT_TILES[1];
-const d5 = DIGIT_TILES[5];
-if (d0 === undefined || d1 === undefined || d5 === undefined) {
-  throw new Error('Missing digit tile');
-}
+const [d0, d1, , , , d5] = DIGIT_TILES;
+const SCORE_ZERO_TILES: HudTileRun = [d0, d0, d0, d0];
+const DELTA_CLEAR_TILES: HudTileRun = [SPACE_TILE, SPACE_TILE, SPACE_TILE, SPACE_TILE];
+const DELTA_TILE_RUNS: Record<DeltaType, HudTileRun> = {
+  [DELTA_PLUS_100]: [PLUS_TILE, d1, d0, d0],
+  [DELTA_PLUS_10]: [SPACE_TILE, PLUS_TILE, d1, d0],
+  [DELTA_MINUS_5]: [SPACE_TILE, SPACE_TILE, MINUS_TILE, d5],
+  [DELTA_MINUS_100]: [MINUS_TILE, d1, d0, d0],
+};
 
 function tilemapAddr(row: number, col: number): number {
   return 0x9800 + row * MAP_COLS + col;
@@ -82,7 +95,7 @@ function tilemapAddr(row: number, col: number): number {
 // ---------------------------------------------------------------------------
 
 /** Generate 16-bit score add: SCORE += delta */
-export function buildAddScore(delta: number): Op[] {
+export function buildAddScore(delta: ScoreDelta): Op[] {
   return [
     ld_a_nn(MEM.KANA_SCORE_LO),
     add_n(u8(delta)),
@@ -94,7 +107,7 @@ export function buildAddScore(delta: number): Op[] {
 }
 
 /** Generate 16-bit score subtract: SCORE -= delta */
-export function buildSubScore(delta: number): Op[] {
+export function buildSubScore(delta: ScoreDelta): Op[] {
   return [
     ld_a_nn(MEM.KANA_SCORE_LO),
     sub_n(u8(delta)),
@@ -106,7 +119,7 @@ export function buildSubScore(delta: number): Op[] {
 }
 
 /** Set DELTA_TYPE and DELTA_TIMER after a score change */
-export function buildSetDelta(deltaType: number): Op[] {
+export function buildSetDelta(deltaType: DeltaType): Op[] {
   return [
     ld_r_n('a', u8(deltaType)),
     ld_nn_a(MEM.DELTA_TYPE),
@@ -138,13 +151,17 @@ function buildHeartAtCol(col: number, minLives: number): Op[] {
 }
 
 /** Draw a single tile at a fixed tilemap address (VRAM must be accessible) */
-export function buildDrawTileAt(row: number, col: number, tileExpr: 'from_a' | number): Op[] {
+export function buildDrawTileAt(row: number, col: number, tileExpr: HudTileExpr): Op[] {
   const ops: Op[] = [ld_rr_nn('hl', u16(tilemapAddr(row, col)))];
   if (tileExpr !== 'from_a') {
     ops.push(ld_r_n('a', u8(tileExpr)));
   }
   ops.push(ldi_hl_a());
   return ops;
+}
+
+function buildDrawTilesAt(row: number, startCol: number, tiles: readonly HudTileExpr[]): Op[] {
+  return tiles.flatMap((tile, offset) => buildDrawTileAt(row, startCol + offset, tile));
 }
 
 // ---------------------------------------------------------------------------
@@ -175,10 +192,7 @@ export function buildDrawHudOps(): Op[] {
     ld_a_nn(MEM.KANA_SCORE_HI),
     and_n(u8(0x80)),
     jr_cc('z', ref('kana_score_positive')),
-    ...buildDrawTileAt(0, SCORE_COL, d0),
-    ...buildDrawTileAt(0, SCORE_COL + 1, d0),
-    ...buildDrawTileAt(0, SCORE_COL + 2, d0),
-    ...buildDrawTileAt(0, SCORE_COL + 3, d0),
+    ...buildDrawTilesAt(0, SCORE_COL, SCORE_ZERO_TILES),
     jp(ref('kana_score_done')),
 
     label('kana_score_positive'),
@@ -272,44 +286,29 @@ export function buildDrawHudOps(): Op[] {
 
     cp_n(u8(DELTA_PLUS_100)),
     jr_cc('nz', ref('delta_not_p100')),
-    ...buildDrawTileAt(0, DELTA_COL, PLUS_TILE),
-    ...buildDrawTileAt(0, DELTA_COL + 1, d1),
-    ...buildDrawTileAt(0, DELTA_COL + 2, d0),
-    ...buildDrawTileAt(0, DELTA_COL + 3, d0),
+    ...buildDrawTilesAt(0, DELTA_COL, DELTA_TILE_RUNS[DELTA_PLUS_100]),
     ret(),
 
     label('delta_not_p100'),
     cp_n(u8(DELTA_PLUS_10)),
     jr_cc('nz', ref('delta_not_p10')),
-    ...buildDrawTileAt(0, DELTA_COL, SPACE_TILE),
-    ...buildDrawTileAt(0, DELTA_COL + 1, PLUS_TILE),
-    ...buildDrawTileAt(0, DELTA_COL + 2, d1),
-    ...buildDrawTileAt(0, DELTA_COL + 3, d0),
+    ...buildDrawTilesAt(0, DELTA_COL, DELTA_TILE_RUNS[DELTA_PLUS_10]),
     ret(),
 
     label('delta_not_p10'),
     cp_n(u8(DELTA_MINUS_5)),
     jr_cc('nz', ref('delta_not_m5')),
-    ...buildDrawTileAt(0, DELTA_COL, SPACE_TILE),
-    ...buildDrawTileAt(0, DELTA_COL + 1, SPACE_TILE),
-    ...buildDrawTileAt(0, DELTA_COL + 2, MINUS_TILE),
-    ...buildDrawTileAt(0, DELTA_COL + 3, d5),
+    ...buildDrawTilesAt(0, DELTA_COL, DELTA_TILE_RUNS[DELTA_MINUS_5]),
     ret(),
 
     label('delta_not_m5'),
     // Must be DELTA_MINUS_100
-    ...buildDrawTileAt(0, DELTA_COL, MINUS_TILE),
-    ...buildDrawTileAt(0, DELTA_COL + 1, d1),
-    ...buildDrawTileAt(0, DELTA_COL + 2, d0),
-    ...buildDrawTileAt(0, DELTA_COL + 3, d0),
+    ...buildDrawTilesAt(0, DELTA_COL, DELTA_TILE_RUNS[DELTA_MINUS_100]),
     ret(),
 
     // Clear delta area (timer expired or type=0)
     label('delta_clear'),
-    ...buildDrawTileAt(0, DELTA_COL, SPACE_TILE),
-    ...buildDrawTileAt(0, DELTA_COL + 1, SPACE_TILE),
-    ...buildDrawTileAt(0, DELTA_COL + 2, SPACE_TILE),
-    ...buildDrawTileAt(0, DELTA_COL + 3, SPACE_TILE),
+    ...buildDrawTilesAt(0, DELTA_COL, DELTA_CLEAR_TILES),
     ret(),
   ];
 }

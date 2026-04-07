@@ -24,24 +24,33 @@ export function rgb(r: number, g: number, b: number): number {
   return ((r >> 3) & 0x1f) | (((g >> 3) & 0x1f) << 5) | (((b >> 3) & 0x1f) << 10);
 }
 
-export type Palette = [number, number, number, number];
+export type Palette = readonly [number, number, number, number];
+export type KanaRound = readonly [
+  KanaQuestion,
+  KanaQuestion,
+  KanaQuestion,
+  KanaQuestion,
+  KanaQuestion,
+];
 
 export interface Scene {
-  name: string;
-  icon: [string, string];
-  dialogue: DialogueNode[];
-  kanaQuestions: KanaQuestion[];
-  palette: Palette;
+  readonly name: string;
+  readonly icon: readonly [string, string];
+  readonly dialogue: readonly DialogueNode[];
+  readonly kanaQuestions: KanaRound;
+  readonly palette: Palette;
 }
+
+type SceneList = readonly [Scene, Scene, Scene, Scene, Scene];
 
 // ---------------------------------------------------------------------------
 // Scene assembly — metadata, palettes, icons, kana questions
 // ---------------------------------------------------------------------------
 
-export const SCENES: Scene[] = [
+export const SCENES = [
   {
     name: 'えき',
-    icon: [...SCENE_ICON_TILES.TRAIN],
+    icon: SCENE_ICON_TILES.TRAIN,
     palette: [
       rgb(0xe8, 0xe8, 0xe0),
       rgb(0xb0, 0xb0, 0xa0),
@@ -84,7 +93,7 @@ export const SCENES: Scene[] = [
   },
   {
     name: 'みち',
-    icon: [...SCENE_ICON_TILES.HOUSE],
+    icon: SCENE_ICON_TILES.HOUSE,
     palette: [
       rgb(0xf0, 0xf0, 0xc0),
       rgb(0xc0, 0xd0, 0x80),
@@ -127,7 +136,7 @@ export const SCENES: Scene[] = [
   },
   {
     name: 'レストラン',
-    icon: [...SCENE_ICON_TILES.BOWL],
+    icon: SCENE_ICON_TILES.BOWL,
     palette: [
       rgb(0xf0, 0xe0, 0xd0),
       rgb(0xd0, 0xa0, 0x80),
@@ -170,7 +179,7 @@ export const SCENES: Scene[] = [
   },
   {
     name: 'コンビニ',
-    icon: [...SCENE_ICON_TILES.SHOP],
+    icon: SCENE_ICON_TILES.SHOP,
     palette: [
       rgb(0xf0, 0xf0, 0xf0),
       rgb(0xa0, 0xc0, 0xe0),
@@ -213,7 +222,7 @@ export const SCENES: Scene[] = [
   },
   {
     name: 'こうえん',
-    icon: [...SCENE_ICON_TILES.TREE],
+    icon: SCENE_ICON_TILES.TREE,
     palette: [
       rgb(0xd0, 0xc0, 0xe0),
       rgb(0x80, 0x70, 0xb0),
@@ -254,7 +263,7 @@ export const SCENES: Scene[] = [
       },
     ],
   },
-];
+] as const satisfies SceneList;
 
 // ---------------------------------------------------------------------------
 // Build packed scene data for ROM

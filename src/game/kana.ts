@@ -71,13 +71,13 @@ export type Kana = string;
 
 export interface KanaQuestion {
   /** The full word to display */
-  word: string;
+  readonly word: string;
   /** Index of the kana to blank out (0-based) */
-  blankIndex: number;
+  readonly blankIndex: number;
   /** The correct kana for the blank */
-  correct: Kana;
+  readonly correct: Kana;
   /** Three wrong kana (should be visually similar distractors) */
-  distractors: [Kana, Kana, Kana];
+  readonly distractors: readonly [Kana, Kana, Kana];
 }
 
 // ---------------------------------------------------------------------------
@@ -91,6 +91,7 @@ const OPT_UP = { row: 3, col: 10 };
 const OPT_DOWN = { row: 9, col: 10 };
 const OPT_LEFT = { row: 6, col: 2 };
 const OPT_RIGHT = { row: 6, col: 17 };
+const OPTION_POSITIONS = [OPT_UP, OPT_DOWN, OPT_LEFT, OPT_RIGHT] as const;
 // Positions ordered: 0=UP, 1=DOWN, 2=LEFT, 3=RIGHT (matches direction encoding)
 
 // Game constants
@@ -112,6 +113,23 @@ const DIR_DOWN = 1;
 const DIR_LEFT = 2;
 const DIR_RIGHT = 3;
 
+type ShuffleSlot = 0 | 1 | 2 | 3;
+type AnswerLayout = readonly [ShuffleSlot, ShuffleSlot, ShuffleSlot, ShuffleSlot];
+
+const SHUFFLE_MEM = [
+  MEM.KANA_SHUFFLE,
+  MEM.KANA_SHUFFLE1,
+  MEM.KANA_SHUFFLE2,
+  MEM.KANA_SHUFFLE3,
+] as const;
+const ANSWER_SLOT_ORDER = [0, 1, 2, 3] as const;
+const ANSWER_LAYOUTS = [
+  [0, 1, 2, 3],
+  [3, 0, 1, 2],
+  [2, 3, 0, 1],
+  [1, 2, 3, 0],
+] as const satisfies readonly [AnswerLayout, AnswerLayout, AnswerLayout, AnswerLayout];
+
 function tilemapAddr(row: number, col: number): number {
   return 0x9800 + row * MAP_COLS + col;
 }
@@ -119,11 +137,22 @@ function tilemapAddr(row: number, col: number): number {
 // Tile constants
 const BLANK_TILE: TileIndex = requireTile(CAT_TILES.BLANK);
 
+function buildAnswerLayout(layout: AnswerLayout): Op[] {
+  return ANSWER_SLOT_ORDER.flatMap((optionIndex) => {
+    const position = OPTION_POSITIONS[optionIndex];
+    const shuffleSlot = layout[optionIndex];
+    return [
+      ld_a_nn(SHUFFLE_MEM[shuffleSlot]),
+      ...buildDrawTileAt(position.row, position.col, 'from_a'),
+    ];
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Data encoder
 // ---------------------------------------------------------------------------
 
-export function buildKanaData(questions: KanaQuestion[]): Uint8Array {
+export function buildKanaData(questions: readonly KanaQuestion[]): Uint8Array {
   const bytes: number[] = [];
 
   for (const q of questions) {
@@ -285,54 +314,26 @@ export function buildKanaEngine(): Op[] {
     cp_n(u8(0)),
     jr_cc('nz', ref('kana_layout_1')),
     // correct_pos=0: UP=buf[0], DOWN=buf[1], LEFT=buf[2], RIGHT=buf[3]
-    ld_a_nn(MEM.KANA_SHUFFLE),
-    ...buildDrawTileAt(OPT_UP.row, OPT_UP.col, 'from_a'),
-    ld_a_nn(MEM.KANA_SHUFFLE1),
-    ...buildDrawTileAt(OPT_DOWN.row, OPT_DOWN.col, 'from_a'),
-    ld_a_nn(MEM.KANA_SHUFFLE2),
-    ...buildDrawTileAt(OPT_LEFT.row, OPT_LEFT.col, 'from_a'),
-    ld_a_nn(MEM.KANA_SHUFFLE3),
-    ...buildDrawTileAt(OPT_RIGHT.row, OPT_RIGHT.col, 'from_a'),
+    ...buildAnswerLayout(ANSWER_LAYOUTS[0]),
     jp(ref('kana_layout_done')),
 
     label('kana_layout_1'),
     cp_n(u8(1)),
     jr_cc('nz', ref('kana_layout_2')),
     // correct_pos=1: UP=buf[3], DOWN=buf[0], LEFT=buf[1], RIGHT=buf[2]
-    ld_a_nn(MEM.KANA_SHUFFLE3),
-    ...buildDrawTileAt(OPT_UP.row, OPT_UP.col, 'from_a'),
-    ld_a_nn(MEM.KANA_SHUFFLE),
-    ...buildDrawTileAt(OPT_DOWN.row, OPT_DOWN.col, 'from_a'),
-    ld_a_nn(MEM.KANA_SHUFFLE1),
-    ...buildDrawTileAt(OPT_LEFT.row, OPT_LEFT.col, 'from_a'),
-    ld_a_nn(MEM.KANA_SHUFFLE2),
-    ...buildDrawTileAt(OPT_RIGHT.row, OPT_RIGHT.col, 'from_a'),
+    ...buildAnswerLayout(ANSWER_LAYOUTS[1]),
     jp(ref('kana_layout_done')),
 
     label('kana_layout_2'),
     cp_n(u8(2)),
     jr_cc('nz', ref('kana_layout_3')),
     // correct_pos=2: UP=buf[2], DOWN=buf[3], LEFT=buf[0], RIGHT=buf[1]
-    ld_a_nn(MEM.KANA_SHUFFLE2),
-    ...buildDrawTileAt(OPT_UP.row, OPT_UP.col, 'from_a'),
-    ld_a_nn(MEM.KANA_SHUFFLE3),
-    ...buildDrawTileAt(OPT_DOWN.row, OPT_DOWN.col, 'from_a'),
-    ld_a_nn(MEM.KANA_SHUFFLE),
-    ...buildDrawTileAt(OPT_LEFT.row, OPT_LEFT.col, 'from_a'),
-    ld_a_nn(MEM.KANA_SHUFFLE1),
-    ...buildDrawTileAt(OPT_RIGHT.row, OPT_RIGHT.col, 'from_a'),
+    ...buildAnswerLayout(ANSWER_LAYOUTS[2]),
     jp(ref('kana_layout_done')),
 
     label('kana_layout_3'),
     // correct_pos=3: UP=buf[1], DOWN=buf[2], LEFT=buf[3], RIGHT=buf[0]
-    ld_a_nn(MEM.KANA_SHUFFLE1),
-    ...buildDrawTileAt(OPT_UP.row, OPT_UP.col, 'from_a'),
-    ld_a_nn(MEM.KANA_SHUFFLE2),
-    ...buildDrawTileAt(OPT_DOWN.row, OPT_DOWN.col, 'from_a'),
-    ld_a_nn(MEM.KANA_SHUFFLE3),
-    ...buildDrawTileAt(OPT_LEFT.row, OPT_LEFT.col, 'from_a'),
-    ld_a_nn(MEM.KANA_SHUFFLE),
-    ...buildDrawTileAt(OPT_RIGHT.row, OPT_RIGHT.col, 'from_a'),
+    ...buildAnswerLayout(ANSWER_LAYOUTS[3]),
 
     label('kana_layout_done'),
 

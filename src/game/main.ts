@@ -34,7 +34,7 @@ import {
   call,
 } from '../asm/ops';
 import { HW, JOY, LCDC, MEM } from '../asm/hardware';
-import { buildTileData, textToTiles, requireTile } from './font';
+import { buildTileData, textToTiles, requireTiles } from './font';
 import { CAT_TILES } from './font-data';
 import { buildReadJoypad } from './joypad';
 import { buildDialogueEngine } from './dialogue';
@@ -76,9 +76,9 @@ const TITLE_PALETTE: Palette = [
 ];
 
 // Cat portrait tile rows (4x3 grid)
-const CAT_ROW0 = CAT_TILES.ROW0.map((ch) => requireTile(ch));
-const CAT_ROW1 = CAT_TILES.ROW1.map((ch) => requireTile(ch));
-const CAT_ROW2 = CAT_TILES.ROW2.map((ch) => requireTile(ch));
+const CAT_ROW0 = requireTiles(CAT_TILES.ROW0);
+const CAT_ROW1 = requireTiles(CAT_TILES.ROW1);
+const CAT_ROW2 = requireTiles(CAT_TILES.ROW2);
 
 // ---------------------------------------------------------------------------
 // Helper: write a row of tiles at a tilemap address
@@ -104,7 +104,7 @@ function buildSetPalette(palette: Palette): Op[] {
   return ops;
 }
 
-function buildWriteRow(row: number, tiles: number[]): Op[] {
+function buildWriteRow(row: number, tiles: readonly number[]): Op[] {
   const ops: Op[] = [];
   const col = Math.floor((SCREEN_COLS - tiles.length) / 2);
   ops.push(ld_rr_nn('hl', u16(tilemapAddr(row, col))));
@@ -306,8 +306,7 @@ export function buildProgram(): Op[] {
     // Draw scene icon at row 4, centered (dispatched by scene_id)
     ...buildSceneDispatch((i) => {
       const scene = at(SCENES, i);
-      const iconTiles = scene.icon.map((ch) => requireTile(ch));
-      return buildWriteRow(4, iconTiles);
+      return buildWriteRow(4, requireTiles(scene.icon));
     }),
 
     // Set scene palette (dispatched by scene_id)

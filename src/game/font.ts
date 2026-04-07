@@ -7,6 +7,8 @@
 import { type TileIndex } from '../asm/types';
 import { ALL_GLYPHS, type Glyph } from './font-data';
 
+type TileTuple<T extends readonly string[]> = { [K in keyof T]: TileIndex };
+
 function glyphToTile(glyph: Glyph): Uint8Array {
   const tile = new Uint8Array(16);
   for (let row = 0 as 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7; row < 8; row++) {
@@ -79,4 +81,9 @@ export function buildTileData(): Uint8Array {
 /** Convert a text string to an array of tile indices. Throws on unknown characters. */
 export function textToTiles(text: string): TileIndex[] {
   return Array.from(text).map((ch) => requireTile(ch));
+}
+
+/** Convert a tuple of characters into a tuple of tile indices. */
+export function requireTiles<const T extends readonly string[]>(chars: T): TileTuple<T> {
+  return chars.map((ch) => requireTile(ch)) as TileTuple<T>;
 }

@@ -11,16 +11,24 @@ import { textToTiles } from './font';
 // Types
 // ---------------------------------------------------------------------------
 
-export interface DialogueNode {
-  text: string;
-  choices: {
-    text: string;
-    next: number | null; // next node index, null = end conversation
-    hint?: string; // shown briefly if this isn't the ideal response
-  }[];
+export interface DialogueChoice {
+  readonly text: string;
+  readonly next: number | null; // next node index, null = end conversation
+  readonly hint?: string; // shown briefly if this isn't the ideal response
 }
 
-export type DialogueTree = DialogueNode[];
+export type DialogueChoices =
+  | readonly []
+  | readonly [DialogueChoice]
+  | readonly [DialogueChoice, DialogueChoice]
+  | readonly [DialogueChoice, DialogueChoice, DialogueChoice];
+
+export interface DialogueNode {
+  readonly text: string;
+  readonly choices: DialogueChoices;
+}
+
+export type DialogueTree = readonly DialogueNode[];
 
 // ---------------------------------------------------------------------------
 // Encoder
