@@ -4,6 +4,31 @@
 
 import { repeatChoice } from './dialogue-helpers';
 
+export const STREET_HAPPY_PATH = repeatChoice(58);
+export const STREET_LOST_TOURIST_PATH = [0, 2, 0, ...repeatChoice(54)];
+export const STREET_RETURN_VISITOR_PATH = [
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  1,
+  0,
+  ...repeatChoice(39),
+];
+
 export const RESTAURANT_HAPPY_PATH = repeatChoice(56);
 export const RESTAURANT_CURRY_PATH = [0, 0, 0, 0, 1, 0, ...repeatChoice(50)];
 export const RESTAURANT_TEA_PATH = [
