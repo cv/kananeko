@@ -74,6 +74,20 @@ describe('dialogue', () => {
     expect(runner.deltaType).toBe(3); // DELTA_MINUS_5
   });
 
+  it('3 bad choices ends dialogue early and enters kana with fresh lives', () => {
+    const runner = new GameRunner().boot().start();
+    expect(runner.kanaLives).toBe(3);
+    // Pick bad choice 3 times in a row
+    for (let i = 0; i < 3; i++) {
+      runner.waitForDialogueChoices();
+      runner.press('DOWN').frames(3).press('A').frames(5);
+    }
+    // Dialogue ended — kana starts with 1 restocked life
+    runner.waitForKanaInput();
+    expect(runner.kanaState).toBe(2);
+    expect(runner.kanaLives).toBe(1); // just 1 life — kana is harder now
+  });
+
   it('branches to next node after choice', () => {
     const runner = new GameRunner().boot().start();
     runner.advanceDialogue(); // node 0 → node 1

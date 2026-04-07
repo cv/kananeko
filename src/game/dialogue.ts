@@ -510,6 +510,11 @@ export function buildDialogueEngine(): Op[] {
     jr_cc('z', ref('dlg_score_done')), // already at 0
     dec_r('a'),
     ld_nn_a(MEM.KANA_LIVES),
+    // If lives just hit 0, end conversation → skip to kana
+    cp_n(u8(0)),
+    jr_cc('nz', ref('dlg_score_done')),
+    ld_r_n('a', u8(0xff)),
+    ld_nn_a(MEM.DLG_NODE_ID),
 
     label('dlg_score_done'),
     // Set state = idle

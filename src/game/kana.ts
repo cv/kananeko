@@ -95,7 +95,6 @@ const OPT_RIGHT = { row: 6, col: 17 };
 
 // Game constants
 const FEEDBACK_FRAMES = 30;
-const INITIAL_LIVES = 3;
 const SCORE_FIRST_TRY = 100;
 const SCORE_SECOND_TRY = 10;
 const SCORE_DEATH_PENALTY = 100;
@@ -163,14 +162,17 @@ export function buildKanaEngine(): Op[] {
     ld_r_r('a', 'd'),
     ld_nn_a(MEM.DLG_STR_HI),
 
-    // Score persists across scenes — don't reset it here.
-    // Lives reset each scene (3 fresh lives per kana round).
+    // Score persists across scenes — initialized at game start only.
+    // Restock 1 life so the player can attempt kana even after dying in dialogue.
     xor_r('a'),
     ld_nn_a(MEM.KANA_Q_IDX),
     ld_nn_a(MEM.KANA_ATTEMPTS),
-
-    ld_r_n('a', u8(INITIAL_LIVES)),
+    ld_a_nn(MEM.KANA_LIVES),
+    cp_n(u8(0)),
+    jr_cc('nz', ref('kana_lives_ok')),
+    ld_r_n('a', u8(1)),
     ld_nn_a(MEM.KANA_LIVES),
+    label('kana_lives_ok'),
 
     jp(ref('kana_load_question')),
 
