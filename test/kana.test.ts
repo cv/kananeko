@@ -16,17 +16,19 @@ import {
   KANA_IDLE,
 } from './helpers/test-constants';
 
-describe('kana', () => {
-  it('encodes kana question data with the expected length prefix and sentinel', () => {
-    const testQ: KanaQuestion[] = [
+describe('Given kana question data is being encoded', () => {
+  it('writes the word length first and terminates the question list with a zero byte', () => {
+    const testQuestions: KanaQuestion[] = [
       { word: 'こんにちは', blankIndex: 0, correct: 'こ', distractors: ['か', 'く', 'き'] },
     ];
-    const data = buildKanaData(testQ);
+    const data = buildKanaData(testQuestions);
     expect(data.length).toBeGreaterThan(0);
     expect(data[0]).toBe(textToTiles('こんにちは').length);
-    expect(data[data.length - 1]).toBe(0); // end sentinel
+    expect(data[data.length - 1]).toBe(0);
   });
+});
 
+describe('Given the player has reached the kana round', () => {
   it('enters the kana round after the player completes the dialogue tree', () => {
     const runner = runnerInKana(0);
     expect(runner.kanaState).toBe(KANA_AWAITING_INPUT);

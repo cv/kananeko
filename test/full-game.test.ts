@@ -16,11 +16,7 @@ import {
 } from './helpers/dialogue-helpers';
 import { KANA_AWAITING_INPUT } from './helpers/test-constants';
 
-// ---------------------------------------------------------------------------
-// Title screen
-// ---------------------------------------------------------------------------
-
-describe('title screen', () => {
+describe('Given the player is on the title screen', () => {
   it('stays idle after boot until the player presses START', () => {
     expect(new GameRunner().boot().dlgState).toBe(0);
   });
@@ -32,11 +28,7 @@ describe('title screen', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Full game
-// ---------------------------------------------------------------------------
-
-describe('full game', () => {
+describe('Given the player plays from start to finish', () => {
   it('plays all five scenes to completion in order', () => {
     const runner = new GameRunner().boot().start();
     for (let i = 0; i < SCENES.length; i++) {
@@ -61,11 +53,7 @@ describe('full game', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Death paths
-// ---------------------------------------------------------------------------
-
-describe('death paths', () => {
+describe('Given the player makes critical mistakes', () => {
   it('enters kana with one restocked life after three bad dialogue choices', () => {
     const runner = new GameRunner().boot().start();
     expect(runner.kanaLives).toBe(3);
