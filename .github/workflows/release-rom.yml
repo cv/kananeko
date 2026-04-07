@@ -102,11 +102,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          shopt -s nullglob
 
           commit_sha="$(git rev-parse HEAD)"
           short_sha="${commit_sha:0:12}"
+          subject="$(git log -1 --format=%s)"
+          body="$(git log -1 --format=%b)"
           tag="rom-${short_sha}"
-          title="ROM build ${short_sha}"
+          title="🎮 ${short_sha} · ${subject}"
+
+          rom_assets=(build/*.gb)
+          sym_assets=(build/*.sym)
 
           {
             echo "commit_sha=$commit_sha"
@@ -115,15 +121,30 @@ jobs:
             echo "title=$title"
           } >> "$GITHUB_OUTPUT"
 
-          cat > release-notes.md <<EOF
-          Automated ROM build for commit [\`${short_sha}\`](https://github.com/${{ github.repository }}/commit/${commit_sha}).
-
-          Assets:
-          - \`kananeko.gb\` — playable Game Boy ROM
-          - \`kananeko.sym\` — symbol file for debuggers/emulators
-
-          Triggered by: \`${{ github.event_name }}\`
-          EOF
+          {
+            echo "## ✨ Commit"
+            echo
+            echo "**${subject}**"
+            echo
+            if [[ -n "$body" ]]; then
+              printf '%s\n' "$body"
+              echo
+            fi
+            echo "## 📦 Downloads"
+            echo
+            for asset in "${rom_assets[@]}"; do
+              echo "- \`$(basename "$asset")\` — playable Game Boy ROM"
+            done
+            for asset in "${sym_assets[@]}"; do
+              echo "- \`$(basename "$asset")\` — symbol file for debuggers/emulators"
+            done
+            echo
+            echo "## 🔎 Build info"
+            echo
+            echo "- Commit: [\`${short_sha}\`](https://github.com/${{ github.repository }}/commit/${commit_sha})"
+            echo "- Release tag: \`${tag}\`"
+            echo "- Triggered by: \`${{ github.event_name }}\`"
+          } > release-notes.md
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
