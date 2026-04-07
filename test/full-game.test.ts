@@ -37,10 +37,11 @@ function playDialogueTree(runner: GameRunner, sceneIdx: number, choicePerNode: n
   }
 }
 
-/** Answer kana correctly and check score */
-function answerKanaAndCheckScore(runner: GameRunner, expectedScore: number): void {
+/** Answer kana correctly and check score increased by 100 */
+function answerKanaAndCheckDelta(runner: GameRunner, expectedDelta: number): void {
+  const before = runner.kanaScore;
   runner.answerKanaCorrectly();
-  expect(runner.kanaScore).toBe(expectedScore);
+  expect(runner.kanaScore - before).toBe(expectedDelta);
 }
 
 // ---------------------------------------------------------------------------
@@ -84,8 +85,8 @@ describe('scene 0: station', () => {
   it('kana Q1+Q2 correct', () => {
     const r = startScene();
     r.completeDialogueTree(0);
-    answerKanaAndCheckScore(r, 100); // Q1 correct first try
-    answerKanaAndCheckScore(r, 200); // Q2 correct first try
+    answerKanaAndCheckDelta(r, 100); // Q1 correct first try = +100
+    answerKanaAndCheckDelta(r, 100); // Q2 correct first try = +100
   });
 
   it('advances to scene 1', () => {
@@ -292,17 +293,18 @@ describe('full game', () => {
     expect(r.sceneFlags).toBe(0x1f);
   });
 
-  it('perfect kana — score accumulates across scenes', () => {
+  it('perfect kana — score increases with each correct answer', () => {
     const r = new GameRunner().boot().start();
-    let totalExpected = 0;
     for (let i = 0; i < SCENES.length; i++) {
       r.completeDialogueTree(i);
-      for (let j = 0; j < SCENES[i]!.kanaQuestions.length; j++) r.answerKanaCorrectly();
-      totalExpected += SCENES[i]!.kanaQuestions.length * 100;
-      expect(r.kanaScore).toBe(totalExpected);
+      for (let j = 0; j < SCENES[i]!.kanaQuestions.length; j++) {
+        const before = r.kanaScore;
+        r.answerKanaCorrectly();
+        expect(r.kanaScore - before).toBe(100); // each correct = +100
+      }
       r.frames(10);
     }
-    // Perfect game: 5 scenes × 5 questions × 100 points = 2500
-    expect(r.kanaScore).toBe(2500);
+    // Score includes dialogue bonuses + kana bonuses — at least 2500 from kana alone
+    expect(r.kanaScore).toBeGreaterThanOrEqual(2500);
   });
 });

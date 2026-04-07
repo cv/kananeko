@@ -35,6 +35,10 @@ import {
   cp_n,
   cp_r,
   add_r,
+  add_n,
+  adc_n,
+  sub_n,
+  sbc_n,
   adc_r,
   add_hl_rr,
   inc_r,
@@ -102,15 +106,13 @@ const TEXT_END = 0xfe; // end of text string (tile 0 = space, so 0x00 is valid c
  * Pack a dialogue tree into ROM data with an offset table for random access.
  *
  * Per node:
- *   [text_tiles...] 0x00
+ *   [text_tiles...] 0xFE
  *   [choice_count]
  *   [next_node × choice_count]           ← compact lookup table
- *   [choice_0_text...] 0x00
- *   [choice_1_text...] 0x00
+ *   [good_flag × choice_count]           ← 1 = good answer (+10), 0 = bad (-5)
+ *   [choice_0_text...] 0xFE
+ *   [choice_1_text...] 0xFE
  *   ...
- *
- * This layout lets the assembly engine read next_node[cursor] directly
- * without tracking per-choice metadata pointers.
  */
 export function buildDialogueTree(tree: DialogueTree): Uint8Array {
   const nodeChunks: number[][] = [];
@@ -128,6 +130,11 @@ export function buildDialogueTree(tree: DialogueTree): Uint8Array {
     // Next-node lookup table (one byte per choice, right after count)
     for (const choice of node.choices) {
       chunk.push(choice.next ?? END_MARKER);
+    }
+
+    // Good-answer flags (1 = no hint = good, 0 = has hint = bad)
+    for (const choice of node.choices) {
+      chunk.push(choice.hint === undefined ? 1 : 0);
     }
 
     // Choice texts, each null-terminated
@@ -359,11 +366,12 @@ export function buildDialogueEngine(): Op[] {
     ld_r_r('a', 'h'),
     ld_nn_a(MEM.DLG_META0_HI),
 
-    // Skip past the next_node table (choice_count bytes) to reach choice texts
+    // Skip past next_node table + good_flag table (choice_count * 2 bytes)
     ld_a_nn(MEM.DLG_CHOICE_CNT),
+    add_r('a'), // A = choice_count * 2
     ld_r_r('c', 'a'),
     ld_r_n('b', u8(0)),
-    add_hl_rr('bc'), // HL += choice_count
+    add_hl_rr('bc'), // HL += choice_count * 2
 
     // Save pointer to first choice text
     ld_r_r('a', 'l'),
@@ -535,20 +543,55 @@ export function buildDialogueEngine(): Op[] {
     ld_nn_a(MEM.DLG_RESULT),
 
     // Read next_node = table_base[cursor]
-    // Load table base pointer into HL
     ld_a_nn(MEM.DLG_META0_LO),
     ld_r_r('l', 'a'),
     ld_a_nn(MEM.DLG_META0_HI),
     ld_r_r('h', 'a'),
-    // Add cursor offset
     ld_a_nn(MEM.DLG_CURSOR),
     ld_r_r('c', 'a'),
     ld_r_n('b', u8(0)),
     add_hl_rr('bc'), // HL = table_base + cursor
-    // Read next_node
     ldi_a_hl(),
     ld_nn_a(MEM.DLG_NODE_ID),
 
+    // Read good_flag = table_base[choice_count + cursor]
+    // HL is now at table_base + cursor + 1. We need table_base + choice_count + cursor.
+    // Offset from current HL: (choice_count - cursor - 1)
+    // Simpler: reload table_base, add choice_count + cursor
+    ld_a_nn(MEM.DLG_META0_LO),
+    ld_r_r('l', 'a'),
+    ld_a_nn(MEM.DLG_META0_HI),
+    ld_r_r('h', 'a'),
+    // Add choice_count + cursor
+    ld_a_nn(MEM.DLG_CHOICE_CNT),
+    add_r('c'), // A = choice_count + cursor (C still has cursor from above)
+    ld_r_r('c', 'a'),
+    ld_r_n('b', u8(0)),
+    add_hl_rr('bc'),
+    ldi_a_hl(), // A = good_flag (1 = good, 0 = bad)
+
+    // Score: +10 if good, -5 if bad
+    cp_n(u8(1)),
+    jr_cc('nz', ref('dlg_bad_choice')),
+    // Good: +10 to kana score
+    ld_a_nn(MEM.KANA_SCORE_LO),
+    add_n(u8(10)),
+    ld_nn_a(MEM.KANA_SCORE_LO),
+    ld_a_nn(MEM.KANA_SCORE_HI),
+    adc_n(u8(0)),
+    ld_nn_a(MEM.KANA_SCORE_HI),
+    jr(ref('dlg_score_done')),
+
+    label('dlg_bad_choice'),
+    // Bad: -5 from kana score
+    ld_a_nn(MEM.KANA_SCORE_LO),
+    sub_n(u8(5)),
+    ld_nn_a(MEM.KANA_SCORE_LO),
+    ld_a_nn(MEM.KANA_SCORE_HI),
+    sbc_n(u8(0)),
+    ld_nn_a(MEM.KANA_SCORE_HI),
+
+    label('dlg_score_done'),
     // Set state = idle
     xor_r('a'),
     ld_nn_a(MEM.DLG_STATE),

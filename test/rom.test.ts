@@ -286,15 +286,17 @@ describe('kana', () => {
 
   it('awards 100 points for correct first try', () => {
     const runner = new GameRunner().boot().start().completeDialogueTree(0);
+    const scoreBefore = runner.kanaScore;
     runner.answerKanaCorrectly();
-    expect(runner.kanaScore).toBe(100);
+    expect(runner.kanaScore - scoreBefore).toBe(100);
   });
 
   it('awards 10 points for correct second try', () => {
     const runner = new GameRunner().boot().start().completeDialogueTree(0);
-    runner.answerKanaWrong(); // attempt 1 wrong
-    runner.answerKanaCorrectly(); // attempt 2 correct
-    expect(runner.kanaScore).toBe(10);
+    const scoreBefore = runner.kanaScore;
+    runner.answerKanaWrong();
+    runner.answerKanaCorrectly();
+    expect(runner.kanaScore - scoreBefore).toBe(10);
   });
 
   it('loses a life after 3 wrong answers', () => {
