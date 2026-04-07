@@ -193,6 +193,14 @@ export class GameRunner {
     return this.readMem(MEM.DLG_NODE_ID);
   }
 
+  get dlgChoiceOrder(): [number, number, number] {
+    return [
+      this.readMem(MEM.DLG_ORDER0),
+      this.readMem(MEM.DLG_ORDER1),
+      this.readMem(MEM.DLG_ORDER2),
+    ];
+  }
+
   get kanaState(): number {
     return this.readMem(MEM.KANA_STATE);
   }
@@ -284,18 +292,33 @@ export class GameRunner {
     );
   }
 
-  /** Wait for dialogue choices to appear, then pick first choice (good) */
-  advanceDialogue(): this {
-    return this.waitForDialogueChoices().pressA().frames(GameRunner.INPUT_DEBOUNCE);
+  dialogueDisplayIndexForChoice(logicalChoice: number): number {
+    const displayIndex = this.dlgChoiceOrder.indexOf(logicalChoice);
+    if (displayIndex === -1) {
+      throw new Error(
+        `Choice ${String(logicalChoice)} is not visible in the current dialogue node`,
+      );
+    }
+    return displayIndex;
   }
 
-  /** Wait for dialogue choices to appear, then pick second choice (bad) */
+  chooseDialogueChoice(logicalChoice: number): this {
+    this.waitForDialogueChoices();
+    const displayIndex = this.dialogueDisplayIndexForChoice(logicalChoice);
+    for (let i = 0; i < displayIndex; i++) {
+      this.pressDown().frames(1);
+    }
+    return this.pressA().frames(GameRunner.INPUT_DEBOUNCE);
+  }
+
+  /** Wait for dialogue choices to appear, then pick first authored choice (good) */
+  advanceDialogue(): this {
+    return this.chooseDialogueChoice(0);
+  }
+
+  /** Wait for dialogue choices to appear, then pick second authored choice (bad) */
   advanceDialogueBad(): this {
-    return this.waitForDialogueChoices()
-      .pressDown()
-      .frames(GameRunner.INPUT_DEBOUNCE)
-      .pressA()
-      .frames(GameRunner.INPUT_DEBOUNCE);
+    return this.chooseDialogueChoice(1);
   }
 
   /** Complete an entire dialogue tree (always choosing first option until conversation ends) */
@@ -315,7 +338,9 @@ export class GameRunner {
     if (key === undefined) throw new Error(`Invalid correct pos: ${String(correctPos)}`);
     this.gb.pressKey(key);
     this.gb.doFrame();
-    return this.waitUntil(() => this.kanaState !== 3, 'kana correct feedback');
+    return this.waitUntil(() => this.kanaState !== 2, 'kana correct answer registration')
+      .waitUntil(() => this.kanaState === 2 || this.kanaState === 0, 'kana correct feedback')
+      .frames(GameRunner.INPUT_DEBOUNCE);
   }
 
   /** Answer the current kana question WRONG */
@@ -327,10 +352,9 @@ export class GameRunner {
     if (key === undefined) throw new Error(`Invalid wrong pos: ${String(wrongPos)}`);
     this.gb.pressKey(key);
     this.gb.doFrame();
-    return this.waitUntil(
-      () => this.kanaState === 2 || this.kanaState === 0,
-      'kana wrong feedback',
-    );
+    return this.waitUntil(() => this.kanaState !== 2, 'kana wrong answer registration')
+      .waitUntil(() => this.kanaState === 2 || this.kanaState === 0, 'kana wrong feedback')
+      .frames(GameRunner.INPUT_DEBOUNCE);
   }
 
   /** Complete all kana questions for a scene (correct on first try) */

@@ -2,7 +2,7 @@
  * Dialogue engine for the Game Boy.
  *
  * Renders a text box at the bottom of the screen (rows 12-17),
- * reveals text character-by-character, presents response choices,
+ * reveals text character-by-character, presents shuffled response choices,
  * and handles cursor navigation with d-pad + A confirm.
  *
  * Supports branching dialogue trees. Each tree has:
@@ -36,6 +36,7 @@ import {
   cp_r,
   add_r,
   adc_r,
+  sub_n,
   add_hl_rr,
   inc_r,
   inc_rr,
@@ -100,6 +101,7 @@ const CURSOR_TILE = requireTile('▶');
 // ---------------------------------------------------------------------------
 
 let choicePositionCounter = 0;
+let choiceOrderCounter = 0;
 
 function buildLoadChoicePosition(positions: Triple<TilePosition>, labelPrefix: string): Op[] {
   const id = `${labelPrefix}_${String(choicePositionCounter++)}`;
@@ -115,6 +117,135 @@ function buildLoadChoicePosition(positions: Triple<TilePosition>, labelPrefix: s
     jr(ref(`${id}_done`)),
     label(`${id}_2`),
     ld_rr_nn('hl', u16(tilemapAddr(positions[2]))),
+    label(`${id}_done`),
+  ];
+}
+
+function buildInitChoiceOrder(): Op[] {
+  const id = `dlg_order_${String(choiceOrderCounter++)}`;
+  return [
+    xor_r('a'),
+    ld_nn_a(MEM.DLG_ORDER0),
+    inc_r('a'),
+    ld_nn_a(MEM.DLG_ORDER1),
+    inc_r('a'),
+    ld_nn_a(MEM.DLG_ORDER2),
+
+    ld_a_nn(MEM.DLG_CHOICE_CNT),
+    cp_n(u8(2)),
+    jr_cc('z', ref(`${id}_two`)),
+    cp_n(u8(3)),
+    jr_cc('z', ref(`${id}_three`)),
+    jp(ref(`${id}_done`)),
+
+    label(`${id}_two`),
+    ldh_a_n(HW.DIV),
+    and_n(u8(1)),
+    jr_cc('z', ref(`${id}_done`)),
+    ld_r_n('a', u8(1)),
+    ld_nn_a(MEM.DLG_ORDER0),
+    xor_r('a'),
+    ld_nn_a(MEM.DLG_ORDER1),
+    jp(ref(`${id}_done`)),
+
+    label(`${id}_three`),
+    ldh_a_n(HW.DIV),
+    and_n(u8(7)),
+    cp_n(u8(6)),
+    jr_cc('c', ref(`${id}_three_dispatch`)),
+    sub_n(u8(6)),
+
+    label(`${id}_three_dispatch`),
+    cp_n(u8(0)),
+    jr_cc('nz', ref(`${id}_perm1`)),
+    jp(ref(`${id}_done`)),
+
+    label(`${id}_perm1`),
+    cp_n(u8(1)),
+    jr_cc('nz', ref(`${id}_perm2`)),
+    ld_r_n('a', u8(2)),
+    ld_nn_a(MEM.DLG_ORDER1),
+    ld_r_n('a', u8(1)),
+    ld_nn_a(MEM.DLG_ORDER2),
+    jp(ref(`${id}_done`)),
+
+    label(`${id}_perm2`),
+    cp_n(u8(2)),
+    jr_cc('nz', ref(`${id}_perm3`)),
+    ld_r_n('a', u8(1)),
+    ld_nn_a(MEM.DLG_ORDER0),
+    xor_r('a'),
+    ld_nn_a(MEM.DLG_ORDER1),
+    jp(ref(`${id}_done`)),
+
+    label(`${id}_perm3`),
+    cp_n(u8(3)),
+    jr_cc('nz', ref(`${id}_perm4`)),
+    ld_r_n('a', u8(1)),
+    ld_nn_a(MEM.DLG_ORDER0),
+    ld_r_n('a', u8(2)),
+    ld_nn_a(MEM.DLG_ORDER1),
+    xor_r('a'),
+    ld_nn_a(MEM.DLG_ORDER2),
+    jp(ref(`${id}_done`)),
+
+    label(`${id}_perm4`),
+    cp_n(u8(4)),
+    jr_cc('nz', ref(`${id}_perm5`)),
+    ld_r_n('a', u8(2)),
+    ld_nn_a(MEM.DLG_ORDER0),
+    xor_r('a'),
+    ld_nn_a(MEM.DLG_ORDER1),
+    ld_r_n('a', u8(1)),
+    ld_nn_a(MEM.DLG_ORDER2),
+    jp(ref(`${id}_done`)),
+
+    label(`${id}_perm5`),
+    ld_r_n('a', u8(2)),
+    ld_nn_a(MEM.DLG_ORDER0),
+    ld_r_n('a', u8(1)),
+    ld_nn_a(MEM.DLG_ORDER1),
+    xor_r('a'),
+    ld_nn_a(MEM.DLG_ORDER2),
+
+    label(`${id}_done`),
+  ];
+}
+
+function buildLoadChoicePositionForOriginalIndex(labelPrefix: string): Op[] {
+  const id = `${labelPrefix}_${String(choiceOrderCounter++)}`;
+  return [
+    ld_a_nn(MEM.DLG_ORDER0),
+    cp_r('b'),
+    jr_cc('nz', ref(`${id}_1`)),
+    ld_rr_nn('hl', u16(tilemapAddr(CHOICE_TEXT_POSITIONS[0]))),
+    jr(ref(`${id}_done`)),
+    label(`${id}_1`),
+    ld_a_nn(MEM.DLG_ORDER1),
+    cp_r('b'),
+    jr_cc('nz', ref(`${id}_2`)),
+    ld_rr_nn('hl', u16(tilemapAddr(CHOICE_TEXT_POSITIONS[1]))),
+    jr(ref(`${id}_done`)),
+    label(`${id}_2`),
+    ld_rr_nn('hl', u16(tilemapAddr(CHOICE_TEXT_POSITIONS[2]))),
+    label(`${id}_done`),
+  ];
+}
+
+function buildLoadLogicalChoiceFromCursor(labelPrefix: string): Op[] {
+  const id = `${labelPrefix}_${String(choiceOrderCounter++)}`;
+  return [
+    cp_n(u8(0)),
+    jr_cc('nz', ref(`${id}_1`)),
+    ld_a_nn(MEM.DLG_ORDER0),
+    jr(ref(`${id}_done`)),
+    label(`${id}_1`),
+    cp_n(u8(1)),
+    jr_cc('nz', ref(`${id}_2`)),
+    ld_a_nn(MEM.DLG_ORDER1),
+    jr(ref(`${id}_done`)),
+    label(`${id}_2`),
+    ld_a_nn(MEM.DLG_ORDER2),
     label(`${id}_done`),
   ];
 }
@@ -338,6 +469,8 @@ export function buildDialogueEngine(): Op[] {
     ld_r_n('a', u8(3)), // state = choosing
     ld_nn_a(MEM.DLG_STATE),
 
+    ...buildInitChoiceOrder(),
+
     // Draw choice texts (with LCD off for bulk write)
     label('dlg_draw_choices_vblank'),
     ldh_a_n(HW.LY),
@@ -359,13 +492,8 @@ export function buildDialogueEngine(): Op[] {
     ld_r_n('b', u8(0)), // B = choice index
 
     label('dlg_draw_choice_loop'),
-    // Calculate VRAM address for this choice row
-    // Row = CHOICE_START_ROW + B, Col = 3 (after border + cursor space)
-    // We inline the address computation for each row
-    ld_r_r('a', 'b'), // choice index
-
-    // VRAM = 0x9800 + (CHOICE_START_ROW + index) * 32 + 3
-    ...buildLoadChoicePosition(CHOICE_TEXT_POSITIONS, 'dlg_choice_pos'),
+    // Calculate VRAM address for this original choice's shuffled display row
+    ...buildLoadChoicePositionForOriginalIndex('dlg_choice_pos'),
 
     label('dlg_choice_write'),
     // DE = ROM string pointer, HL = VRAM destination
@@ -475,15 +603,17 @@ export function buildDialogueEngine(): Op[] {
     ld_a_nn(MEM.DLG_CURSOR),
     ld_nn_a(MEM.DLG_RESULT),
 
-    // Read next_node = table_base[cursor]
+    // Read next_node = table_base[logical_choice]
+    ld_a_nn(MEM.DLG_CURSOR),
+    ...buildLoadLogicalChoiceFromCursor('dlg_choice_logical'),
+    ld_r_r('c', 'a'),
+
     ld_a_nn(MEM.DLG_META0_LO),
     ld_r_r('l', 'a'),
     ld_a_nn(MEM.DLG_META0_HI),
     ld_r_r('h', 'a'),
-    ld_a_nn(MEM.DLG_CURSOR),
-    ld_r_r('c', 'a'),
     ld_r_n('b', u8(0)),
-    add_hl_rr('bc'), // HL = table_base + cursor
+    add_hl_rr('bc'), // HL = table_base + logical_choice
     ldi_a_hl(),
     ld_nn_a(MEM.DLG_NODE_ID),
 

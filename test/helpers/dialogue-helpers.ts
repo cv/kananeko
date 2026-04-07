@@ -87,10 +87,7 @@ export function playDialogueTree(
     runner.waitForDialogueChoices();
     expect(runner.dlgState).toBe(DIALOGUE_CHOOSING);
 
-    for (let i = 0; i < choiceIdx; i++) {
-      runner.pressDown().frames(1);
-    }
-    runner.pressA().frames(5);
+    runner.chooseDialogueChoice(choiceIdx).frames(2);
 
     if (choice.next === null) {
       expect(runner.dlgNodeId).toBe(DIALOGUE_END_NODE);

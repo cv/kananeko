@@ -61,11 +61,10 @@ describe('Given the player has started the opening conversation', () => {
 
   it('restores one life and shows a positive delta after a good choice', () => {
     const runner = runnerAtOpeningDialogue();
-    runner.waitForDialogueChoices();
-    runner.pressDown().frames(3).pressA().frames(3);
+    runner.chooseDialogueChoice(1).frames(3);
     expect(runner.kanaLives).toBe(2);
 
-    runner.waitForDialogueChoices().pressA().frames(3);
+    runner.chooseDialogueChoice(0).frames(3);
     expect(runner.kanaLives).toBe(3);
     expect(runner.deltaType).toBe(DELTA_PLUS_10);
   });
@@ -73,15 +72,14 @@ describe('Given the player has started the opening conversation', () => {
   it('does not increase lives above the cap after a good choice', () => {
     const runner = runnerAtOpeningDialogue();
     expect(runner.kanaLives).toBe(3);
-    runner.waitForDialogueChoices().pressA().frames(3);
+    runner.chooseDialogueChoice(0).frames(3);
     expect(runner.kanaLives).toBe(3);
   });
 
   it('removes one life and shows a negative delta after a bad choice', () => {
     const runner = runnerAtOpeningDialogue();
     expect(runner.kanaLives).toBe(3);
-    runner.waitForDialogueChoices();
-    runner.pressDown().frames(3).pressA().frames(3);
+    runner.chooseDialogueChoice(1).frames(3);
     expect(runner.kanaLives).toBe(2);
     expect(runner.deltaType).toBe(DELTA_MINUS_5);
   });
@@ -91,8 +89,7 @@ describe('Given the player has started the opening conversation', () => {
     expect(runner.kanaLives).toBe(3);
 
     for (let i = 0; i < 3; i++) {
-      runner.waitForDialogueChoices();
-      runner.pressDown().frames(3).pressA().frames(5);
+      runner.chooseDialogueChoice(1).frames(5);
     }
 
     runner.waitForKanaInput();

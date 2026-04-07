@@ -80,12 +80,11 @@ export const MEM = {
   DLG_TREE_LO: u16(0xc02b), // Base pointer to current tree data (lo)
   DLG_TREE_HI: u16(0xc02c), // Base pointer to current tree data (hi)
   // Per-choice metadata pointers (ROM address of next_node byte for each choice)
-  DLG_META0_LO: u16(0xc02d), // ROM ptr to choice 0's next_node byte
-  DLG_META0_HI: u16(0xc02e),
-  DLG_META1_LO: u16(0xc02f), // ROM ptr to choice 1's next_node byte
-  DLG_META1_HI: u16(0xc030),
-  DLG_META2_LO: u16(0xc031), // ROM ptr to choice 2's next_node byte
-  DLG_META2_HI: u16(0xc032),
+  DLG_META0_LO: u16(0xc02d), // ROM ptr to next_node table base (lo)
+  DLG_META0_HI: u16(0xc02e), // ROM ptr to next_node table base (hi)
+  DLG_ORDER0: u16(0xc02f), // Display row 0 → logical choice index
+  DLG_ORDER1: u16(0xc030), // Display row 1 → logical choice index
+  DLG_ORDER2: u16(0xc031), // Display row 2 → logical choice index
 
   // WRAM — kana mini-game
   KANA_STATE: u16(0xc040), // 0=idle, 2=awaiting, 3=correct feedback, 4=wrong feedback
