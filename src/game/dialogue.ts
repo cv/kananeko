@@ -488,18 +488,28 @@ export function buildDialogueEngine(): Op[] {
     add_hl_rr('bc'),
     ldi_a_hl(), // A = good_flag (1 = good, 0 = bad)
 
-    // Score: +10 if good, -5 if bad
+    // Score + lives: good = +10 & regain life, bad = -5 & lose life
     cp_n(u8(1)),
     jr_cc('nz', ref('dlg_bad_choice')),
-    // Good: +10
+    // Good: +10 score, +1 life (capped at 3)
     ...buildAddScore(10),
     ...buildSetDelta(DELTA_PLUS_10),
+    ld_a_nn(MEM.KANA_LIVES),
+    cp_n(u8(3)),
+    jr_cc('nc', ref('dlg_score_done')), // already at max
+    inc_r('a'),
+    ld_nn_a(MEM.KANA_LIVES),
     jr(ref('dlg_score_done')),
 
     label('dlg_bad_choice'),
-    // Bad: -5
+    // Bad: -5 score, -1 life (floor at 0)
     ...buildSubScore(5),
     ...buildSetDelta(DELTA_MINUS_5),
+    ld_a_nn(MEM.KANA_LIVES),
+    cp_n(u8(0)),
+    jr_cc('z', ref('dlg_score_done')), // already at 0
+    dec_r('a'),
+    ld_nn_a(MEM.KANA_LIVES),
 
     label('dlg_score_done'),
     // Set state = idle

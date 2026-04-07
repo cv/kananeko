@@ -46,24 +46,31 @@ describe('dialogue', () => {
     expect(runner.dlgResult).toBe(1);
   });
 
-  it('scores +10 for good choice (no hint)', () => {
+  it('good choice: +10 score and regains a life', () => {
     const runner = new GameRunner().boot().start();
-    // Node 0: choice 0 has no hint = good
-    const before = runner.kanaScore;
+    // Lose a life first via bad choice
+    runner.waitForDialogueChoices();
+    runner.press('DOWN').frames(3).press('A').frames(3);
+    expect(runner.kanaLives).toBe(2);
+    // Now good choice should restore the life
     runner.waitForDialogueChoices().press('A').frames(3);
-    expect(runner.kanaScore - before).toBe(10);
+    expect(runner.kanaLives).toBe(3); // restored
     expect(runner.deltaType).toBe(2); // DELTA_PLUS_10
   });
 
-  it('scores -5 for bad choice (has hint)', () => {
+  it('good choice: lives capped at 3', () => {
     const runner = new GameRunner().boot().start();
-    // First do a good choice to get score > 0
+    expect(runner.kanaLives).toBe(3);
     runner.waitForDialogueChoices().press('A').frames(3);
-    // Node 1: choice 1 has hint = bad (つかれました)
-    const before = runner.kanaScore;
+    expect(runner.kanaLives).toBe(3); // still 3, not 4
+  });
+
+  it('bad choice: -5 score and loses a life', () => {
+    const runner = new GameRunner().boot().start();
+    expect(runner.kanaLives).toBe(3);
     runner.waitForDialogueChoices();
     runner.press('DOWN').frames(3).press('A').frames(3);
-    expect(before - runner.kanaScore).toBe(5); // lost 5 points
+    expect(runner.kanaLives).toBe(2);
     expect(runner.deltaType).toBe(3); // DELTA_MINUS_5
   });
 
