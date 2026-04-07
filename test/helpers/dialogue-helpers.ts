@@ -3,11 +3,45 @@
  */
 
 import { expect } from 'vitest';
-import { GameRunner } from './game-runner';
+import { GameRunner, type GameRunnerSnapshot } from './game-runner';
 import { SCENES } from '@game/scene';
 import { DIALOGUE_CHOOSING, DIALOGUE_END_NODE, KANA_AWAITING_INPUT } from './test-constants';
 
 const GAME_OVER_RESET_FRAMES = 10;
+
+const sceneStartSnapshots = new Map<number, GameRunnerSnapshot>();
+const sceneKanaSnapshots = new Map<number, GameRunnerSnapshot>();
+
+function getSceneStartSnapshot(sceneIdx: number): GameRunnerSnapshot {
+  const cached = sceneStartSnapshots.get(sceneIdx);
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const runner =
+    sceneIdx === 0
+      ? new GameRunner().boot().start()
+      : GameRunner.fromSnapshot(getSceneStartSnapshot(sceneIdx - 1)).completeScene(sceneIdx - 1);
+
+  const snapshot = runner.snapshot();
+  sceneStartSnapshots.set(sceneIdx, snapshot);
+  return snapshot;
+}
+
+function getSceneKanaSnapshot(sceneIdx: number): GameRunnerSnapshot {
+  const cached = sceneKanaSnapshots.get(sceneIdx);
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const runner = GameRunner.fromSnapshot(getSceneStartSnapshot(sceneIdx))
+    .completeDialogueTree()
+    .waitForKanaInput();
+
+  const snapshot = runner.snapshot();
+  sceneKanaSnapshots.set(sceneIdx, snapshot);
+  return snapshot;
+}
 
 /** Repeat the same dialogue choice index N times. */
 export function repeatChoice(count: number, choiceIdx = 0): number[] {
@@ -16,14 +50,12 @@ export function repeatChoice(count: number, choiceIdx = 0): number[] {
 
 /** Advance runner to the start of the given scene (completes all prior scenes). */
 export function runnerAtScene(sceneIdx: number): GameRunner {
-  const runner = new GameRunner().boot().start();
-  for (let i = 0; i < sceneIdx; i++) runner.completeScene(i);
-  return runner;
+  return GameRunner.fromSnapshot(getSceneStartSnapshot(sceneIdx));
 }
 
 /** Advance runner to a scene and enter its kana round via the default dialogue path. */
 export function runnerInKana(sceneIdx: number): GameRunner {
-  return runnerAtScene(sceneIdx).completeDialogueTree().waitForKanaInput();
+  return GameRunner.fromSnapshot(getSceneKanaSnapshot(sceneIdx));
 }
 
 /** Play a full dialogue path and assert it reaches the kana round. */

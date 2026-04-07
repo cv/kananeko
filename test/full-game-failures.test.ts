@@ -8,12 +8,11 @@ import {
   returnToTitleAfterGameOver,
   runnerAtScene,
 } from './helpers/dialogue-helpers';
-import { GameRunner } from './helpers/game-runner';
 import { KANA_AWAITING_INPUT } from './helpers/test-constants';
 
 describe('Given the player makes critical mistakes', () => {
   it('enters kana with one restocked life after three bad dialogue choices', () => {
-    const runner = new GameRunner().boot().start();
+    const runner = runnerAtScene(0);
     expect(runner.kanaLives).toBe(3);
 
     runner.advanceDialogueBad();
@@ -30,7 +29,7 @@ describe('Given the player makes critical mistakes', () => {
   });
 
   it('returns to title-state values after dialogue death leads to kana death', () => {
-    const runner = new GameRunner().boot().start();
+    const runner = runnerAtScene(0);
 
     for (let i = 0; i < 3; i++) runner.advanceDialogueBad();
 

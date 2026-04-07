@@ -1,7 +1,6 @@
 /** Dialogue engine tests. */
 
 import { describe, it, expect } from 'vitest';
-import { GameRunner } from './helpers/game-runner';
 import {
   DELTA_MINUS_5,
   DELTA_PLUS_10,
@@ -10,9 +9,10 @@ import {
   KANA_AWAITING_INPUT,
 } from './helpers/test-constants';
 import { buildDialogueTree } from '@game/dialogue';
+import { runnerAtScene } from './helpers/dialogue-helpers';
 
-function runnerAtOpeningDialogue(): GameRunner {
-  return new GameRunner().boot().start();
+function runnerAtOpeningDialogue(): ReturnType<typeof runnerAtScene> {
+  return runnerAtScene(0);
 }
 
 describe('Given the dialogue tree is being encoded into ROM data', () => {

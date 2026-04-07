@@ -3,12 +3,12 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { GameRunner } from './helpers/game-runner';
+import { runnerAtScene } from './helpers/dialogue-helpers';
 import { SCENES } from '@game/scene';
 
 describe('Given the player plays a perfect run', () => {
   it('adds 100 points for every first-try kana answer in a perfect run', () => {
-    const runner = new GameRunner().boot().start();
+    const runner = runnerAtScene(0);
     for (let i = 0; i < SCENES.length; i++) {
       runner.completeDialogueTree();
       for (let j = 0; j < SCENES[i]!.kanaQuestions.length; j++) {

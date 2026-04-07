@@ -22,6 +22,48 @@ const { rom, symbols } = assemble(buildProgram(), {
 
 export { rom, symbols };
 
+type SaveStatePayload = ReturnType<EmulatorCore['saveState']>;
+
+interface EmulatorCore {
+  saveState(): unknown[];
+  saving(state: unknown[]): void;
+}
+
+interface EmulatorInternals {
+  gameboy: EmulatorCore;
+  frames: number;
+  pressed: boolean[];
+}
+
+export interface GameRunnerSnapshot {
+  readonly state: SaveStatePayload;
+  readonly frames: number;
+}
+
+function patchRomForServerboy(sourceRom: Uint8Array): Buffer {
+  const patchedRom = Buffer.from(sourceRom);
+  for (let i = 0x0150; i < 0x0300; i++) {
+    // Find: 3E 01 EA FF FF FB (LD A,$01; LD ($FFFF),A; EI)
+    if (
+      patchedRom[i] === 0x3e &&
+      patchedRom[i + 1] === 0x01 &&
+      patchedRom[i + 2] === 0xea &&
+      patchedRom[i + 3] === 0xff &&
+      patchedRom[i + 4] === 0xff &&
+      patchedRom[i + 5] === 0xfb
+    ) {
+      // NOP out the LD A,$01 and LD ($FFFF),A (5 bytes), keep the EI
+      patchedRom[i] = 0x00;
+      patchedRom[i + 1] = 0x00;
+      patchedRom[i + 2] = 0x00;
+      patchedRom[i + 3] = 0x00;
+      patchedRom[i + 4] = 0x00;
+      break;
+    }
+  }
+  return patchedRom;
+}
+
 // Direction index → serverboy key mapping (0=UP, 1=DOWN, 2=LEFT, 3=RIGHT)
 const DIR_KEYS: number[] = [
   Gameboy.KEYMAP.UP as number,
@@ -35,33 +77,51 @@ const DIR_KEYS: number[] = [
  */
 export class GameRunner {
   private readonly gb: InstanceType<typeof Gameboy>;
+  private readonly internals: EmulatorInternals;
 
-  constructor() {
+  private static readonly patchedRom = patchRomForServerboy(rom);
+  private static interfacePrivateKey: string | undefined;
+
+  constructor(snapshot?: GameRunnerSnapshot) {
     this.gb = new Gameboy();
-    // Patch out the IE write for serverboy — it can't handle VBlank interrupts.
-    // The real build ROM has LD A,$01 / LD ($FFFF),A before EI.
-    // Replace with NOPs (00 00 00 00 00) so serverboy treats HALT as frame advance.
-    const patchedRom = Buffer.from(rom);
-    for (let i = 0x0150; i < 0x0300; i++) {
-      // Find: 3E 01 EA FF FF FB (LD A,$01; LD ($FFFF),A; EI)
-      if (
-        patchedRom[i] === 0x3e &&
-        patchedRom[i + 1] === 0x01 &&
-        patchedRom[i + 2] === 0xea &&
-        patchedRom[i + 3] === 0xff &&
-        patchedRom[i + 4] === 0xff &&
-        patchedRom[i + 5] === 0xfb
-      ) {
-        // NOP out the LD A,$01 and LD ($FFFF),A (5 bytes), keep the EI
-        patchedRom[i] = 0x00;
-        patchedRom[i + 1] = 0x00;
-        patchedRom[i + 2] = 0x00;
-        patchedRom[i + 3] = 0x00;
-        patchedRom[i + 4] = 0x00;
-        break;
-      }
+    this.gb.loadRom(GameRunner.patchedRom);
+    this.internals = GameRunner.getInternals(this.gb);
+
+    if (snapshot !== undefined) {
+      this.restore(snapshot);
     }
-    this.gb.loadRom(patchedRom);
+  }
+
+  private static getInternals(gb: InstanceType<typeof Gameboy>): EmulatorInternals {
+    GameRunner.interfacePrivateKey ??= Object.getOwnPropertyNames(gb).find((key) =>
+      key.startsWith('_'),
+    );
+    const privateKey = GameRunner.interfacePrivateKey;
+    if (privateKey === undefined) {
+      throw new Error('Could not locate serverboy internals');
+    }
+    const internals = (gb as Record<string, EmulatorInternals | undefined>)[privateKey];
+    if (internals === undefined) {
+      throw new Error('Could not access serverboy internals');
+    }
+    return internals;
+  }
+
+  static fromSnapshot(snapshot: GameRunnerSnapshot): GameRunner {
+    return new GameRunner(snapshot);
+  }
+
+  snapshot(): GameRunnerSnapshot {
+    return {
+      state: this.internals.gameboy.saveState(),
+      frames: this.internals.frames,
+    };
+  }
+
+  private restore(snapshot: GameRunnerSnapshot): void {
+    this.internals.gameboy.saving(snapshot.state);
+    this.internals.frames = snapshot.frames;
+    this.internals.pressed.fill(false);
   }
 
   // ---------------------------------------------------------------------------
@@ -178,6 +238,9 @@ export class GameRunner {
 
   /** Wait until a predicate on game state is true, or throw after MAX_WAIT frames */
   waitUntil(predicate: () => boolean, description: string): this {
+    if (predicate()) {
+      return this;
+    }
     for (let i = 0; i < GameRunner.MAX_WAIT; i++) {
       this.frames(1);
       if (predicate()) return this;
@@ -215,7 +278,10 @@ export class GameRunner {
 
   /** Press START to begin the game from the title screen */
   start(): this {
-    return this.pressStart().frames(GameRunner.INPUT_DEBOUNCE);
+    this.pressStart();
+    return this.waitUntil(() => this.dlgState > 0, 'scene 0 opening dialogue').frames(
+      GameRunner.INPUT_DEBOUNCE,
+    );
   }
 
   /** Wait for dialogue choices to appear, then pick first choice (good) */

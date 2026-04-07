@@ -1,7 +1,8 @@
 /** Scene system tests. */
 
 import { describe, it, expect } from 'vitest';
-import { GameRunner, symbols } from './helpers/game-runner';
+import { symbols } from './helpers/game-runner';
+import { runnerAtScene } from './helpers/dialogue-helpers';
 import { SCENES } from '@game/scene';
 
 describe('Given the scene registry is assembled', () => {
@@ -24,13 +25,13 @@ describe('Given the scene registry is assembled', () => {
 
 describe('Given the player starts the game', () => {
   it('loads scene 0 after START', () => {
-    const runner = new GameRunner().boot().start();
+    const runner = runnerAtScene(0);
     expect(runner.sceneId).toBe(0);
     expect(runner.dlgState).toBeGreaterThan(0);
   });
 
   it('advances from scene 0 to scene 1 after the first scene is completed', () => {
-    const runner = new GameRunner().boot().start().completeScene(0);
+    const runner = runnerAtScene(0).completeScene(0);
     expect(runner.sceneId).toBe(1);
     expect(runner.sceneFlags & 0x01).toBe(0x01);
   });
