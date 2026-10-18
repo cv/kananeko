@@ -120,7 +120,8 @@ const BORDER_BOTTOM = requireTile('▁'); // with the shadow
 
 /** Cursor sprite position for the first choice row (OAM coordinates) */
 const CURSOR_Y = CHOICE_START_ROW * 8 + OAM_Y_OFFSET;
-const CURSOR_X = CHOICE_CURSOR_COL * 8 + OAM_X_OFFSET;
+/** One pixel left of its column: a 1-pixel gap before the choice text (the bounce closes it) */
+const CURSOR_X = CHOICE_CURSOR_COL * 8 + OAM_X_OFFSET - 1;
 /** Bit of DLG_BOUNCE that nudges the cursor (toggles every 8 frames) */
 const CURSOR_BOUNCE_FRAMES = 8;
 
