@@ -225,6 +225,11 @@ export class GameRunner {
     return this.readMem(MEM.DELTA_TYPE);
   }
 
+  /** Whether the HUD is currently flashing a score delta */
+  get deltaVisible(): boolean {
+    return this.readMem(MEM.DELTA_TIMER) > 0;
+  }
+
   get sceneId(): number {
     return this.readMem(MEM.SCENE_ID);
   }

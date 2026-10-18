@@ -63,6 +63,7 @@ import {
   DELTA_PLUS_10,
   DELTA_PLUS_100,
   buildAddScore,
+  buildClearDelta,
   buildDrawTileAt,
   buildSetDelta,
   buildSubScore,
@@ -231,6 +232,7 @@ export function buildKanaEngine(): Op[] {
     // Score persists across scenes — initialized at game start only.
     // Restock 1 life so the player can attempt kana even after dying in dialogue.
     ...zeroBytes(MEM.KANA_Q_IDX, MEM.KANA_ATTEMPTS),
+    ...buildClearDelta(), // don't carry a dialogue flash into the round
     ld_a_nn(MEM.KANA_LIVES),
     cp_n(u8(0)),
     jr_cc('nz', ref('kana_lives_ok')),
@@ -345,10 +347,13 @@ export function buildKanaEngine(): Op[] {
 
     label('kana_score_attempt1'),
     cp_n(u8(1)),
-    jr_cc('nz', ref('kana_correct_done')),
+    jr_cc('nz', ref('kana_score_none')),
     ...buildAddScore(SCORE_SECOND_TRY),
     ...buildSetDelta(DELTA_PLUS_10),
-    // Attempt 2: +0 (fall through)
+    jr(ref('kana_correct_done')),
+
+    label('kana_score_none'), // attempt 2: +0
+    ...buildClearDelta(),
 
     label('kana_correct_done'),
     ...enterFeedback(KanaState.ADVANCE_FEEDBACK),
@@ -363,6 +368,7 @@ export function buildKanaEngine(): Op[] {
     // Not dead yet — count the attempt and re-prompt after feedback
     inc_r('a'),
     ld_nn_a(MEM.KANA_ATTEMPTS),
+    ...buildClearDelta(),
     ...enterFeedback(KanaState.RETRY_FEEDBACK),
     ret(),
 

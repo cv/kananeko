@@ -18,8 +18,13 @@ describe('Given the player answers kana prompts', () => {
     expect(runner.kanaState).toBe(KanaState.AWAITING);
   });
 
-  it('re-prompts the same question after a wrong answer', () => {
+  it('starts without a leftover dialogue score flash', () => {
+    expect(kanaRound().deltaVisible).toBe(false);
+  });
+
+  it('re-prompts the same question after a wrong answer, without a score flash', () => {
     const runner = kanaRound().answerKanaWrong();
+    expect(runner.deltaVisible).toBe(false);
     expect(runner.kanaQuestionIdx).toBe(0);
     expect(runner.kanaAttempts).toBe(1);
     expect(runner.kanaState).toBe(KanaState.AWAITING);
@@ -31,9 +36,10 @@ describe('Given the player answers kana prompts', () => {
     expect(runner.deltaType).toBe(DELTA_PLUS_10);
   });
 
-  it('awards nothing when the third answer is correct', () => {
+  it('awards nothing, and flashes nothing, when the third answer is correct', () => {
     const runner = kanaRound().answerKanaWrong().answerKanaWrong();
     answerKanaAndCheckDelta(runner, 0);
+    expect(runner.deltaVisible).toBe(false);
   });
 });
 

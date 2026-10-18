@@ -37,7 +37,7 @@ import {
   ret,
 } from '../asm/ops';
 import { MEM } from '../asm/hardware';
-import { switchCases } from '../asm/macros';
+import { switchCases, zeroBytes } from '../asm/macros';
 import { at } from '../asm/util';
 import { requireTile, requireTiles } from './font';
 import { CAT_TILES } from './font-data';
@@ -129,6 +129,11 @@ export function buildSubScore(delta: ScoreDelta): Op[] {
 }
 
 /** Set DELTA_TYPE and DELTA_TIMER after a score change */
+/** Hide the delta flash (for actions that change the score by nothing). */
+export function buildClearDelta(): Op[] {
+  return zeroBytes(MEM.DELTA_TIMER);
+}
+
 export function buildSetDelta(deltaType: DeltaType): Op[] {
   return [
     ld_r_n('a', u8(deltaType)),
