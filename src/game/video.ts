@@ -4,8 +4,21 @@
 
 import { HW, LCDC, MEM } from '../asm/hardware';
 import { lcdOff, lcdOn, zeroPages } from '../asm/macros';
-import { ld_r_n, ld_rr_nn, ldh_n_a, ldi_hl_a } from '../asm/ops';
-import { type Op, u8, u16 } from '../asm/types';
+import {
+  and_n,
+  call,
+  jr_cc,
+  label,
+  ld_r_n,
+  ld_rr_nn,
+  ldh_a_n,
+  ldh_n_a,
+  ldi_hl_a,
+  pop,
+  push,
+  ret,
+} from '../asm/ops';
+import { type Op, ref, u8, u16 } from '../asm/types';
 import { type Quad } from './fixed';
 import { centerStartCol, tilemapAddr, tileRow } from './tilemap';
 
@@ -27,12 +40,48 @@ export function clearTilemap(name: string): Op[] {
   return zeroPages(name, MEM.VRAM_MAP0, 4);
 }
 
-/** Write a row of tiles horizontally centered on the visible screen. */
-export function writeCenteredRow(row: number, tiles: readonly number[]): Op[] {
+/** STAT mode bit 1 is set during OAM scan (2) and pixel transfer (3) */
+const STAT_BUSY = 0x02;
+
+/**
+ * Subroutine: write A to [HL+] once VRAM is accessible. Preserves A and flags.
+ *
+ * Waits for HBlank or VBlank, which leaves at least ~20 M-cycles for the write.
+ * With the LCD off STAT reads mode 0, so this never blocks. Use it for any VRAM
+ * write made while the LCD is on.
+ */
+export function buildVramPut(): Op[] {
+  return [
+    label('vram_put'),
+    push('af'),
+    label('vram_put_wait'),
+    ldh_a_n(HW.STAT),
+    and_n(u8(STAT_BUSY)),
+    jr_cc('nz', ref('vram_put_wait')),
+    pop('af'),
+    ldi_hl_a(),
+    ret(),
+  ];
+}
+
+/** Write A to [HL+] safely while the LCD is on (see buildVramPut). */
+export function vramPut(): Op[] {
+  return [call(ref('vram_put'))];
+}
+
+/**
+ * Write a row of tiles horizontally centered on the visible screen.
+ * `lcdOn` routes each write through vram_put so it is safe mid-frame.
+ */
+export function writeCenteredRow(
+  row: number,
+  tiles: readonly number[],
+  { lcdOn = false }: { lcdOn?: boolean } = {},
+): Op[] {
   const col = centerStartCol(tiles.length);
   return [
     ld_rr_nn('hl', u16(tilemapAddr(tileRow(row), col))),
-    ...tiles.flatMap((tile) => [ld_r_n('a', u8(tile)), ldi_hl_a()]),
+    ...tiles.flatMap((tile) => [ld_r_n('a', u8(tile)), ...(lcdOn ? vramPut() : [ldi_hl_a()])]),
   ];
 }
 

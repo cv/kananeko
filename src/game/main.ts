@@ -23,9 +23,12 @@ import {
   ld_a_nn,
   ld_nn_a,
   ld_r_n,
+  ld_r_r,
   ld_rr_nn,
   ldh_n_a,
   or_r,
+  ret,
+  ret_cc,
   xor_r,
 } from '../asm/ops';
 import { type Op, type U16, ref, u8, u16 } from '../asm/types';
@@ -39,6 +42,7 @@ import { type PackedScene, type Scene, SCENES, buildSceneData } from './scene';
 import { END_OF_CONVERSATION, MAX_LIVES } from './state';
 import {
   type Palette,
+  buildVramPut,
   clearTilemap,
   rgb,
   screenOff,
@@ -153,6 +157,27 @@ function waitForStart(name: string): Op[] {
   ];
 }
 
+/** Subroutine: tick TITLE_TIMER and redraw the START prompt when its blink phase flips. */
+function buildTitleBlink(): Op[] {
+  return [
+    label('title_blink'),
+    ld_a_nn(MEM.TITLE_TIMER),
+    inc_r('a'),
+    ld_nn_a(MEM.TITLE_TIMER),
+    ld_r_r('b', 'a'),
+    and_n(u8(BLINK_BIT - 1)),
+    ret_cc('nz'),
+    ld_r_r('a', 'b'),
+    and_n(u8(BLINK_BIT)),
+    jr_cc('z', ref('title_prompt_on')),
+    ...writeCenteredRow(START_PROMPT_ROW, START_BOX_OFF, { lcdOn: true }),
+    ret(),
+    label('title_prompt_on'),
+    ...writeCenteredRow(START_PROMPT_ROW, START_BOX_ON, { lcdOn: true }),
+    ret(),
+  ];
+}
+
 // ---------------------------------------------------------------------------
 // Program builder
 // ---------------------------------------------------------------------------
@@ -216,16 +241,7 @@ export function buildProgram(): Op[] {
     ...waitFrame(),
     call(ref('joy_read')),
 
-    ld_a_nn(MEM.TITLE_TIMER),
-    inc_r('a'),
-    ld_nn_a(MEM.TITLE_TIMER),
-    and_n(u8(BLINK_BIT)),
-    jr_cc('z', ref('title_prompt_on')),
-    ...writeCenteredRow(START_PROMPT_ROW, START_BOX_OFF),
-    jr(ref('title_prompt_done')),
-    label('title_prompt_on'),
-    ...writeCenteredRow(START_PROMPT_ROW, START_BOX_ON),
-    label('title_prompt_done'),
+    call(ref('title_blink')),
 
     ld_a_nn(MEM.JOYPAD_NEW),
     and_n(u8(JOY.START)),
@@ -315,9 +331,11 @@ export function buildProgram(): Op[] {
 
     // ==== Subroutines ====
     ...buildReadJoypad(),
+    ...buildTitleBlink(),
     ...buildDialogueEngine(),
     ...buildKanaEngine(),
     ...buildDrawHudOps(),
+    ...buildVramPut(),
 
     // ==== Data ====
     label('tileData'),

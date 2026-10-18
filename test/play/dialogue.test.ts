@@ -8,6 +8,17 @@ import { type GameRunner } from '../helpers/game-runner';
 
 const openingDialogue = (): GameRunner => runnerAt(checkpoint.sceneStart(0));
 
+/** Choice 0 is the good answer: lives stay full and +10 flashes; others cost a life. */
+function expectOutcomeOf(runner: GameRunner, logicalChoice: number): void {
+  if (logicalChoice === 0) {
+    expect(runner.kanaLives).toBe(MAX_LIVES);
+    expect(runner.deltaType).toBe(DELTA_PLUS_10);
+  } else {
+    expect(runner.kanaLives).toBe(MAX_LIVES - 1);
+    expect(runner.deltaType).toBe(DELTA_MINUS_5);
+  }
+}
+
 describe('Given the player is in a conversation', () => {
   it('reveals the text and then offers choices', () => {
     const runner = openingDialogue();
@@ -21,9 +32,11 @@ describe('Given the player is in a conversation', () => {
     expect([...order].sort()).toEqual([0, 1, 2]);
   });
 
-  it('records the confirmed display row', () => {
-    const runner = openingDialogue().waitForDialogueChoices().pressA();
-    expect(runner.dlgResult).toBe(0);
+  it('confirms the choice shown on the highlighted row', () => {
+    const runner = openingDialogue().waitForDialogueChoices();
+    const [topChoice] = runner.dlgChoiceOrder;
+    runner.pressA().frames(3);
+    expectOutcomeOf(runner, topChoice);
   });
 
   it('branches to the next node of the chosen answer', () => {
@@ -35,8 +48,10 @@ describe('Given the player is in a conversation', () => {
   });
 
   it('wraps the cursor from the first row up to the last', () => {
-    const runner = openingDialogue().waitForDialogueChoices().pressUp().frames(1).pressA();
-    expect(runner.dlgResult).toBe(2);
+    const runner = openingDialogue().waitForDialogueChoices();
+    const bottomChoice = runner.dlgChoiceOrder[2];
+    runner.pressUp().frames(1).pressA().frames(3);
+    expectOutcomeOf(runner, bottomChoice);
   });
 });
 

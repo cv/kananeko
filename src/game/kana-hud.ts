@@ -13,7 +13,7 @@
  *   buildSetDelta  — set delta type + timer after score changes
  */
 
-import { type Op, type TileIndex, ref, u8, u16 } from '../asm/types';
+import { type Op, type TileIndex, type U16, ref, u8, u16 } from '../asm/types';
 import {
   label,
   ld_r_n,
@@ -21,9 +21,9 @@ import {
   ld_rr_nn,
   ld_a_nn,
   ld_nn_a,
-  ldi_hl_a,
   and_n,
   cp_n,
+  cp_r,
   add_n,
   adc_n,
   sub_n,
@@ -33,6 +33,7 @@ import {
   jr,
   jr_cc,
   jp,
+  jp_cc,
   ret,
 } from '../asm/ops';
 import { MEM } from '../asm/hardware';
@@ -43,6 +44,7 @@ import { CAT_TILES } from './font-data';
 import { type Quad } from './fixed';
 import { MAX_LIVES } from './state';
 import { tilemapAddr, type TilePosition } from './tilemap';
+import { vramPut } from './video';
 
 // ---------------------------------------------------------------------------
 // Layout & tile constants
@@ -62,6 +64,15 @@ export const DELTA_MINUS_5 = 3;
 export const DELTA_MINUS_100 = 4;
 
 /** Dispatch order for the delta flash; the last entry is the fallback */
+/**
+ * Jump to hud_redraw if what the HUD shows (`shownAddr`) differs from the current
+ * value (register B or a memory address). Clobbers A and C.
+ */
+function redrawIfChanged(shownAddr: U16, current: U16 | 'b'): Op[] {
+  const load = current === 'b' ? [ld_r_r('c', 'b')] : [ld_a_nn(current), ld_r_r('c', 'a')];
+  return [...load, ld_a_nn(shownAddr), cp_r('c'), jp_cc('nz', ref('hud_redraw'))];
+}
+
 const DELTA_TYPES = [DELTA_PLUS_100, DELTA_PLUS_10, DELTA_MINUS_5, DELTA_MINUS_100] as const;
 
 export type DeltaType =
@@ -170,7 +181,7 @@ export function buildDrawTileAt(
   if (tileExpr !== 'from_a') {
     ops.push(ld_r_n('a', u8(tileExpr)));
   }
-  ops.push(ldi_hl_a());
+  ops.push(...vramPut());
   return ops;
 }
 
@@ -189,12 +200,49 @@ function buildDrawTilesAt(row: number, startCol: number, tiles: readonly HudTile
  */
 export function buildDrawHudOps(): Op[] {
   return [
-    // === hud_update: called from game loops after HALT (VBlank) ===
-    // Falls through to kana_draw_hud to refresh score + delta.
+    // === hud_update: called once per frame from the game loops ===
+    // Ticks the delta flash, then redraws only if what the HUD shows changed.
     label('hud_update'),
+    ld_a_nn(MEM.DELTA_TIMER),
+    cp_n(u8(0)),
+    jr_cc('z', ref('hud_delta_ticked')),
+    dec_r('a'),
+    ld_nn_a(MEM.DELTA_TIMER),
+    label('hud_delta_ticked'),
 
-    // === kana_draw_hud: full HUD redraw (VRAM must be accessible) ===
+    // B = visible delta type (0 once the flash has expired)
+    ld_r_n('b', u8(0)),
+    ld_a_nn(MEM.DELTA_TIMER),
+    cp_n(u8(0)),
+    jr_cc('z', ref('hud_delta_known')),
+    ld_a_nn(MEM.DELTA_TYPE),
+    ld_r_r('b', 'a'),
+    label('hud_delta_known'),
+
+    ...redrawIfChanged(MEM.HUD_SHOWN_DELTA, 'b'),
+    ...redrawIfChanged(MEM.HUD_SHOWN_LIVES, MEM.KANA_LIVES),
+    ...redrawIfChanged(MEM.HUD_SHOWN_SCORE_LO, MEM.KANA_SCORE_LO),
+    ...redrawIfChanged(MEM.HUD_SHOWN_SCORE_HI, MEM.KANA_SCORE_HI),
+    ret(), // nothing changed
+
+    // === kana_draw_hud: full HUD redraw; safe with the LCD on or off ===
+    label('hud_redraw'),
     label('kana_draw_hud'),
+    ld_r_n('b', u8(0)),
+    ld_a_nn(MEM.DELTA_TIMER),
+    cp_n(u8(0)),
+    jr_cc('z', ref('hud_shadow_delta')),
+    ld_a_nn(MEM.DELTA_TYPE),
+    ld_r_r('b', 'a'),
+    label('hud_shadow_delta'),
+    ld_r_r('a', 'b'),
+    ld_nn_a(MEM.HUD_SHOWN_DELTA),
+    ld_a_nn(MEM.KANA_LIVES),
+    ld_nn_a(MEM.HUD_SHOWN_LIVES),
+    ld_a_nn(MEM.KANA_SCORE_LO),
+    ld_nn_a(MEM.HUD_SHOWN_SCORE_LO),
+    ld_a_nn(MEM.KANA_SCORE_HI),
+    ld_nn_a(MEM.HUD_SHOWN_SCORE_HI),
 
     // --- Hearts at cols 1-3 ---
     ...Array.from({ length: MAX_LIVES }, (_, i) => buildHeart(i + 1)).flat(),
@@ -284,14 +332,10 @@ export function buildDrawHudOps(): Op[] {
 
     label('kana_score_done'),
 
-    // --- Delta flash at cols 15-18 ---
+    // --- Delta flash at cols 15-18 (timer ticks in hud_update) ---
     ld_a_nn(MEM.DELTA_TIMER),
     cp_n(u8(0)),
-    jr_cc('z', ref('delta_clear')),
-
-    // Decrement timer
-    dec_r('a'),
-    ld_nn_a(MEM.DELTA_TIMER),
+    jp_cc('z', ref('delta_clear')),
 
     // Dispatch on delta type (the last case is the default)
     ld_a_nn(MEM.DELTA_TYPE),

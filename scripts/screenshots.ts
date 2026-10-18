@@ -136,10 +136,6 @@ fs.writeFileSync(
 
 Captured from the real ROM in the test emulator by \`npm run screenshots\`.
 
-> **Emulator caveat:** gaps in text that is still being revealed (すみません! showing as \`すみ ん!\`) come from
-> serverboy, not the ROM. Its HALT emulation does not wake reliably on VBlank, so the test
-> harness disables the VBlank interrupt and the per-character VRAM writes land outside VBlank.
-> Text drawn with the LCD off (choices, kana rounds) is unaffected.
 
 | | | |
 | --- | --- | --- |

@@ -63,7 +63,7 @@ import {
 } from './kana-hud';
 import { DialogueState, END_OF_CONVERSATION, MAX_LIVES } from './state';
 import { SCREEN_COLS, type TilePosition, tilePos, tilemapAddr } from './tilemap';
-import { screenOff, screenOn } from './video';
+import { screenOff, screenOn, vramPut } from './video';
 
 // Re-export data types and encoder from dialogue-data.ts
 export { buildDialogueTree, defineDialogueTree } from './dialogue-data';
@@ -297,12 +297,11 @@ export function buildDialogueEngine(): Op[] {
     cp_n(u8(TEXT_END)),
     jr_cc('z', ref('dlg_text_done')),
 
-    // Write the tile at the VRAM cursor and advance it.
-    // Called right after HALT, so this single write lands inside VBlank.
+    // Write the tile at the VRAM cursor and advance it
     ld_r_r('b', 'a'),
     ...loadPointer('hl', MEM.DLG_VRAM_LO, MEM.DLG_VRAM_HI),
     ld_r_r('a', 'b'),
-    ldi_hl_a(),
+    ...vramPut(),
     ...storePointer('hl', MEM.DLG_VRAM_LO, MEM.DLG_VRAM_HI),
     ret(),
 
@@ -510,7 +509,7 @@ export function buildDialogueEngine(): Op[] {
     ld_a_nn(MEM.DLG_CURSOR),
     ...buildLoadChoicePosition(CHOICE_CURSOR_POSITIONS, 'dlg_erase_pos'),
     xor_r('a'),
-    ldi_hl_a(), // write blank tile
+    ...vramPut(), // blank tile
     ret(),
 
     // =================================================================
@@ -520,7 +519,7 @@ export function buildDialogueEngine(): Op[] {
     ld_a_nn(MEM.DLG_CURSOR),
     ...buildLoadChoicePosition(CHOICE_CURSOR_POSITIONS, 'dlg_draw_pos'),
     ld_r_n('a', u8(CURSOR_TILE)),
-    ldi_hl_a(),
+    ...vramPut(),
     ret(),
 
     // =================================================================

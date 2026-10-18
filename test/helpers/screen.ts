@@ -2,6 +2,7 @@
  * Helpers for asserting on what the LCD actually shows.
  */
 
+import { ALL_GLYPHS } from '@game/font-data';
 import { type GameRunner } from './game-runner';
 
 export const SCREEN_W = 160;
@@ -49,6 +50,43 @@ export function inkBounds(runner: GameRunner, tileRow: number): InkBounds | unde
     }
   }
   return right < 0 ? undefined : { left, right };
+}
+
+/** Glyph ink masks ("0"/"1" per pixel, 64 chars) → character */
+const GLYPH_BY_MASK = new Map<string, string>(
+  Object.entries(ALL_GLYPHS)
+    .reverse() // earlier definitions win on duplicate masks
+    .map(([ch, glyph]) => [
+      glyph.map((line) => line.replace(/[^.]/g, '1').replace(/\./g, '0')).join(''),
+      ch,
+    ]),
+);
+const BLANK_MASK = '0'.repeat(64);
+
+/**
+ * Read characters back from the screen by matching each 8x8 cell's ink against
+ * the font. Blank cells read as spaces and unrecognized cells as "?".
+ */
+export function readText(
+  runner: GameRunner,
+  tileRow: number,
+  tileCol: number,
+  length: number,
+): string {
+  const screen = runner.getScreen();
+  let out = '';
+  for (let c = 0; c < length; c++) {
+    const x0 = (tileCol + c) * TILE;
+    const y0 = tileRow * TILE;
+    let paper = 0;
+    for (let y = 0; y < TILE; y++)
+      for (let x = 0; x < TILE; x++) paper = Math.max(paper, luma(screen, x0 + x, y0 + y));
+    let mask = '';
+    for (let y = 0; y < TILE; y++)
+      for (let x = 0; x < TILE; x++) mask += luma(screen, x0 + x, y0 + y) < paper - 1 ? '1' : '0';
+    out += mask === BLANK_MASK ? ' ' : (GLYPH_BY_MASK.get(mask) ?? '?');
+  }
+  return out;
 }
 
 /** Number of ink pixels on a tile row */

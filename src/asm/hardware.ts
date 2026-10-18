@@ -108,6 +108,12 @@ export const MEM = {
   DELTA_TYPE: u16(0xc04c), // 0=none, 1=+100, 2=+10, 3=-5, 4=-100
   DELTA_TIMER: u16(0xc04d), // Frames remaining for flash display
 
+  // WRAM — what the HUD currently shows, so it only redraws on change
+  HUD_SHOWN_LIVES: u16(0xc058),
+  HUD_SHOWN_SCORE_LO: u16(0xc059),
+  HUD_SHOWN_SCORE_HI: u16(0xc05a),
+  HUD_SHOWN_DELTA: u16(0xc05b), // delta type on screen (0 = cleared)
+
   // WRAM — scene system
   SCENE_ID: u16(0xc050), // Current scene index (0-4, 0xFF = title)
   SCENE_FLAGS: u16(0xc051), // Per-scene completion bitfield
