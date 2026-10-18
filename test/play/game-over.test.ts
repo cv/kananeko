@@ -7,7 +7,7 @@ import { SCENES } from '@game/scene';
 import { checkpoint, runnerAt } from '../helpers/checkpoints';
 import { type GameRunner } from '../helpers/game-runner';
 import { asSeenOnScreen, readText, waitForPicture } from '../helpers/screen';
-import { loseAllKanaLives, returnToTitleAfterGameOver } from '../helpers/play';
+import { loseAllKanaLives, loseDialogueLives, returnToTitleAfterGameOver } from '../helpers/play';
 
 const SCREEN_COLS = 20;
 const row = (runner: GameRunner, r: number): string => readText(runner, r, 0, SCREEN_COLS).trim();
@@ -25,8 +25,7 @@ describe('Given the game over screen', () => {
 
 describe('Given the player runs out of lives', () => {
   it('still finishes the scene after a dialogue wipe-out if the kana round goes well', () => {
-    const runner = runnerAt(checkpoint.sceneStart(0));
-    for (let i = 0; i < MAX_LIVES; i++) runner.advanceDialogueBad();
+    const runner = loseDialogueLives(runnerAt(checkpoint.sceneStart(0)), 0, MAX_LIVES);
     runner.waitForKanaInput();
     expect(runner.kanaLives).toBe(1);
 
@@ -35,8 +34,7 @@ describe('Given the player runs out of lives', () => {
   });
 
   it('resets the run after a dialogue wipe-out followed by a kana game over', () => {
-    const runner = runnerAt(checkpoint.sceneStart(0));
-    for (let i = 0; i < MAX_LIVES; i++) runner.advanceDialogueBad();
+    const runner = loseDialogueLives(runnerAt(checkpoint.sceneStart(0)), 0, MAX_LIVES);
     runner.waitForKanaInput();
     returnToTitleAfterGameOver(loseAllKanaLives(runner));
   });

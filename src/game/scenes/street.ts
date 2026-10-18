@@ -10,7 +10,7 @@ export const STREET_DIALOGUE = defineDialogueTree([
     choices: [
       { text: 'はい?', next: 1 },
       { text: 'なんですか?', next: 1 },
-      { text: '...', next: 1, hint: 'はい がいいですよ' },
+      { text: '...', next: 1, hint: 'はい がいいですよ', rating: 'bad' },
     ],
   },
   {
@@ -552,7 +552,7 @@ export const STREET_DIALOGUE = defineDialogueTree([
     text: 'りんご!',
     choices: [
       { text: 'ゴリラ!', next: 62 },
-      { text: 'ごはん!', next: 62 },
+      { text: 'ごはん!', next: 62, rating: 'bad' },
       { text: 'ごま!', next: 62 },
     ],
   },
@@ -570,7 +570,7 @@ export const STREET_DIALOGUE = defineDialogueTree([
     text: 'じょうず! らっぱ!',
     choices: [
       { text: 'パンダ!', next: 63 },
-      { text: 'パン!', next: 63 },
+      { text: 'パン!', next: 63, rating: 'bad' },
       { text: 'パイナップル!', next: 63 },
     ],
   },

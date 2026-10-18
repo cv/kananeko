@@ -10,6 +10,7 @@ import {
   textToTiles,
 } from '@game/font';
 import { MAX_KANA_WORD_LENGTH, buildKanaData, defineKanaQuestion } from '@game/kana';
+import { type DialogueNode, buildDialogueTree } from '@game/dialogue';
 import { packScene, SCENES } from '@game/scene';
 import { centerStartCol, tilemapAddr, tilePos } from '@game/tilemap';
 import { FADE_STEPS, buildFadeTable, rgb } from '@game/video';
@@ -77,6 +78,38 @@ describe('defineKanaQuestion', () => {
     expect(() => defineKanaQuestion(['こ', 'ん'] as const, 9 as never, 'か', 'く', 'け')).toThrow(
       /Kana blank index out of range/,
     );
+  });
+});
+
+describe('buildDialogueTree ratings', () => {
+  const node = (choices: DialogueNode['choices']): DialogueNode => ({ text: 'あ', choices });
+
+  it('flags bad answers in bit 7 of their next-node byte', () => {
+    const data = buildDialogueTree([
+      node([
+        { text: 'い', next: null },
+        { text: 'う', next: 0, rating: 'bad' },
+      ]),
+    ]);
+    // header (1 + 2) + text "あ" + TEXT_END + count, then the next-node table
+    expect([...data.slice(6, 8)]).toEqual([0x7f, 0x80]);
+  });
+
+  it('rejects ratings the encoding cannot express', () => {
+    expect(() => buildDialogueTree([node([{ text: 'い', next: null, rating: 'ok' }])])).toThrow(
+      /first choice/,
+    );
+    expect(() =>
+      buildDialogueTree([
+        node([
+          { text: 'い', next: null },
+          { text: 'う', next: null, rating: 'good' },
+        ]),
+      ]),
+    ).toThrow(/first choice/);
+    expect(() =>
+      buildDialogueTree(Array.from({ length: 127 }, () => node([{ text: 'い', next: null }]))),
+    ).toThrow(/limited/);
   });
 });
 

@@ -10,7 +10,7 @@ export const CONBINI_DIALOGUE = defineDialogueTree([
     choices: [
       { text: 'こんにちは!', next: 1 },
       { text: 'すみません', next: 1 },
-      { text: '...', next: 1, hint: 'こんにちは!' },
+      { text: '...', next: 1, hint: 'こんにちは!', rating: 'bad' },
     ],
   },
   {

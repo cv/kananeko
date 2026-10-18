@@ -9,8 +9,8 @@ export const STATION_DIALOGUE = defineDialogueTree([
     text: 'こんにちは!',
     choices: [
       { text: 'こんにちは!', next: 1 },
-      { text: 'はい...', next: 1, hint: 'こんにちは!' },
-      { text: '...', next: 1, hint: 'こんにちは!' },
+      { text: 'はい...', next: 1, hint: 'こんにちは!', rating: 'bad' },
+      { text: '...', next: 1, hint: 'こんにちは!', rating: 'bad' },
     ],
   },
   {
@@ -172,7 +172,7 @@ export const STATION_DIALOGUE = defineDialogueTree([
     choices: [
       { text: 'いってきます!', next: 19 },
       { text: 'ありがとう!', next: 19 },
-      { text: 'さようなら!', next: 19 },
+      { text: 'さようなら!', next: 19, rating: 'bad' },
     ],
   },
   {
@@ -372,7 +372,7 @@ export const STATION_DIALOGUE = defineDialogueTree([
     choices: [
       { text: 'はい なんですか?', next: 41 },
       { text: 'だれですか?', next: 41 },
-      { text: '...', next: 41, hint: 'はい がいいですよ' },
+      { text: '...', next: 41, hint: 'はい がいいですよ', rating: 'bad' },
     ],
   },
   {
@@ -715,7 +715,7 @@ export const STATION_DIALOGUE = defineDialogueTree([
     choices: [
       { text: 'いってきます!', next: 79 },
       { text: 'ありがとう!', next: 79 },
-      { text: 'さようなら!', next: 79 },
+      { text: 'さようなら!', next: 79, rating: 'bad' },
     ],
   },
   {

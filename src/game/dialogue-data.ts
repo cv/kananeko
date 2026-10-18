@@ -7,17 +7,39 @@
 
 import { type TupleIndex } from './fixed';
 import { textToTiles } from './font';
-import { END_OF_CONVERSATION } from './state';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
+/**
+ * How appropriate a reply is:
+ *   good — the model answer: +10 and a life back
+ *   ok   — a fine reply that isn't the model answer: no change
+ *   bad  — inappropriate (silence to a greeting, こんにちは at night, ...): -5 and a life
+ */
+export type ChoiceRating = 'good' | 'ok' | 'bad';
+
 export interface DialogueChoice<Next extends number | null = number | null> {
   readonly text: string;
   readonly next: Next; // next node index, null = end conversation
-  readonly hint?: string; // shown briefly if this isn't the ideal response
+  readonly hint?: string; // what the NPC might say to this reply (not shown yet)
+  /** Defaults to 'good' for the first choice and 'ok' for the others */
+  readonly rating?: ChoiceRating;
 }
+
+/** A choice's rating, applying the defaults */
+export function choiceRating(
+  choice: { readonly rating?: ChoiceRating | undefined },
+  index: number,
+): ChoiceRating {
+  return choice.rating ?? (index === 0 ? 'good' : 'ok');
+}
+
+/** Set in a next-node byte when the choice is a bad answer */
+export const BAD_CHOICE_FLAG = 0x80;
+/** next-node value (without the flag) meaning "end of conversation" */
+export const NEXT_END = 0x7f;
 
 export type DialogueChoices<Next extends number | null = number | null> =
   | readonly []
@@ -38,11 +60,13 @@ type ValidateChoice<Choice, Next extends number | null> = Choice extends {
   readonly text: infer Text extends string;
   readonly next: infer ChoiceNext extends number | null;
   readonly hint?: infer Hint extends string | undefined;
+  readonly rating?: infer Rating extends ChoiceRating | undefined;
 }
   ? {
       readonly text: Text;
       readonly next: ChoiceNext extends Next ? ChoiceNext : Next;
       readonly hint?: Hint;
+      readonly rating?: Rating;
     }
   : DialogueChoice<Next>;
 
@@ -96,12 +120,19 @@ export const TEXT_END = 0xfe;
  * Per node:
  *   [text_tiles...] 0xFE
  *   [choice_count]
- *   [next_node × choice_count]           ← compact lookup table
+ *   [next_node × choice_count]           ← bits 0-6: node (NEXT_END = end),
+ *                                           bit 7: BAD_CHOICE_FLAG
+ *
+ * Ratings: the first choice is the model answer ('good'); later choices are
+ * 'ok' unless flagged bad. Ratings that don't fit this are rejected.
  *   [choice_0_text...] 0xFE
  *   [choice_1_text...] 0xFE
  *   ...
  */
 export function buildDialogueTree(tree: DialogueTree): Uint8Array {
+  if (tree.length >= NEXT_END) {
+    throw new RangeError(`Dialogue trees are limited to ${String(NEXT_END)} nodes`);
+  }
   const nodeChunks: number[][] = [];
   for (const node of tree) {
     const chunk: number[] = [];
@@ -115,9 +146,13 @@ export function buildDialogueTree(tree: DialogueTree): Uint8Array {
     chunk.push(node.choices.length);
 
     // Next-node lookup table (one byte per choice, right after count)
-    for (const choice of node.choices) {
-      chunk.push(choice.next ?? END_OF_CONVERSATION);
-    }
+    node.choices.forEach((choice, i) => {
+      const rating = choiceRating(choice, i);
+      if ((i === 0) !== (rating === 'good') && rating !== 'bad') {
+        throw new Error(`Only the first choice can be 'good' ("${choice.text}")`);
+      }
+      chunk.push((choice.next ?? NEXT_END) | (rating === 'bad' ? BAD_CHOICE_FLAG : 0));
+    });
 
     // Choice texts, each null-terminated
     for (const choice of node.choices) {

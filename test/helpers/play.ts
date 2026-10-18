@@ -4,6 +4,7 @@
 
 import { expect } from 'vitest';
 import { type DialogueNode } from '@game/dialogue';
+import { choiceRating } from '@game/dialogue-data';
 import { SCENES } from '@game/scene';
 import { DialogueState, END_OF_CONVERSATION, KanaState, MAX_LIVES } from '@game/state';
 import { FADE_STEPS, FADE_STEP_FRAMES } from '@game/video';
@@ -59,6 +60,36 @@ export function playDialoguePath(
     nodeIdx = choice.next;
   }
   throw new Error(`Dialogue in scene ${String(sceneIdx)} did not end`);
+}
+
+/**
+ * Lose `count` lives in a scene's dialogue: at each node pick a bad answer if there
+ * is one, otherwise a reply that keeps the conversation going (preferring 'ok').
+ */
+export function loseDialogueLives(runner: GameRunner, sceneIdx: number, count: number): GameRunner {
+  const tree = sceneDialogue(sceneIdx);
+  const target = Math.max(0, runner.kanaLives - count);
+  for (let step = 0; step < MAX_DIALOGUE_STEPS && runner.kanaLives > target; step++) {
+    const node = tree[runner.dlgNodeId];
+    if (node === undefined) {
+      // At zero lives the engine ends the conversation (and the kana round restocks one)
+      if (target === 0) return runner;
+      throw new Error('Conversation ended before losing enough lives');
+    }
+    const options = node.choices.map((choice, i) => ({
+      i,
+      rating: choiceRating(choice, i),
+      next: choice.next,
+    }));
+    const pick =
+      options.find((o) => o.rating === 'bad') ??
+      options.find((o) => o.rating === 'ok' && o.next !== null) ??
+      options.find((o) => o.next !== null) ??
+      options[0];
+    runner.chooseDialogueChoice(pick?.i ?? 0);
+  }
+  expect(runner.kanaLives).toBe(target);
+  return runner;
 }
 
 /** Answer kana correctly and check the score changed by the expected amount. */

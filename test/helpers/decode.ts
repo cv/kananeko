@@ -7,11 +7,20 @@ import { CHAR_MAP } from '@game/font';
 
 const TILE_TO_CHAR = new Map(Object.entries(CHAR_MAP).map(([ch, tile]) => [tile as number, ch]));
 const TEXT_END = 0xfe;
-const END_OF_CONVERSATION = 0xff;
+
+export type DecodedRating = 'ok' | 'good' | 'bad';
+const BAD_FLAG = 0x80;
+const NEXT_END = 0x7f;
+
+function ratingOf(next: number, index: number): DecodedRating {
+  if (next & BAD_FLAG) return 'bad';
+  return index === 0 ? 'good' : 'ok';
+}
 
 export interface DecodedChoice {
   text: string;
   next: number | null;
+  rating: DecodedRating;
 }
 
 export interface DecodedNode {
@@ -55,9 +64,10 @@ export function decodeDialogueTree(data: Uint8Array): DecodedNode[] {
     const text = r.text();
     const choiceCount = r.byte();
     const next = Array.from({ length: choiceCount }, () => r.byte());
-    const choices = next.map((n) => ({
+    const choices = next.map((n, i) => ({
+      rating: ratingOf(n, i),
       text: r.text(),
-      next: n === END_OF_CONVERSATION ? null : n,
+      next: (n & ~BAD_FLAG) === NEXT_END ? null : n & ~BAD_FLAG,
     }));
     return { text, choices };
   });

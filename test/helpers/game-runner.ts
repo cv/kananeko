@@ -319,9 +319,6 @@ export class GameRunner {
   }
 
   /** Wait for dialogue choices to appear, then pick second authored choice (bad) */
-  advanceDialogueBad(): this {
-    return this.chooseDialogueChoice(1);
-  }
 
   /** Complete an entire dialogue tree (always choosing first option until conversation ends) */
   completeDialogueTree(): this {

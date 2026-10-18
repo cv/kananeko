@@ -9,7 +9,7 @@ export const PARK_DIALOGUE = defineDialogueTree([
     text: 'こんばんは!',
     choices: [
       { text: 'こんばんは!', next: 1 },
-      { text: 'こんにちは', next: 1, hint: 'よるはこんばんは' },
+      { text: 'こんにちは', next: 1, hint: 'よるはこんばんは', rating: 'bad' },
       { text: 'やあ!', next: 1 },
     ],
   },

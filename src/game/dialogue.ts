@@ -52,13 +52,14 @@ import {
 } from '../asm/ops';
 import { type Op, ref, u8, u16 } from '../asm/types';
 import { at, hi, lo } from '../asm/util';
-import { TEXT_END } from './dialogue-data';
+import { BAD_CHOICE_FLAG, NEXT_END, TEXT_END } from './dialogue-data';
 import { type Triple } from './fixed';
 import { requireTile } from './font';
 import {
   DELTA_MINUS_5,
   DELTA_PLUS_10,
   buildAddScore,
+  buildClearDelta,
   buildSetDelta,
   buildSubScore,
 } from './kana-hud';
@@ -482,13 +483,26 @@ export function buildDialogueEngine(): Op[] {
     ld_r_n('b', u8(0)),
     add_hl_rr('bc'), // HL = table_base + logical_choice
     ldi_a_hl(),
+    ld_r_r('b', 'a'), // B = raw next byte (bit 7 = bad answer)
+    and_n(u8(0xff ^ BAD_CHOICE_FLAG)),
+    cp_n(u8(NEXT_END)),
+    jr_cc('nz', ref('dlg_next_store')),
+    ld_r_n('a', u8(END_OF_CONVERSATION)),
+    label('dlg_next_store'),
     ld_nn_a(MEM.DLG_NODE_ID),
 
-    // Score + lives: the first authored choice (logical 0) is the good answer:
-    // good = +10 & regain a life, bad = -5 & lose a life
+    // Rating: flagged = bad, first authored choice = good, anything else = ok.
+    // good = +10 & regain a life, ok = no change, bad = -5 & lose a life
+    ld_r_r('a', 'b'),
+    and_n(u8(BAD_CHOICE_FLAG)),
+    jr_cc('nz', ref('dlg_bad_choice')),
     ld_r_r('a', 'c'),
     cp_n(u8(0)),
-    jr_cc('nz', ref('dlg_bad_choice')),
+    jr_cc('z', ref('dlg_good_choice')),
+    ...buildClearDelta(), // ok: nothing changes
+    jr(ref('dlg_score_done')),
+
+    label('dlg_good_choice'),
     // Good: +10 score, +1 life (capped at MAX_LIVES)
     ...buildAddScore(10),
     ...buildSetDelta(DELTA_PLUS_10),

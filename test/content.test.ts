@@ -10,6 +10,7 @@ import {
   buildDialogueTree,
   type DialogueNode,
 } from '@game/dialogue';
+import { choiceRating } from '@game/dialogue-data';
 import { textToTiles } from '@game/font';
 import { buildKanaData } from '@game/kana';
 import { SCENES } from '@game/scene';
@@ -85,6 +86,12 @@ describe.each(SCENES.map((scene, index) => ({ scene, index })))(
         expect(stuck).toEqual([]);
       });
 
+      it('offers the model answer first and never a choice between bad answers', () => {
+        tree.forEach((node) => {
+          expect(node.choices[0] && choiceRating(node.choices[0], 0)).toBe('good');
+        });
+      });
+
       it('ends the always-pick-the-good-answer path without looping', () => {
         const visited = new Set<number>();
         let id: number | null = 0;
@@ -113,7 +120,11 @@ describe.each(SCENES.map((scene, index) => ({ scene, index })))(
         expect(decoded).toEqual(
           tree.map((node) => ({
             text: node.text,
-            choices: node.choices.map((c) => ({ text: c.text, next: c.next })),
+            choices: node.choices.map((c, i) => ({
+              text: c.text,
+              next: c.next,
+              rating: choiceRating(c, i),
+            })),
           })),
         );
       });

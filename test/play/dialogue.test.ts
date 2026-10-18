@@ -5,18 +5,36 @@ import { DELTA_MINUS_5, DELTA_PLUS_10 } from '@game/kana-hud';
 import { DialogueState, END_OF_CONVERSATION, KanaState, MAX_LIVES } from '@game/state';
 import { checkpoint, runnerAt } from '../helpers/checkpoints';
 import { type GameRunner } from '../helpers/game-runner';
+import { loseDialogueLives } from '../helpers/play';
+import { type ChoiceRating, type DialogueNode, choiceRating } from '@game/dialogue-data';
+import { SCENES } from '@game/scene';
 
 const openingDialogue = (): GameRunner => runnerAt(checkpoint.sceneStart(0));
 
-/** Choice 0 is the good answer: lives stay full and +10 flashes; others cost a life. */
-function expectOutcomeOf(runner: GameRunner, logicalChoice: number): void {
-  if (logicalChoice === 0) {
-    expect(runner.kanaLives).toBe(MAX_LIVES);
-    expect(runner.deltaType).toBe(DELTA_PLUS_10);
-  } else {
+const STATION: readonly DialogueNode[] = SCENES[0].dialogue;
+const OPENING: DialogueNode = SCENES[0].dialogue[0];
+
+/** Check the effect of answering the opening line with the given logical choice. */
+function expectOutcomeOf(runner: GameRunner, logicalChoice: number | undefined): void {
+  const choice = OPENING.choices[logicalChoice ?? -1];
+  if (choice === undefined) throw new Error(`No opening choice ${String(logicalChoice)}`);
+  const rating = choiceRating(choice, logicalChoice ?? 0);
+  if (rating === 'bad') {
     expect(runner.kanaLives).toBe(MAX_LIVES - 1);
     expect(runner.deltaType).toBe(DELTA_MINUS_5);
+  } else {
+    expect(runner.kanaLives).toBe(MAX_LIVES);
+    if (rating === 'good') expect(runner.deltaType).toBe(DELTA_PLUS_10);
+    else expect(runner.deltaVisible).toBe(false);
   }
+}
+
+/** Index of the first choice with this rating at a node of the station dialogue */
+function choiceRated(node: number, rating: ChoiceRating): number {
+  const index = STATION[node]?.choices.findIndex((c, i) => choiceRating(c, i) === rating);
+  if (index === undefined || index < 0)
+    throw new Error(`Node ${String(node)} has no ${rating} choice`);
+  return index;
 }
 
 describe('Given the player is in a conversation', () => {
@@ -55,23 +73,33 @@ describe('Given the player is in a conversation', () => {
   });
 });
 
-describe('Given the player picks good or bad answers', () => {
+describe('Given the player picks good, ok, or bad answers', () => {
   it('removes a life and flashes -5 after a bad choice', () => {
-    const runner = openingDialogue().chooseDialogueChoice(1);
+    const runner = openingDialogue().chooseDialogueChoice(choiceRated(0, 'bad'));
     expect(runner.kanaLives).toBe(MAX_LIVES - 1);
     expect(runner.deltaType).toBe(DELTA_MINUS_5);
   });
 
   it('restores a life and flashes +10 after a good choice', () => {
-    const runner = openingDialogue().chooseDialogueChoice(1).chooseDialogueChoice(0);
+    const runner = openingDialogue().chooseDialogueChoice(choiceRated(0, 'bad'));
+    runner.chooseDialogueChoice(choiceRated(1, 'good'));
     expect(runner.kanaLives).toBe(MAX_LIVES);
     expect(runner.deltaType).toBe(DELTA_PLUS_10);
   });
 
+  it('changes nothing after a reply that is fine but not the model answer', () => {
+    const runner = openingDialogue().chooseDialogueChoice(choiceRated(0, 'good'));
+    const score = runner.kanaScore;
+    runner.chooseDialogueChoice(choiceRated(1, 'ok'));
+    expect(runner.kanaLives).toBe(MAX_LIVES);
+    expect(runner.kanaScore).toBe(score);
+    expect(runner.deltaVisible).toBe(false);
+  });
+
   it('never lets the score drop below zero', () => {
-    const runner = openingDialogue().chooseDialogueChoice(1);
+    const runner = openingDialogue().chooseDialogueChoice(choiceRated(0, 'bad'));
     expect(runner.kanaScore).toBe(0);
-    runner.chooseDialogueChoice(0);
+    runner.chooseDialogueChoice(choiceRated(1, 'good'));
     expect(runner.kanaScore).toBe(10);
   });
 
@@ -81,8 +109,7 @@ describe('Given the player picks good or bad answers', () => {
   });
 
   it('ends the conversation at zero lives and restocks one life for kana', () => {
-    const runner = openingDialogue();
-    for (let i = 0; i < MAX_LIVES; i++) runner.chooseDialogueChoice(1);
+    const runner = loseDialogueLives(openingDialogue(), 0, MAX_LIVES);
     expect(runner.dlgNodeId).toBe(END_OF_CONVERSATION);
     runner.waitForKanaInput();
     expect(runner.kanaState).toBe(KanaState.AWAITING);

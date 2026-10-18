@@ -10,7 +10,7 @@ export const RESTAURANT_DIALOGUE = defineDialogueTree([
     choices: [
       { text: 'こんにちは!', next: 1 },
       { text: 'ひとりです', next: 1 },
-      { text: '...', next: 1, hint: 'こんにちは!' },
+      { text: '...', next: 1, hint: 'こんにちは!', rating: 'bad' },
     ],
   },
   {
@@ -19,7 +19,7 @@ export const RESTAURANT_DIALOGUE = defineDialogueTree([
     choices: [
       { text: 'ひとりです', next: 2 },
       { text: 'ふたりです', next: 3 },
-      { text: 'わかりません', next: 2, hint: 'ひとりですか?' },
+      { text: 'わかりません', next: 2, hint: 'ひとりですか?', rating: 'bad' },
     ],
   },
   {
