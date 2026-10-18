@@ -16,7 +16,7 @@ import { STREET_DIALOGUE } from './scenes/street';
 import { RESTAURANT_DIALOGUE } from './scenes/restaurant';
 import { CONBINI_DIALOGUE } from './scenes/conbini';
 import { PARK_DIALOGUE } from './scenes/park';
-import { type Backdrop, encodeBackdrop } from './backdrop';
+import { type Backdrop, buildSceneArt } from './backdrop';
 import {
   CONBINI_BACKDROP,
   PARK_BACKDROP,
@@ -161,14 +161,18 @@ export interface PackedScene {
   readonly dialogueData: Uint8Array;
   readonly kanaData: Uint8Array;
   readonly backdropData: Uint8Array;
+  /** Pixel data of the scene's own BG tiles (see SCENE_TILE_BASE) */
+  readonly sceneTileData: Uint8Array;
 }
 
 export function packScene(scene: Scene): PackedScene {
+  const art = buildSceneArt(scene.backdrop);
   return {
     nameRow: textToTiles(scene.name),
     dialogueData: buildDialogueTree(scene.dialogue),
     kanaData: buildKanaData(scene.kanaQuestions),
-    backdropData: encodeBackdrop(scene.backdrop),
+    backdropData: art.backdrop,
+    sceneTileData: art.tileData,
   };
 }
 

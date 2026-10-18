@@ -15,7 +15,14 @@ import { type DialogueNode, buildDialogueTree } from '@game/dialogue';
 import { packScene, SCENES } from '@game/scene';
 import { centerStartCol, tilemapAddr, tilePos } from '@game/tilemap';
 import { FADE_STEPS, bgTileAddr, buildFadeTable, rgb } from '@game/video';
-import { BACKDROP, BACKDROP_LEGEND, encodeBackdrop } from '@game/backdrop';
+import {
+  BACKDROP,
+  BACKDROP_LEGEND,
+  SCENE_TILE_BASE,
+  SCENE_TILE_CAPACITY,
+  buildSceneArt,
+} from '@game/backdrop';
+import { BACKDROP_GLYPHS } from '@game/glyphs-backdrop';
 
 describe('font', () => {
   it('maps space to the blank tile 0 and every glyph to a later tile', () => {
@@ -139,23 +146,39 @@ describe('scene packing', () => {
   });
 });
 
-describe('encodeBackdrop', () => {
+describe('buildSceneArt', () => {
   const blankRow = ' '.repeat(BACKDROP.cols);
   const blank = Array<string>(BACKDROP.rows).fill(blankRow);
 
-  it('maps each cell through the legend', () => {
+  it('gives kit tiles scene slots in order of first use; icons and blanks stay global', () => {
     const map = [...blank];
-    map[0] = 'o' + blankRow.slice(1);
-    const data = encodeBackdrop(map);
-    expect(data.length).toBe(BACKDROP.rows * BACKDROP.cols);
-    expect(data[0]).toBe(requireTile(BACKDROP_LEGEND['o'] ?? ''));
-    expect(data[1]).toBe(0);
+    map[0] = 'o.o' + blankRow.slice(3);
+    map[1] = 'Tt' + blankRow.slice(2);
+    const { backdrop, tileData } = buildSceneArt(map);
+    expect(backdrop.length).toBe(BACKDROP.rows * BACKDROP.cols);
+    expect([...backdrop.slice(0, 4)]).toEqual([
+      SCENE_TILE_BASE,
+      SCENE_TILE_BASE + 1,
+      SCENE_TILE_BASE,
+      0,
+    ]);
+    expect(backdrop[BACKDROP.cols]).toBe(requireTile(BACKDROP_LEGEND['T'] ?? ''));
+    expect(tileData.length).toBe(2 * 16);
+  });
+
+  it('keeps every scene within its tile block', () => {
+    expect(Object.keys(BACKDROP_GLYPHS).length).toBeLessThanOrEqual(SCENE_TILE_CAPACITY);
+    for (const scene of SCENES) {
+      expect(buildSceneArt(scene.backdrop).tileData.length / 16).toBeLessThanOrEqual(
+        SCENE_TILE_CAPACITY,
+      );
+    }
   });
 
   it('rejects maps of the wrong size or with unknown cells', () => {
-    expect(() => encodeBackdrop(blank.slice(1))).toThrow(/rows/);
-    expect(() => encodeBackdrop([blankRow + ' ', ...blank.slice(1)])).toThrow(/wide/);
-    expect(() => encodeBackdrop(['?' + blankRow.slice(1), ...blank.slice(1)])).toThrow(/Unknown/);
+    expect(() => buildSceneArt(blank.slice(1))).toThrow(/rows/);
+    expect(() => buildSceneArt([blankRow + ' ', ...blank.slice(1)])).toThrow(/wide/);
+    expect(() => buildSceneArt(['?' + blankRow.slice(1), ...blank.slice(1)])).toThrow(/Unknown/);
   });
 });
 

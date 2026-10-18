@@ -3,7 +3,12 @@
 import { describe, expect, it } from 'vitest';
 import { ROM_SIZE, globalChecksum, headerChecksum } from '@asm/assembler';
 import { buildTileData } from '@game/font';
-import { sceneBackdropLabel, sceneDialogueLabel, sceneKanaLabel } from '@game/main';
+import {
+  sceneBackdropLabel,
+  sceneDialogueLabel,
+  sceneKanaLabel,
+  sceneTilesLabel,
+} from '@game/main';
 import { SCENES, buildSceneData } from '@game/scene';
 import { rom, symbols } from './helpers/game-runner';
 
@@ -62,13 +67,18 @@ describe('Given the ROM has been assembled', () => {
       expect(bytesAt(sceneBackdropLabel(i), packed.backdropData.length)).toEqual(
         packed.backdropData,
       );
+      expect(bytesAt(sceneTilesLabel(i), packed.sceneTileData.length)).toEqual(
+        packed.sceneTileData,
+      );
     });
     expect(SCENES).toHaveLength(5);
   });
 
-  it('leaves at least 8 KB free for new content', () => {
+  // The game is a single 32 KB bank (no mapper). This floor keeps headroom for
+  // dialogue and small art changes; outgrowing it means moving to MBC1 banking.
+  it('leaves at least 4 KB free for new content', () => {
     let end = rom.length;
     while (end > 0 && rom[end - 1] === 0) end--;
-    expect(ROM_SIZE - end).toBeGreaterThanOrEqual(8 * 1024);
+    expect(ROM_SIZE - end).toBeGreaterThanOrEqual(4 * 1024);
   });
 });

@@ -10,6 +10,7 @@ import { HW } from './hardware';
 import {
   cp_n,
   dec_r,
+  dec_rr,
   halt,
   inc_rr,
   jp,
@@ -27,10 +28,11 @@ import {
   ldh_n_a,
   ldi_hl_a,
   nop,
+  or_r,
   ret_cc,
   xor_r,
 } from './ops';
-import { type LabelRef, type Op, type U16, ref, u8 } from './types';
+import { type LabelRef, type Op, type U16, ref, u8, u16 } from './types';
 
 /** First scanline of the vertical blank period. */
 const VBLANK_LINE = 144;
@@ -127,6 +129,25 @@ export function copyBytes(name: string, dst: U16, src: U16 | LabelRef, count: nu
     ldi_hl_a(),
     inc_rr('de'),
     dec_r('b'),
+    jr_cc('nz', ref(name)),
+  ];
+}
+
+/** Copy exactly `count` (1-65535) bytes from `src` to `dst`. Clobbers A, BC, DE, HL. */
+export function copyBlock(name: string, dst: U16, src: U16 | LabelRef, count: number): Op[] {
+  if (count < 1 || count > 0xffff)
+    throw new RangeError(`copyBlock count must be 1-65535, got ${String(count)}`);
+  return [
+    ld_rr_nn('hl', dst),
+    ld_rr_nn('de', src),
+    ld_rr_nn('bc', u16(count)),
+    label(name),
+    ld_a_de(),
+    ldi_hl_a(),
+    inc_rr('de'),
+    dec_rr('bc'),
+    ld_r_r('a', 'b'),
+    or_r('c'),
     jr_cc('nz', ref(name)),
   ];
 }

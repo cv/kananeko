@@ -1,6 +1,7 @@
 /**
- * Scene backdrops: a 20x9 tile illustration above the dialogue box, written
- * as a character map so scenes can be drawn (and reviewed) as text.
+ * Scene backdrops: a 20x8 tile illustration above the dialogue box, written
+ * as a character map so scenes can be drawn (and reviewed) as text. Backdrop
+ * tiles aren't part of the global font: each scene loads the ones it uses.
  */
 
 import {
@@ -19,9 +20,12 @@ import {
 } from '../asm/ops';
 import { ld_rr_nn } from '../asm/ops';
 import { type Op, ref, u8, u16 } from '../asm/types';
-import { requireTile } from './font';
-import { SCENE_ICON_TILES } from './font-data';
+import { copyBlock } from '../asm/macros';
+import { TILE_COUNT, encodeGlyph, requireTile } from './font';
+import { type Glyph, SCENE_ICON_TILES } from './font-data';
+import { BACKDROP_GLYPHS } from './glyphs-backdrop';
 import { SCREEN_COLS, tilemapAddr } from './tilemap';
+import { bgTileAddr } from './video';
 
 /** Where backdrops sit: rows 1-8, between the HUD and the dialogue box */
 export const BACKDROP = { top: 1, rows: 8, cols: SCREEN_COLS } as const;
@@ -62,8 +66,42 @@ export const BACKDROP_LEGEND: Readonly<Record<string, string>> = {
 
 export type Backdrop = readonly string[];
 
+/** First BG tile index after the global font: each scene loads its own art from here */
+export const SCENE_TILE_BASE = TILE_COUNT + 1;
+/** BG tile slots available to one scene's art */
+export const SCENE_TILE_CAPACITY = 256 - SCENE_TILE_BASE;
+
+export interface SceneArt {
+  /** Tilemap indices for the backdrop, row by row */
+  readonly backdrop: Uint8Array;
+  /** Pixel data for the scene's own tiles, loaded at SCENE_TILE_BASE */
+  readonly tileData: Uint8Array;
+}
+
+/**
+ * Encode a backdrop map. Kit tiles (glyphs-backdrop.ts) get slots in the scene's
+ * tile block in order of first use; everything else (blank, scene icons) is global.
+ */
+export function buildSceneArt(map: Backdrop): SceneArt {
+  // Fits by construction while the whole kit fits SCENE_TILE_CAPACITY (checked by tests)
+  const local = new Map<string, Glyph>();
+  const tileOf = (ch: string): number => {
+    const glyph = BACKDROP_GLYPHS[ch];
+    if (glyph === undefined) return requireTile(ch);
+    if (!local.has(ch)) local.set(ch, glyph);
+    return SCENE_TILE_BASE + [...local.keys()].indexOf(ch);
+  };
+  const backdrop = encodeBackdrop(map, tileOf);
+  return {
+    backdrop,
+    tileData: Uint8Array.from(
+      [...local.values()].flatMap((glyph) => Array.from(encodeGlyph(glyph))),
+    ),
+  };
+}
+
 /** Encode a backdrop map as tile indices, row by row. */
-export function encodeBackdrop(map: Backdrop): Uint8Array {
+function encodeBackdrop(map: Backdrop, tileOf: (ch: string) => number): Uint8Array {
   if (map.length !== BACKDROP.rows) {
     throw new RangeError(`Backdrop needs ${String(BACKDROP.rows)} rows, got ${String(map.length)}`);
   }
@@ -79,7 +117,7 @@ export function encodeBackdrop(map: Backdrop): Uint8Array {
         const ch = BACKDROP_LEGEND[cell];
         if (ch === undefined)
           throw new Error(`Unknown backdrop cell "${cell}" in row ${String(r)}`);
-        return requireTile(ch);
+        return tileOf(ch);
       });
     }),
   );
@@ -113,6 +151,11 @@ export function buildCopyRows(): Op[] {
     jr_cc('nz', ref('copy_rows')),
     ret(),
   ];
+}
+
+/** Load a scene's own tiles (LCD off). */
+export function loadSceneTiles(name: string, dataLabel: string, bytes: number): Op[] {
+  return copyBlock(name, u16(bgTileAddr(SCENE_TILE_BASE)), ref(dataLabel), bytes);
 }
 
 /** Draw the backdrop stored at `dataLabel` (LCD off). */

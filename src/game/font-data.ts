@@ -18,7 +18,6 @@ import { LATIN_UPPER, DIGITS_PUNCT, BORDER } from './glyphs-latin';
 import { HIRAGANA } from './glyphs-hiragana';
 import { KATAKANA } from './glyphs-katakana';
 import { CAT, CAT_BLINK_CHARS, CAT_SAD_CHARS, SCENE_ICONS, UI_ICONS } from './glyphs-icons';
-import { BACKDROP_GLYPHS } from './glyphs-backdrop';
 
 /**
  * Latin letters the game actually prints (PRESS START, GAME OVER). Every letter is
@@ -40,7 +39,6 @@ export const ALL_GLYPHS: Record<string, Glyph> = {
   ...CAT,
   ...SCENE_ICONS,
   ...UI_ICONS,
-  ...BACKDROP_GLYPHS,
 };
 
 // Cat tile indices for easy reference

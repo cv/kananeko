@@ -33,7 +33,7 @@ import {
   xor_r,
 } from '../asm/ops';
 import { type Op, type U16, ref, u8, u16 } from '../asm/types';
-import { buildCopyRows, drawBackdrop } from './backdrop';
+import { buildCopyRows, drawBackdrop, loadSceneTiles } from './backdrop';
 import { buildSpriteData, buildSpriteInit, runDma } from './sprites';
 import { DIALOGUE_LAYOUT, buildDialogueEngine } from './dialogue';
 import { buildTileData, requireTile, requireTiles, textToTiles } from './font';
@@ -134,6 +134,10 @@ const TITLE_FADE = 'title_fade';
 
 function resultFadeLabel(screen: { readonly name: string }): string {
   return `${screen.name}_fade`;
+}
+
+export function sceneTilesLabel(sceneIndex: number): string {
+  return `scene${String(sceneIndex)}_tiles`;
 }
 
 export function sceneBackdropLabel(sceneIndex: number): string {
@@ -429,7 +433,14 @@ export function buildProgram(): Op[] {
     // Backdrop above the dialogue box
     ...sceneSwitch(
       'scene_backdrop',
-      (_s, _p, i) => drawBackdrop(sceneBackdropLabel(i)),
+      (_s, packed, i) => [
+        ...loadSceneTiles(
+          `scene${String(i)}_tile_copy`,
+          sceneTilesLabel(i),
+          packed.sceneTileData.length,
+        ),
+        ...drawBackdrop(sceneBackdropLabel(i)),
+      ],
       packedScenes,
     ),
     call(ref('kana_draw_hud')), // hearts + score on row 0
@@ -531,6 +542,8 @@ export function buildProgram(): Op[] {
       db(scene.kanaData),
       label(sceneBackdropLabel(i)),
       db(scene.backdropData),
+      label(sceneTilesLabel(i)),
+      db(scene.sceneTileData),
     ]),
 
     // Fade tables for every palette
