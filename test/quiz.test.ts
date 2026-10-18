@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { type DialogueNode } from '@game/dialogue';
-import { distractorsFor, generateQuestions, phrasesOf, pick, questionFor } from '@game/quiz';
+import {
+  distractorsFor,
+  generateQuestions,
+  matchQuestionFor,
+  phrasesOf,
+  pick,
+  questionFor,
+} from '@game/quiz';
 
 const line = (text: string): DialogueNode => ({ text, choices: [{ text: 'はい', next: null }] });
 
@@ -52,6 +59,27 @@ describe('questionFor', () => {
 
   it('gives up on phrases with nothing to blank', () => {
     expect(questionFor('っー')).toBeUndefined();
+  });
+});
+
+describe('matchQuestionFor', () => {
+  it('pairs a hiragana word with its katakana and blanks a katakana', () => {
+    const question = matchQuestionFor('すごい');
+    expect(question?.word).toBe('すごい スゴイ');
+    expect(question?.prompt).toBe('katakana');
+    expect(question?.blankIndex).toBeGreaterThanOrEqual(4);
+    expect(Array.from(question?.word ?? '')[question?.blankIndex ?? 0]).toBe(question?.correct);
+    for (const option of question?.distractors ?? []) expect(option).toMatch(/[\u30a0-\u30ff]/u);
+  });
+
+  it.each([
+    ['ありがとう', 'too long to show twice'],
+    ['はなが', 'a word plus a particle'],
+    ['ラーメン', 'already katakana'],
+    ['さんぽ', 'ポ is missing from the font'],
+    ['ゃゃゃ', 'nothing to blank'],
+  ])('skips %s (%s)', (phrase) => {
+    expect(matchQuestionFor(phrase)).toBeUndefined();
   });
 });
 

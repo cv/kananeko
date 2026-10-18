@@ -4,6 +4,7 @@
  */
 
 import { CHAR_MAP } from '@game/font';
+import { MATCH_FLAG } from '@game/kana';
 
 const TILE_TO_CHAR = new Map(Object.entries(CHAR_MAP).map(([ch, tile]) => [tile as number, ch]));
 const TEXT_END = 0xfe;
@@ -78,6 +79,7 @@ export interface DecodedKanaQuestion {
   blankIndex: number;
   correct: string;
   distractors: string[];
+  prompt?: 'katakana';
 }
 
 export function decodeKanaData(data: Uint8Array): DecodedKanaQuestion[] {
@@ -89,12 +91,13 @@ export function decodeKanaData(data: Uint8Array): DecodedKanaQuestion[] {
     return ch;
   };
   const questions: DecodedKanaQuestion[] = [];
-  for (let length = r.byte(); length !== 0; length = r.byte()) {
-    const word = Array.from({ length }, tile).join('');
+  for (let header = r.byte(); header !== 0; header = r.byte()) {
+    const word = Array.from({ length: header & ~MATCH_FLAG }, tile).join('');
     const blankIndex = r.byte();
     const correct = tile();
     const distractors = [tile(), tile(), tile()];
-    questions.push({ word, blankIndex, correct, distractors });
+    const prompt = header & MATCH_FLAG ? { prompt: 'katakana' as const } : {};
+    questions.push({ word, blankIndex, correct, distractors, ...prompt });
   }
   return questions;
 }

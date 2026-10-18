@@ -162,6 +162,44 @@ export function questionFor(
   };
 }
 
+/** Particles and sentence endings that follow a word */
+const PARTICLES = new Set(Array.from('がはをにでのもへとねよか'));
+
+/** The katakana for a hiragana character (same sound) */
+function toKatakana(ch: string): string {
+  return String.fromCharCode(ch.charCodeAt(0) + 0x60);
+}
+
+/**
+ * A question pairing a hiragana phrase with its katakana (さんぽ サン□), blanking a
+ * katakana, or undefined if the phrase is too long or the font lacks its katakana.
+ */
+export function matchQuestionFor(phrase: string): KanaQuestion | undefined {
+  const chars = Array.from(phrase);
+  if (chars.length * 2 + 1 > MAX_KANA_WORD_LENGTH || !chars.every(isHiragana)) return undefined;
+  // A word, not a word plus particle: はなが would ask for ハナガ
+  if (PARTICLES.has(phrase.slice(-1))) return undefined;
+  const katakana = chars.map(toKatakana);
+  if (!katakana.every(inFont)) return undefined;
+  const eligible = katakana.flatMap((ch, i) => (blankable(ch) ? [{ ch, i }] : []));
+  if (eligible.length === 0) return undefined;
+  const blank = pick(eligible, hash(phrase));
+  const options = distractorsFor(blank.ch);
+  const seed = hash(`${phrase}/${blank.ch}`);
+  const second = pick(options.slice(1), seed);
+  const third = pick(
+    options.slice(1).filter((option) => option !== second),
+    seed >>> 8,
+  );
+  return {
+    word: `${phrase} ${katakana.join('')}`,
+    blankIndex: chars.length + 1 + blank.i,
+    correct: blank.ch,
+    distractors: [pick(options, 0), second, third],
+    prompt: 'katakana',
+  };
+}
+
 /** What a scene has already asked about, so later rounds pick something new */
 export interface QuizHistory {
   readonly phrases: Set<string>;

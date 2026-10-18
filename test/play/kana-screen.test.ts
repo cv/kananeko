@@ -62,6 +62,31 @@ describe.each(SCENES.map((scene, i) => [scene.name, i] as const))(
   },
 );
 
+describe('Given the review asks for katakana', () => {
+  const review = sceneRounds(SCENES[0]).at(-1)?.questions ?? [];
+  const matchIndex = review.findIndex((q) => q.prompt === 'katakana');
+  const atMatch = (): GameRunner => {
+    const runner = waitForPicture(runnerAt(checkpoint.kanaStart(0)).frames(4));
+    for (let i = 0; i < matchIndex; i++) runner.answerKanaCorrectly();
+    return runner.waitForKanaInput().frames(4);
+  };
+
+  it('ends the station review with a hiragana word to write in katakana', () => {
+    expect(matchIndex).toBe(review.length - 1);
+    const runner = atMatch();
+    expect(prompt(runner)).toBe(KANA_MESSAGES.katakana);
+    expect(word(runner)).toBe(
+      withBlank(review[matchIndex]?.word ?? '', review[matchIndex]?.blankIndex ?? 0),
+    );
+  });
+
+  it('asks for katakana again after a miss', () => {
+    const runner = atMatch().pressKanaAnswer(false).frames(FEEDBACK_SHOWN);
+    runner.waitForKanaInput().frames(10); // the LCD shows the new prompt a few frames later
+    expect(prompt(runner)).toBe(KANA_MESSAGES.katakana);
+  });
+});
+
 describe('Given the player answers three in a row on the first try', () => {
   it('cheers the streak and pays a bonus', () => {
     const runner = waitForPicture(runnerAt(checkpoint.kanaStart(0)).frames(4)).resetStreak();

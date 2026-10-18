@@ -9,7 +9,7 @@
  * Three wrong on one question = lose a life.
  *
  * ROM format per question:
- *   [word_length: u8]
+ *   [word_length: u8]       (| MATCH_FLAG: ask for katakana)
  *   [tile_indices...]        (full word, no blank marker)
  *   [blank_position: u8]     (which tile to blank, 0-indexed)
  *   [correct_tile: u8]       (the right answer)
@@ -52,6 +52,7 @@ import {
   ldh_a_n,
   ldi_hl_a,
   ret,
+  or_r,
   ret_cc,
   srl,
   sub_r,
@@ -83,6 +84,9 @@ import { clearScreen, fadeInCurrent, fadeOut, screenOff, vramPut, writeCenteredR
 /** A single kana character string (hiragana or katakana) */
 export type Kana = string;
 
+/** Bit of the encoded word length marking a question that asks for katakana */
+export const MATCH_FLAG = 0x80;
+
 export interface KanaQuestion {
   /** The full word to display */
   readonly word: string;
@@ -92,6 +96,8 @@ export interface KanaQuestion {
   readonly correct: Kana;
   /** Three wrong kana (should be visually similar distractors) */
   readonly distractors: Triple<Kana>;
+  /** Ask for katakana (the word shows a hiragana phrase and its katakana) */
+  readonly prompt?: 'katakana';
 }
 
 export function defineKanaQuestion<const Chars extends NonEmpty<Kana>>(
@@ -165,6 +171,7 @@ export const KANA_MESSAGES = {
   retry: 'もう いちど!',
   reveal: 'ざんねん...',
   streak: 'れんぞく!',
+  katakana: 'カタカナで?',
 } as const;
 const MESSAGE_WIDTH = Math.max(...Object.values(KANA_MESSAGES).map((m) => Array.from(m).length));
 
@@ -218,15 +225,18 @@ function showFace(face: keyof typeof CAT_FACES): Op[] {
 const ARROW_TILES = requireTiles(UI_TILES.ARROWS);
 
 /** Prompt-row message, centered and padded so every message fully replaces the last */
-function showMessage(text: string): Op[] {
+function messageTiles(text: string): number[] {
   const tiles = textToTiles(text);
   const left = Math.floor((MESSAGE_WIDTH - tiles.length) / 2);
-  const padded = [
+  return [
     ...Array<number>(left).fill(0),
     ...tiles,
     ...Array<number>(MESSAGE_WIDTH - tiles.length - left).fill(0),
   ];
-  return writeCenteredRow(PROMPT_ROW, padded, { lcdOn: true });
+}
+
+function showMessage(text: string): Op[] {
+  return writeCenteredRow(PROMPT_ROW, messageTiles(text), { lcdOn: true });
 }
 
 /** The parts of the round screen that don't change between questions (LCD off) */
@@ -277,7 +287,7 @@ export function buildKanaData(questions: readonly KanaQuestion[]): Uint8Array {
     if (tiles.length > MAX_KANA_WORD_LENGTH) {
       throw new RangeError(`Kana word too long for the box: ${q.word}`);
     }
-    bytes.push(tiles.length);
+    bytes.push(tiles.length | (q.prompt === 'katakana' ? MATCH_FLAG : 0));
 
     for (const tile of tiles) {
       bytes.push(tile);
@@ -375,9 +385,20 @@ export function buildKanaEngine(): Op[] {
     inc_rr('de'),
     cp_n(u8(0)),
     jp_cc('z', ref('kana_all_done')),
+    ld_r_r('c', 'a'),
+    and_n(u8(MATCH_FLAG)),
+    ld_nn_a(MEM.KANA_PROMPT),
+    ld_r_r('a', 'c'),
+    and_n(u8(0xff ^ MATCH_FLAG)),
     ld_r_r('c', 'a'), // C = word length
 
     ...buildRoundFrame(),
+    // Match questions ask for katakana instead
+    ld_a_nn(MEM.KANA_PROMPT),
+    or_r('a'),
+    jr_cc('z', ref('kana_prompt_drawn')),
+    ...writeCenteredRow(PROMPT_ROW, messageTiles(KANA_MESSAGES.katakana)),
+    label('kana_prompt_drawn'),
 
     // HL = start of the word, centered in the box: inner + (width - length) / 2
     ld_r_n('a', u8(WORD_BOX.innerWidth)),
@@ -573,9 +594,22 @@ export function buildKanaEngine(): Op[] {
     // =================================================================
     label('kana_wrong_fb'),
     ...countDownOrReturn(MEM.KANA_FEEDBACK_TIMER),
-    ...showMessage(KANA_MESSAGES.prompt),
+    call(ref('kana_show_prompt')),
     ...showFace('neutral'),
     ...storeByte(MEM.KANA_STATE, KanaState.AWAITING),
+    ret(),
+
+    // =================================================================
+    // kana_show_prompt — Ask again, for katakana if the question wants it.
+    // =================================================================
+    label('kana_show_prompt'),
+    ld_a_nn(MEM.KANA_PROMPT),
+    or_r('a'),
+    jr_cc('nz', ref('kana_show_katakana')),
+    ...showMessage(KANA_MESSAGES.prompt),
+    ret(),
+    label('kana_show_katakana'),
+    ...showMessage(KANA_MESSAGES.katakana),
     ret(),
 
     // =================================================================

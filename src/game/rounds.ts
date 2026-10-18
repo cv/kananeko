@@ -13,7 +13,7 @@ import { type DialogueNode } from './dialogue';
 import { choiceRating } from './dialogue-data';
 import { CAT_TILES } from './font-data';
 import { buildKanaData, type KanaQuestion } from './kana';
-import { type QuizHistory, generateQuestions } from './quiz';
+import { type QuizHistory, generateQuestions, matchQuestionFor, phrasesOf } from './quiz';
 import { type SceneCast } from './scenes/npcs';
 import { END_OF_CONVERSATION } from './state';
 
@@ -105,8 +105,16 @@ export function planQuiz(
   });
 
   const fillIns = new Map(sayIts.map((sayIt) => [sayIt.key, sayIt]));
+  // The review ends with a hiragana phrase from the scene to write in katakana
+  const match = phrasesOf(dialogue)
+    .map(matchQuestionFor)
+    .find((question) => question !== undefined);
+
   return {
-    rounds: [...rounds, { at: END_OF_CONVERSATION, questions: review }],
+    rounds: [
+      ...rounds,
+      { at: END_OF_CONVERSATION, questions: match ? [...review, match] : review },
+    ],
     chances: [...sayIts.map(({ key, questions }) => ({ key, questions })), ...redemptions],
     dialogue: dialogue.map((node, n) => {
       const fillIn = fillIns.get(n);

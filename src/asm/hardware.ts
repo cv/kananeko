@@ -131,6 +131,7 @@ export const MEM = {
   DLG_FROM_NODE: u16(0xc07f), // node the last choice was made at
   DLG_PICK: u16(0xc080), // last choice: logical index, bit 7 = bad answer
   KANA_STREAK: u16(0xc081), // first-try answers in a row toward the next streak bonus
+  KANA_PROMPT: u16(0xc087), // nonzero = the current question asks for katakana (see MATCH_FLAG)
 
   // WRAM — scene system
   SCENE_ID: u16(0xc050), // Current scene index (0-4, 0xFF = title)

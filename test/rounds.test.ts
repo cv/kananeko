@@ -56,7 +56,11 @@ describe('planRounds', () => {
     expect(rounds.map((r) => r.at)).toEqual([10, 20, END_OF_CONVERSATION]);
     expect(rounds[0]?.questions.map((x) => x.word)).toEqual(['おはよう', 'ございます']);
     expect(rounds[1]?.questions.map((x) => x.word)).toEqual(['さくらが', 'きれい']);
-    expect(rounds[2]?.questions).toBe(review);
+    expect(rounds[2]?.questions.slice(0, -1)).toEqual(review);
+    expect(rounds[2]?.questions.at(-1)).toMatchObject({
+      word: 'きれい キレイ',
+      prompt: 'katakana',
+    });
   });
 });
 
