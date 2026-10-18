@@ -212,7 +212,7 @@ export function packScene(scene: Scene): PackedScene {
 
 /** When the scene's kana rounds happen and what they ask */
 export function sceneRounds(scene: Scene): readonly KanaCheckpoint[] {
-  return planRounds(scene.cast, scene.kanaQuestions);
+  return planRounds(scene.cast, scene.dialogue, scene.kanaQuestions);
 }
 
 export function buildSceneData(): PackedScene[] {

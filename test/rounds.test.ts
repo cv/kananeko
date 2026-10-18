@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { SCENES, sceneRounds } from '@game/scene';
-import { MAX_ROUNDS, buildRoundsData, conversationBreaks, planRounds } from '@game/rounds';
+import {
+  MAX_ROUNDS,
+  QUESTIONS_PER_BREAK,
+  buildRoundsData,
+  conversationBreaks,
+  planRounds,
+} from '@game/rounds';
+import { type DialogueNode } from '@game/dialogue';
+import { CHAR_MAP } from '@game/font';
+import { phrasesOf } from '@game/quiz';
 import { type KanaQuestion, buildKanaData } from '@game/kana';
 import { END_OF_CONVERSATION } from '@game/state';
 import { type SceneCast } from '@game/scenes/npcs';
@@ -33,15 +42,18 @@ describe('conversationBreaks', () => {
 });
 
 describe('planRounds', () => {
-  it('spreads the questions in order, with leftovers at the end', () => {
-    const questions = ['あい', 'あう', 'あえ', 'あお', 'あか'].map(q);
-    const rounds = planRounds(CAST, questions);
+  const line = (text: string): DialogueNode => ({ text, choices: [{ text: 'はい', next: null }] });
+  const dialogue = Array.from({ length: 24 }, (_, i) =>
+    line(i < 10 ? 'おはよう ございます' : i < 20 ? 'さくらが きれい' : 'たのしい ですね'),
+  );
+
+  it('asks about each conversation after it, then the review at the end', () => {
+    const review = [q('あい')];
+    const rounds = planRounds(CAST, dialogue, review);
     expect(rounds.map((r) => r.at)).toEqual([10, 20, END_OF_CONVERSATION]);
-    expect(rounds.map((r) => r.questions.map((x) => x.word))).toEqual([
-      ['あい'],
-      ['あう', 'あえ'],
-      ['あお', 'あか'],
-    ]);
+    expect(rounds[0]?.questions.map((x) => x.word)).toEqual(['おはよう', 'ございます']);
+    expect(rounds[1]?.questions.map((x) => x.word)).toEqual(['さくらが', 'きれい']);
+    expect(rounds[2]?.questions).toBe(review);
   });
 });
 
@@ -84,6 +96,28 @@ describe.each(SCENES.map((scene) => [scene.name, scene] as const))('%s', (_name,
   it('has a round after each conversation and one at the end', () => {
     expect(rounds.length).toBeGreaterThan(1);
     expect(rounds.at(-1)?.at).toBe(END_OF_CONVERSATION);
+  });
+
+  it.each(rounds.slice(0, -1).map((round) => [round.at, round] as const))(
+    'asks %i about phrases its conversation just used',
+    (at, round) => {
+      const breaks = rounds.map((r) => r.at);
+      const start = breaks[breaks.indexOf(at) - 1] ?? 0;
+      const said = phrasesOf(scene.dialogue.slice(start, at));
+      expect(round.questions).toHaveLength(QUESTIONS_PER_BREAK);
+      for (const question of round.questions) {
+        expect(said).toContain(question.word);
+        expect(Array.from(question.word)[question.blankIndex]).toBe(question.correct);
+        const options = [question.correct, ...question.distractors];
+        expect(new Set(options).size).toBe(4);
+        for (const option of options) expect(CHAR_MAP).toHaveProperty(option);
+      }
+    },
+  );
+
+  it('never asks the same phrase twice in a scene', () => {
+    const words = rounds.flatMap((round) => round.questions.map((q) => q.word));
+    expect(new Set(words).size).toBe(words.length);
   });
 
   it('triggers every mid-scene round at a node the dialogue can reach', () => {

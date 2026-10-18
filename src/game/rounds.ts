@@ -1,6 +1,6 @@
 /**
- * When kana rounds happen: a short round each time a conversation ends,
- * and a last one when the scene's dialogue is over.
+ * When kana rounds happen: a short round about what was just said each time a
+ * conversation ends, and the scene's review round when its dialogue is over.
  *
  * ROM layout of a scene's rounds (see buildRoundsData):
  *   count
@@ -9,7 +9,9 @@
  *   question lists (see buildKanaData)
  */
 
+import { type DialogueNode } from './dialogue';
 import { buildKanaData, type KanaQuestion } from './kana';
+import { type QuizHistory, generateQuestions } from './quiz';
 import { type SceneCast } from './scenes/npcs';
 import { END_OF_CONVERSATION } from './state';
 
@@ -29,24 +31,32 @@ export function conversationBreaks(cast: SceneCast): number[] {
     .map((segment) => segment.from);
 }
 
+/** Questions in each round between conversations */
+export const QUESTIONS_PER_BREAK = 2;
+
 /**
- * Spread a scene's questions over a round per conversation break plus one at the end,
- * in order; later rounds get the leftovers.
+ * A round after each conversation, asking about phrases from that conversation,
+ * then the scene's authored review questions at the end.
  */
 export function planRounds(
   cast: SceneCast,
-  questions: readonly KanaQuestion[],
+  dialogue: readonly DialogueNode[],
+  review: readonly KanaQuestion[],
 ): readonly KanaCheckpoint[] {
-  const stops = [...conversationBreaks(cast), END_OF_CONVERSATION];
-  const base = Math.floor(questions.length / stops.length);
-  const extra = questions.length % stops.length;
-  let next = 0;
-  return stops.map((at, i) => {
-    const size = base + (i >= stops.length - extra ? 1 : 0);
-    const round = { at, questions: questions.slice(next, next + size) };
-    next += size;
-    return round;
-  });
+  const history: QuizHistory = {
+    phrases: new Set(review.map((q) => q.word)),
+    kana: new Set(review.map((q) => q.correct)),
+  };
+  const breaks = conversationBreaks(cast);
+  const rounds = breaks.map((at, i) => ({
+    at,
+    questions: generateQuestions(
+      dialogue.slice(breaks[i - 1] ?? 0, at),
+      QUESTIONS_PER_BREAK,
+      history,
+    ),
+  }));
+  return [...rounds, { at: END_OF_CONVERSATION, questions: review }];
 }
 
 export function buildRoundsData(rounds: readonly KanaCheckpoint[]): Uint8Array {
@@ -55,17 +65,17 @@ export function buildRoundsData(rounds: readonly KanaCheckpoint[]): Uint8Array {
       `A scene needs 1-${String(MAX_ROUNDS)} kana rounds, got ${String(rounds.length)}`,
     );
   }
-  const lists = rounds.map((round) => {
+  const packed = rounds.map((round) => {
     if (round.questions.length === 0)
       throw new RangeError(`Empty kana round at node ${String(round.at)}`);
-    return buildKanaData(round.questions);
+    return { at: round.at, list: buildKanaData(round.questions) };
   });
   const bytes: number[] = [rounds.length];
   let offset = 1 + 3 * rounds.length;
-  rounds.forEach((round, i) => {
-    bytes.push(round.at, offset & 0xff, offset >> 8);
-    offset += lists[i]?.length ?? 0;
-  });
-  for (const list of lists) bytes.push(...list);
+  for (const { at, list } of packed) {
+    bytes.push(at, offset & 0xff, offset >> 8);
+    offset += list.length;
+  }
+  for (const { list } of packed) bytes.push(...list);
   return new Uint8Array(bytes);
 }
