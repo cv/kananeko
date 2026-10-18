@@ -10,7 +10,6 @@ import { type KanaQuestion, buildKanaData, defineKanaQuestion } from './kana';
 import { textToTiles } from './font';
 import { SCENE_ICON_TILES } from './font-data';
 import { type Pair, type Quint } from './fixed';
-import { centerStartCol } from './tilemap';
 import { type Palette, rgb } from './video';
 import { STATION_DIALOGUE } from './scenes/station';
 import { STREET_DIALOGUE } from './scenes/street';
@@ -142,17 +141,15 @@ export const SCENES = defineScenes([
 // ---------------------------------------------------------------------------
 
 export interface PackedScene {
-  /** Scene name tiles, left-padded with blanks so the name is centered */
+  /** Scene name tiles (centered when drawn) */
   readonly nameRow: readonly number[];
   readonly dialogueData: Uint8Array;
   readonly kanaData: Uint8Array;
 }
 
 export function packScene(scene: Scene): PackedScene {
-  const nameTiles = textToTiles(scene.name);
-  const pad = centerStartCol(nameTiles.length);
   return {
-    nameRow: [...Array<number>(pad).fill(0), ...nameTiles],
+    nameRow: textToTiles(scene.name),
     dialogueData: buildDialogueTree(scene.dialogue),
     kanaData: buildKanaData(scene.kanaQuestions),
   };

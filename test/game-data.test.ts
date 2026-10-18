@@ -56,14 +56,9 @@ describe('buildKanaData', () => {
 });
 
 describe('scene packing', () => {
-  it('centers the scene name with leading blank tiles', () => {
+  it('stores the scene name without padding (it is centered when drawn)', () => {
     const scene = SCENES[0];
-    const { nameRow } = packScene(scene);
-    const nameTiles = textToTiles(scene.name);
-    expect(nameRow).toEqual([
-      ...Array<number>(centerStartCol(nameTiles.length)).fill(0),
-      ...nameTiles,
-    ]);
+    expect(packScene(scene).nameRow).toEqual(textToTiles(scene.name));
   });
 });
 
