@@ -6,7 +6,8 @@
  */
 
 import { type DialogueNode, buildDialogueTree } from './dialogue';
-import { type KanaQuestion, buildKanaData, defineKanaQuestion } from './kana';
+import { type KanaQuestion, defineKanaQuestion } from './kana';
+import { type KanaCheckpoint, buildRoundsData, planRounds } from './rounds';
 import { textToTiles } from './font';
 import { SCENE_ICON_TILES } from './font-data';
 import { type Pair, type Quint } from './fixed';
@@ -175,7 +176,8 @@ export interface PackedScene {
   /** Scene name tiles (centered when drawn) */
   readonly nameRow: readonly number[];
   readonly dialogueData: Uint8Array;
-  readonly kanaData: Uint8Array;
+  /** Kana rounds and their questions (see buildRoundsData) */
+  readonly roundsData: Uint8Array;
   readonly backdropData: Uint8Array;
   /** Pixel data of the scene's own BG tiles (see SCENE_TILE_BASE) */
   readonly sceneTileData: Uint8Array;
@@ -194,7 +196,7 @@ export function packScene(scene: Scene): PackedScene {
   return {
     nameRow: textToTiles(scene.name),
     dialogueData: buildDialogueTree(scene.dialogue),
-    kanaData: buildKanaData(scene.kanaQuestions),
+    roundsData: buildRoundsData(sceneRounds(scene)),
     backdropData: art.backdrop,
     sceneTileData: art.tileData,
     cast: packCast(scene.cast),
@@ -206,6 +208,11 @@ export function packScene(scene: Scene): PackedScene {
       ),
     ),
   };
+}
+
+/** When the scene's kana rounds happen and what they ask */
+export function sceneRounds(scene: Scene): readonly KanaCheckpoint[] {
+  return planRounds(scene.cast, scene.kanaQuestions);
 }
 
 export function buildSceneData(): PackedScene[] {

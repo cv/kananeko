@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { CAT_TILES } from '@game/font-data';
 import { KANA_LAYOUT, KANA_MESSAGES, type KanaQuestion } from '@game/kana';
-import { SCENES } from '@game/scene';
+import { SCENES, sceneRounds } from '@game/scene';
 import { checkpoint, runnerAt } from '../helpers/checkpoints';
 import { type GameRunner } from '../helpers/game-runner';
 import { loseOneKanaLife } from '../helpers/play';
@@ -30,7 +30,8 @@ function options(runner: GameRunner): string[] {
 }
 
 function firstQuestion(sceneIdx: number): KanaQuestion {
-  const question = SCENES[sceneIdx]?.kanaQuestions[0];
+  const scene = SCENES[sceneIdx];
+  const question = scene ? sceneRounds(scene).at(-1)?.questions[0] : undefined;
   if (question === undefined) throw new Error('scene has no kana questions');
   return question;
 }

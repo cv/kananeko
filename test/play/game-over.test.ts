@@ -16,7 +16,7 @@ describe('Given the game over screen', () => {
   it('shows the sad cat, the final score, and stamps for the scenes cleared so far', () => {
     // Wait out the fade-out, screen change, and fade-in before reading
     const runner = waitForPicture(
-      loseAllKanaLives(runnerAt(checkpoint.kanaStart(3))).frames(SETTLE_FRAMES),
+      loseAllKanaLives(runnerAt(checkpoint.kanaStart(3)).setLives(1)).frames(SETTLE_FRAMES),
     );
     expect(row(runner, 6)).toBe('GAME OVER');
     expect(row(runner, 10)).toBe(`とくてん ${String(runner.kanaScore).padStart(4, '0')}`);
@@ -43,14 +43,14 @@ describe('Given the player runs out of lives', () => {
   });
 
   it('lets the player start a fresh run after a kana game over', () => {
-    const runner = runnerAt(checkpoint.kanaStart(0));
+    const runner = runnerAt(checkpoint.kanaStart(0)).setLives(1);
     returnToTitleAfterGameOver(loseAllKanaLives(runner)).start();
     expect(runner.sceneId).toBe(0);
     expect(runner.dlgState).not.toBe(DialogueState.IDLE);
   });
 
   it('forgets cleared scenes when a new run starts after a later game over', () => {
-    const runner = loseAllKanaLives(runnerAt(checkpoint.kanaStart(3)));
+    const runner = loseAllKanaLives(runnerAt(checkpoint.kanaStart(3)).setLives(1));
     expect(runner.kanaState).toBe(KanaState.IDLE);
     returnToTitleAfterGameOver(runner).start();
     expect(runner.sceneId).toBe(0);

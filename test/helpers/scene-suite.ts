@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { SCENES } from '@game/scene';
+import { SCENES, sceneRounds } from '@game/scene';
 import { checkpoint, runnerAt } from './checkpoints';
 import { type Detours, answerKanaAndCheckDelta, playDialoguePath } from './play';
 
@@ -39,9 +39,11 @@ export function describeScene(sceneIdx: number, paths: readonly DialoguePath[]):
       { timeout: TIMEOUT },
       () => {
         const runner = runnerAt(checkpoint.kanaStart(sceneIdx));
-        scene.kanaQuestions.forEach(() => {
-          answerKanaAndCheckDelta(runner, FIRST_TRY_POINTS);
-        });
+        sceneRounds(scene)
+          .at(-1)
+          ?.questions.forEach(() => {
+            answerKanaAndCheckDelta(runner, FIRST_TRY_POINTS);
+          });
         runner.frames(SCENE_ADVANCE_FRAMES);
         expect(runner.sceneFlags & doneFlags).toBe(doneFlags);
         if (!isLast) expect(runner.sceneId).toBe(sceneIdx + 1);

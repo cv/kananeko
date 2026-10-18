@@ -4,7 +4,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { SCENES } from '@game/scene';
+import { SCENES, sceneRounds } from '@game/scene';
 import { DialogueState, KanaState, MAX_LIVES } from '@game/state';
 import { checkpoint, runnerAt } from '../helpers/checkpoints';
 import { type GameRunner } from '../helpers/game-runner';
@@ -34,7 +34,10 @@ describe('Given the player plays through the whole game', () => {
   it('completes every scene and keeps the perfect score', () => {
     const runner = runnerAt(checkpoint.gameComplete);
     expect(runner.sceneFlags).toBe(ALL_SCENES);
-    const kanaPoints = SCENES.reduce((sum, s) => sum + s.kanaQuestions.length * 100, 0);
+    const kanaPoints = SCENES.reduce(
+      (sum, s) => sum + sceneRounds(s).reduce((n, round) => n + round.questions.length, 0) * 100,
+      0,
+    );
     expect(runner.kanaScore).toBeGreaterThanOrEqual(kanaPoints);
   });
 });

@@ -6,7 +6,7 @@ import { buildTileData } from '@game/font';
 import {
   sceneBackdropLabel,
   sceneDialogueLabel,
-  sceneKanaLabel,
+  sceneRoundsLabel,
   sceneTilesLabel,
 } from '@game/main';
 import { SCENES, buildSceneData } from '@game/scene';
@@ -63,7 +63,7 @@ describe('Given the ROM has been assembled', () => {
       expect(bytesAt(sceneDialogueLabel(i), packed.dialogueData.length)).toEqual(
         packed.dialogueData,
       );
-      expect(bytesAt(sceneKanaLabel(i), packed.kanaData.length)).toEqual(packed.kanaData);
+      expect(bytesAt(sceneRoundsLabel(i), packed.roundsData.length)).toEqual(packed.roundsData);
       expect(bytesAt(sceneBackdropLabel(i), packed.backdropData.length)).toEqual(
         packed.backdropData,
       );

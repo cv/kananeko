@@ -6,15 +6,28 @@
 
 import { type AssembleResult, type ROMHeader, assemble } from '../asm/assembler';
 import { HW, JOY, MEM } from '../asm/hardware';
-import { copyPages, storeByte, switchCases, waitFrame, zeroBytes } from '../asm/macros';
 import {
+  copyPages,
+  loadPointer,
+  storeByte,
+  storePointer,
+  switchCases,
+  waitFrame,
+  zeroBytes,
+} from '../asm/macros';
+import {
+  add_hl_rr,
   and_n,
+  and_r,
   call,
   cp_n,
+  cp_r,
+  dec_r,
   db,
   di,
   ei,
   inc_r,
+  inc_rr,
   jp,
   jp_cc,
   jr,
@@ -26,10 +39,14 @@ import {
   ld_r_r,
   ld_rr_nn,
   ldh_n_a,
+  ldi_a_hl,
   ldi_hl_a,
   or_r,
+  pop,
+  push,
   ret,
   ret_cc,
+  sla,
   xor_r,
 } from '../asm/ops';
 import { type Op, type U16, ref, u8, u16 } from '../asm/types';
@@ -111,8 +128,8 @@ export function sceneDialogueLabel(sceneIndex: number): string {
   return `scene${String(sceneIndex)}_dlg`;
 }
 
-export function sceneKanaLabel(sceneIndex: number): string {
-  return `scene${String(sceneIndex)}_kana`;
+export function sceneRoundsLabel(sceneIndex: number): string {
+  return `scene${String(sceneIndex)}_rounds`;
 }
 
 export function sceneFadeLabel(sceneIndex: number): string {
@@ -191,6 +208,61 @@ function engineLoop(name: string, update: string, stateAddr: U16): Op[] {
     ld_a_nn(stateAddr),
     cp_n(u8(0)),
     jr_cc('nz', ref(name)),
+  ];
+}
+
+/**
+ * round_check — if the scene has an unplayed kana round at DLG_NODE_ID, play it.
+ * Returns NZ if a round ran (the screen then shows the round, not the scene).
+ */
+function buildRoundCheck(): Op[] {
+  return [
+    label('round_check'),
+    ...loadPointer('hl', MEM.ROUNDS_LO, MEM.ROUNDS_HI),
+    ldi_a_hl(), // round count
+    ld_r_r('b', 'a'),
+    ld_r_n('c', u8(1)), // this round's ROUNDS_DONE bit
+    ld_a_nn(MEM.DLG_NODE_ID),
+    ld_r_r('d', 'a'),
+    label('round_scan'),
+    ld_r_r('a', 'b'),
+    or_r('a'),
+    ret_cc('z'), // no round at this node
+    ldi_a_hl(),
+    cp_r('d'),
+    jr_cc('z', ref('round_found')),
+    inc_rr('hl'), // skip the offset
+    inc_rr('hl'),
+    sla('c'),
+    dec_r('b'),
+    jr(ref('round_scan')),
+
+    label('round_found'),
+    ld_a_nn(MEM.ROUNDS_DONE),
+    and_r('c'),
+    jr_cc('z', ref('round_fresh')),
+    xor_r('a'), // already played (dialogue looped back): Z
+    ret(),
+    label('round_fresh'),
+    ld_a_nn(MEM.ROUNDS_DONE),
+    or_r('c'),
+    ld_nn_a(MEM.ROUNDS_DONE),
+    // DE = rounds data + offset of this round's questions
+    ldi_a_hl(),
+    ld_r_r('e', 'a'),
+    ld_r_r('d', 'hl_ptr'),
+    ...loadPointer('hl', MEM.ROUNDS_LO, MEM.ROUNDS_HI),
+    add_hl_rr('de'),
+    ld_r_r('d', 'h'),
+    ld_r_r('e', 'l'),
+    push('de'),
+    call(ref('npc_hide')),
+    pop('de'),
+    call(ref('kana_start')),
+    ...engineLoop('round_loop', 'kana_update', MEM.KANA_STATE),
+    ld_r_n('a', u8(1)),
+    or_r('a'), // NZ: a round ran
+    ret(),
   ];
 }
 
@@ -445,6 +517,66 @@ export function buildProgram(): Op[] {
 
     // ==== Scene load ====
     label('scene_load'),
+    ...storeByte(MEM.ROUNDS_DONE, 0),
+    ...sceneSwitch(
+      'scene_rounds_ptr',
+      (_s, _p, i) => [ld_rr_nn('hl', ref(sceneRoundsLabel(i)))],
+      packedScenes,
+    ),
+    ...storePointer('hl', MEM.ROUNDS_LO, MEM.ROUNDS_HI),
+    call(ref('scene_draw')),
+
+    // ==== Dialogue, with a kana round after each conversation ====
+    ...sceneSwitch(
+      'scene_dlg_ptr',
+      (_s, _p, i) => [ld_rr_nn('de', ref(sceneDialogueLabel(i)))],
+      packedScenes,
+    ),
+    call(ref('dlg_open_tree')), // initialize tree and open node 0
+
+    // Process nodes until the conversation ends
+    ...engineLoop('scene_dlg_loop', 'dlg_update', MEM.DLG_STATE),
+    call(ref('round_check')), // a kana round before this node?
+    jr_cc('z', ref('scene_no_round')),
+    // Out of lives → game over
+    ld_a_nn(MEM.KANA_LIVES),
+    cp_n(u8(0)),
+    jp_cc('z', ref('game_over')),
+    ld_a_nn(MEM.DLG_NODE_ID),
+    cp_n(u8(END_OF_CONVERSATION)),
+    jr_cc('z', ref('scene_complete')),
+    call(ref('scene_draw')), // back from the round: the conversation resumes
+    jr(ref('scene_open_node')),
+    label('scene_no_round'),
+    ld_a_nn(MEM.DLG_NODE_ID),
+    cp_n(u8(END_OF_CONVERSATION)),
+    jr_cc('z', ref('scene_complete')),
+    label('scene_open_node'),
+    call(ref('dlg_open_node')),
+    jp(ref('scene_dlg_loop')),
+
+    label('scene_complete'),
+    // ==== Scene complete — set completion flag and advance ====
+    ...sceneSwitch('scene_flag', (_s, _p, i) => [ld_r_n('b', u8(1 << i))], packedScenes),
+    ld_a_nn(MEM.SCENE_FLAGS),
+    or_r('b'),
+    ld_nn_a(MEM.SCENE_FLAGS),
+
+    ld_a_nn(MEM.SCENE_ID),
+    inc_r('a'),
+    ld_nn_a(MEM.SCENE_ID),
+    cp_n(u8(SCENES.length)),
+    jp_cc('c', ref('scene_load')), // more scenes to go
+
+    // ==== Game complete — ending screen, then back to the title ====
+    ...buildResultScreen(ENDING),
+
+    // ==== Game Over ====
+    ...buildResultScreen(GAME_OVER),
+
+    // ==== Subroutines ====
+    // scene_draw — fade out, draw the current scene (backdrop, cast, HUD, empty box, name), fade in
+    label('scene_draw'),
     ...fadeOut(),
     ...screenOff('scene_vblank'),
     ...clearScreen(),
@@ -489,58 +621,8 @@ export function buildProgram(): Op[] {
       packedScenes,
     ),
     call(ref('fade_in')),
-
-    // ==== Dialogue ====
-    ...sceneSwitch(
-      'scene_dlg_ptr',
-      (_s, _p, i) => [ld_rr_nn('de', ref(sceneDialogueLabel(i)))],
-      packedScenes,
-    ),
-    call(ref('dlg_open_tree')), // initialize tree and open node 0
-
-    // Process nodes until the conversation ends
-    ...engineLoop('scene_dlg_loop', 'dlg_update', MEM.DLG_STATE),
-    ld_a_nn(MEM.DLG_NODE_ID),
-    cp_n(u8(END_OF_CONVERSATION)),
-    jr_cc('z', ref('scene_dlg_done')),
-    call(ref('dlg_open_node')),
-    jr(ref('scene_dlg_loop')),
-    label('scene_dlg_done'),
-    call(ref('npc_hide')),
-
-    // ==== Kana round ====
-    ...sceneSwitch(
-      'scene_kana_ptr',
-      (_s, _p, i) => [ld_rr_nn('de', ref(sceneKanaLabel(i)))],
-      packedScenes,
-    ),
-    call(ref('kana_start')),
-    ...engineLoop('scene_kana_loop', 'kana_update', MEM.KANA_STATE),
-
-    // Out of lives → game over
-    ld_a_nn(MEM.KANA_LIVES),
-    cp_n(u8(0)),
-    jp_cc('z', ref('game_over')),
-
-    // ==== Scene complete — set completion flag and advance ====
-    ...sceneSwitch('scene_flag', (_s, _p, i) => [ld_r_n('b', u8(1 << i))], packedScenes),
-    ld_a_nn(MEM.SCENE_FLAGS),
-    or_r('b'),
-    ld_nn_a(MEM.SCENE_FLAGS),
-
-    ld_a_nn(MEM.SCENE_ID),
-    inc_r('a'),
-    ld_nn_a(MEM.SCENE_ID),
-    cp_n(u8(SCENES.length)),
-    jp_cc('c', ref('scene_load')), // more scenes to go
-
-    // ==== Game complete — ending screen, then back to the title ====
-    ...buildResultScreen(ENDING),
-
-    // ==== Game Over ====
-    ...buildResultScreen(GAME_OVER),
-
-    // ==== Subroutines ====
+    ret(),
+    ...buildRoundCheck(),
     ...buildReadJoypad(),
     ...buildTitleBlink(),
     ...buildCatBlink(),
@@ -570,8 +652,8 @@ export function buildProgram(): Op[] {
     ...packedScenes.flatMap((scene, i) => [
       label(sceneDialogueLabel(i)),
       db(scene.dialogueData),
-      label(sceneKanaLabel(i)),
-      db(scene.kanaData),
+      label(sceneRoundsLabel(i)),
+      db(scene.roundsData),
       label(sceneBackdropLabel(i)),
       db(scene.backdropData),
       label(sceneTilesLabel(i)),

@@ -55,7 +55,7 @@ describe('Given the player misses kana prompts repeatedly', () => {
   });
 
   it('ends the round when the last life is lost', () => {
-    const runner = loseAllKanaLives(kanaRound());
+    const runner = loseAllKanaLives(kanaRound().setLives(1));
     expect(runner.kanaLives).toBe(0);
     expect(runner.kanaState).toBe(KanaState.IDLE);
   });

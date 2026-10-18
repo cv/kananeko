@@ -120,6 +120,11 @@ export const MEM = {
   HUD_SHOWN_DELTA: u16(0xc05b), // delta type on screen (0 = cleared)
   SCORE_DIGITS: u16(0xc05c), // 4 digit tiles of the score, most significant first ($C05C-$C05F)
 
+  // WRAM — kana rounds of the current scene (see rounds.ts)
+  ROUNDS_LO: u16(0xc078), // pointer to the scene's rounds data (lo)
+  ROUNDS_HI: u16(0xc079), // pointer to the scene's rounds data (hi)
+  ROUNDS_DONE: u16(0xc07a), // bit i set = round i already played
+
   // WRAM — scene system
   SCENE_ID: u16(0xc050), // Current scene index (0-4, 0xFF = title)
   SCENE_FLAGS: u16(0xc051), // Per-scene completion bitfield

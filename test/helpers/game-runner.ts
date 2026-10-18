@@ -8,7 +8,7 @@
 import Gameboy from 'serverboy';
 import { MEM } from '@asm/hardware';
 import { buildRom } from '@game/main';
-import { SCENES } from '@game/scene';
+import { SCENES, sceneRounds } from '@game/scene';
 import { DialogueState, END_OF_CONVERSATION, KanaState } from '@game/state';
 
 // Build the ROM once per worker — shared across all tests
@@ -209,6 +209,12 @@ export class GameRunner {
     return this.readMem(MEM.KANA_LIVES);
   }
 
+  /** Test shortcut: set the lives left by writing WRAM directly */
+  setLives(lives: number): this {
+    this.getMemory()[MEM.KANA_LIVES] = lives;
+    return this;
+  }
+
   get kanaAttempts(): number {
     return this.readMem(MEM.KANA_ATTEMPTS);
   }
@@ -259,10 +265,19 @@ export class GameRunner {
 
   /** Wait until dialogue has finished printing and waits for input or a choice */
   waitForDialogueChoices(): this {
-    return this.waitUntil(
-      () => this.dlgState === DialogueState.WAITING || this.dlgState === DialogueState.CHOOSING,
-      'dialogue choosing/wait state',
-    ).frames(GameRunner.INPUT_DEBOUNCE);
+    const choosing = (): boolean =>
+      this.dlgState === DialogueState.WAITING || this.dlgState === DialogueState.CHOOSING;
+    // A conversation break may run a kana round first: answer it correctly
+    for (let round = 0; ; round++) {
+      this.waitUntil(
+        () => choosing() || this.kanaState === KanaState.AWAITING,
+        'dialogue choosing/wait state',
+      );
+      if (choosing()) break;
+      if (round > 16) throw new Error('Kana round never gave way to the dialogue');
+      this.answerKanaCorrectly();
+    }
+    return this.frames(GameRunner.INPUT_DEBOUNCE);
   }
 
   /** Wait until the kana round awaits a d-pad answer */
@@ -361,7 +376,8 @@ export class GameRunner {
 
   /** Complete all kana questions for a scene (correct on first try) */
   completeKanaQuestions(sceneIndex: number): this {
-    const questions = SCENES[sceneIndex]?.kanaQuestions ?? [];
+    const scene = SCENES[sceneIndex];
+    const questions = scene ? (sceneRounds(scene).at(-1)?.questions ?? []) : [];
     for (let i = 0; i < questions.length; i++) {
       this.answerKanaCorrectly();
     }
