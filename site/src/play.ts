@@ -23,7 +23,8 @@ const AUDIO_FRAMES = 4096;
 const AUDIO_LATENCY_SECONDS = 0.1;
 /** Gambatte-style color correction for the GBC screen */
 const CGB_COLOR_CURVE = 2;
-const ROM_URL = 'kananeko.gb';
+/** kananeko.gb with a version query, so a new ROM is never read from a stale cache (build-site.ts) */
+const ROM_URL = __ROM_URL__;
 const MUTED_KEY = 'kananeko:muted';
 
 const SETTERS: Record<Button, (m: BinjgbModule, e: number, down: boolean) => void> = {

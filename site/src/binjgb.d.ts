@@ -29,5 +29,8 @@ interface BinjgbModule {
   _set_joyp_select(e: number, down: boolean): void;
 }
 
+/** Set at build time (scripts/build-site.ts) */
+declare const __ROM_URL__: string;
+
 /** Defined by vendor/binjgb.js */
 declare function Binjgb(): Promise<BinjgbModule>;

@@ -141,7 +141,11 @@ test('a quick second tap does not zoom the page', async ({ page, isMobile }) => 
     const w = window as unknown as { taps: boolean[]; times: number[] };
     return { taps: w.taps, times: w.times };
   });
-  expect(taps, `touchend times: ${times.join(', ')}`).toEqual([false, true, false]);
+  // A tap is cancelled exactly when it follows the previous one within 350 ms (on a busy
+  // machine the "quick" pair can come slower; the rule must hold either way)
+  const quick = times.map((t, i) => i > 0 && t - (times[i - 1] ?? -Infinity) < 350);
+  expect(taps, `touchend times: ${times.join(', ')}`).toEqual(quick);
+  expect(quick.slice(1, 2), 'the first two taps came quickly').toEqual([true]);
   expect(await page.evaluate(() => window.visualViewport?.scale ?? 1)).toBe(1);
 });
 
