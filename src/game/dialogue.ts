@@ -68,6 +68,7 @@ import { DialogueState, END_OF_CONVERSATION, MAX_LIVES } from './state';
 import { SCREEN_COLS, type TilePosition, tilePos, tilemapAddr } from './tilemap';
 import { OAM_X_OFFSET, OAM_Y_OFFSET, SPRITE_SLOT, SPRITE_TILES, oamField } from './sprites';
 import { vramPut } from './video';
+import { catFace } from './cat';
 
 // Re-export data types and encoder from dialogue-data.ts
 export { buildDialogueTree, defineDialogueTree } from './dialogue-data';
@@ -527,6 +528,7 @@ export function buildDialogueEngine(): Op[] {
     jr(ref('dlg_score_done')),
 
     label('dlg_good_choice'),
+    ...catFace('cat_react', 'happy'),
     // Good: +10 score, +1 life (capped at MAX_LIVES)
     ...buildAddScore(10),
     ...buildSetDelta(DELTA_PLUS_10),
@@ -538,6 +540,7 @@ export function buildDialogueEngine(): Op[] {
     jr(ref('dlg_score_done')),
 
     label('dlg_bad_choice'),
+    ...catFace('cat_react', 'sad'),
     // Bad: -5 score, -1 life (floor at 0)
     ...buildSubScore(5),
     ...buildSetDelta(DELTA_MINUS_5),

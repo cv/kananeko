@@ -77,6 +77,7 @@ import {
 import { KanaMode, KanaState, MAX_LIVES } from './state';
 import { type TilePosition, tilePos, tilemapAddr } from './tilemap';
 import { clearScreen, fadeInCurrent, fadeOut, screenOff, vramPut, writeCenteredRow } from './video';
+import { CAT_SPOTS, catFace, placeCat } from './cat';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -141,7 +142,7 @@ const WORD_INNER_COL = WORD_BOX.left + 1;
 export const MAX_KANA_WORD_LENGTH = WORD_BOX.innerWidth;
 
 const DPAD_ROW = 12;
-const DPAD_COL = 10;
+const DPAD_COL = 13; // right of the cat
 // Ordered by direction index: 0=UP, 1=DOWN, 2=LEFT, 3=RIGHT
 const OPTION_POSITIONS = [
   tilePos(DPAD_ROW - 2, DPAD_COL),
@@ -162,7 +163,7 @@ export const KANA_LAYOUT = {
   promptRow: PROMPT_ROW,
   word: { row: WORD_ROW, col: WORD_INNER_COL, width: WORD_BOX.innerWidth },
   options: OPTION_POSITIONS,
-  cat: DPAD_CENTER,
+  center: DPAD_CENTER,
 } as const;
 
 /** Messages shown on the prompt row, all padded to the same width */
@@ -216,19 +217,9 @@ const ANSWER_LAYOUTS = [
 
 // Tile constants
 const BLANK_TILE: TileIndex = requireTile(CAT_TILES.BLANK);
-const CAT_FACES = {
-  neutral: requireTile(CAT_TILES.FACE_NEUTRAL),
-  happy: requireTile(CAT_TILES.FACE_HAPPY),
-  sad: requireTile(CAT_TILES.FACE_SAD),
-} as const;
-
-/** Change the cat's face in the middle of the d-pad (LCD on) */
-function showFace(face: keyof typeof CAT_FACES): Op[] {
-  return [
-    ld_rr_nn('hl', u16(tilemapAddr(DPAD_CENTER))),
-    ld_r_n('a', u8(CAT_FACES[face])),
-    ...vramPut(),
-  ];
+/** The cat beside the answers cheers or sulks for a moment, or settles back to neutral */
+function showFace(face: 'neutral' | 'happy' | 'sad'): Op[] {
+  return face === 'neutral' ? catFace('cat_rest', 'neutral') : catFace('cat_react', face);
 }
 const ARROW_TILES = requireTiles(UI_TILES.ARROWS);
 
@@ -271,7 +262,7 @@ function buildRoundFrame(): Op[] {
     ...tileAt(tilePos(top + 1, right), requireTile('▕')),
     ...horizontal(top + 2, '└', '▁', '┘'),
     ...ARROW_POSITIONS.flatMap((pos, dir) => tileAt(pos, at(ARROW_TILES, dir))),
-    ...tileAt(DPAD_CENTER, CAT_FACES.neutral),
+    ...tileAt(DPAD_CENTER, requireTile(UI_TILES.PAW)),
   ];
 }
 
@@ -368,6 +359,7 @@ export function buildKanaEngine(): Op[] {
     jr_cc('nz', ref('kana_lives_ok')),
     ...storeByte(MEM.KANA_LIVES, 1),
     label('kana_lives_ok'),
+    ...catFace('cat_rest', 'neutral'),
 
     jp(ref('kana_load_question')),
 
@@ -459,6 +451,7 @@ export function buildKanaEngine(): Op[] {
     }),
 
     ...fadeInCurrent(),
+    ...placeCat(CAT_SPOTS.quiz),
 
     // Reset attempts and wait for input
     ...zeroBytes(MEM.KANA_ATTEMPTS),

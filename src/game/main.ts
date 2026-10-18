@@ -52,12 +52,21 @@ import {
 } from '../asm/ops';
 import { type Op, type U16, ref, u8, u16 } from '../asm/types';
 import { buildCopyRows, drawBackdrop, loadSceneTiles } from './backdrop';
-import { buildSpriteData, buildSpriteInit, runDma } from './sprites';
+import { buildSpriteData, buildSpriteInit, buildSpriteRoutines, runDma } from './sprites';
+import {
+  CAT_SPOTS,
+  type CatFace,
+  buildCatData,
+  buildCatInit,
+  buildCatRoutines,
+  catFace,
+  placeCat,
+} from './cat';
 import { buildNpcRoutines, loadCast } from './npc';
 import { buildAnimRoutines, loadAnimation } from './anim';
 import { DIALOGUE_LAYOUT, buildDialogueEngine } from './dialogue';
 import { buildTileData, requireTile, requireTiles, textToTiles } from './font';
-import { CAT_TILES, UI_TILES } from './font-data';
+import { UI_TILES } from './font-data';
 import { buildReadJoypad } from './joypad';
 import { buildKanaData, buildKanaEngine } from './kana';
 import {
@@ -71,7 +80,7 @@ import { centerStartCol, tilemapAddr } from './tilemap';
 import { type PackedScene, type Scene, SCENES, SPEED_ROUND, buildSceneData } from './scene';
 import { BAD_PICK, END_OF_CONVERSATION, KanaMode, MAX_LIVES } from './state';
 import { REDEEM_KEY } from './rounds';
-import { type ColorScheme, buildPaletteSet, paletteOf } from './color';
+import { type ColorScheme, buildPaletteSet } from './color';
 import { ENDING_COLORS, GAME_OVER_COLORS, TITLE_COLORS } from './scenes/colors';
 import { BACKDROP } from './backdrop';
 import {
@@ -84,7 +93,6 @@ import {
   clearScreen,
   fadeIn,
   fadeOut,
-  fillAttributes,
   screenOff,
   writeCenteredRow,
 } from './video';
@@ -102,13 +110,6 @@ export const ROM_HEADER: ROMHeader = {
 const TITLE = 'カナネコ';
 const SUBTITLE = 'ねこと にほんごの たび';
 
-// Cat portrait tile rows (4x3 grid)
-const CAT_ROWS = [
-  requireTiles(CAT_TILES.ROW0),
-  requireTiles(CAT_TILES.ROW1),
-  requireTiles(CAT_TILES.ROW2),
-] as const;
-const CAT_SAD_ROWS = CAT_TILES.SAD_ROWS.map((row) => row.map((ch) => requireTile(ch)));
 const START_BOX_TOP = textToTiles('┌────────────┐');
 const START_BOX_ON = textToTiles('│ スタートを おしてね ▕');
 const START_BOX_OFF = textToTiles('│            ▕');
@@ -216,6 +217,7 @@ function engineLoop(name: string, update: string, stateAddr: U16): Op[] {
     ...waitFrame(),
     ...runDma(),
     call(ref('hud_update')), // refresh HUD early in VBlank window
+    call(ref('cat_tick')),
     call(ref('joy_read')),
     call(ref(update)),
     ld_a_nn(stateAddr),
@@ -323,36 +325,25 @@ function buildRoundRoutines(): Op[] {
 interface ResultScreen {
   /** Label the game jumps to; also the prefix for internal labels */
   readonly name: string;
-  readonly cat: readonly (readonly number[])[];
+  /** The cat's face here (a neutral cat blinks) */
+  readonly face: CatFace;
   readonly title: string;
   readonly colors: ColorScheme;
-  /** Whether the (happy) portrait blinks */
-  readonly blink: boolean;
 }
 
 const ENDING: ResultScreen = {
   name: 'game_complete',
-  cat: CAT_ROWS,
+  face: 'happy',
   title: ENDING_TITLE,
   colors: ENDING_COLORS,
-  blink: true,
 };
 
 const GAME_OVER: ResultScreen = {
   name: 'game_over',
-  cat: CAT_SAD_ROWS,
+  face: 'sad',
   title: 'ゲームオーバー',
   colors: GAME_OVER_COLORS,
-  blink: false, // the sad portrait keeps its own eyes
 };
-
-/** On GBC, give the portrait (rows 2-4, centered) the scheme's 'cat' palette */
-function catPortraitColors(name: string, colors: ColorScheme): Op[] {
-  return cgbAttributes(
-    name,
-    fillAttributes(ENDING_ROWS.cat, centerStartCol(4), 3, 4, paletteOf(colors, 'cat')),
-  );
-}
 
 /** Width of the stamp row: each scene icon is 2 tiles, one blank tile apart */
 const STAMP_ROW_WIDTH = SCENES.length * 3 - 1;
@@ -386,7 +377,6 @@ function buildResultScreen(screen: ResultScreen): Op[] {
     ...zeroBytes(MEM.TITLE_TIMER), // prompt starts visible
 
     call(ref('kana_draw_hud')),
-    ...screen.cat.flatMap((tiles, i) => writeCenteredRow(ENDING_ROWS.cat + i, tiles)),
     ...writeCenteredRow(ENDING_ROWS.title, textToTiles(screen.title)),
     ...drawClearedStamps(name, ENDING_ROWS.stamps),
     ld_rr_nn('hl', u16(tilemapAddr(ENDING_ROWS.score, scoreCol))),
@@ -394,14 +384,16 @@ function buildResultScreen(screen: ResultScreen): Op[] {
     call(ref('score_digits')),
     ...buildDrawScoreDigits(ENDING_ROWS.score, scoreCol + labelTiles.length),
     call(ref('draw_start_box')),
-    ...catPortraitColors(`${name}_cat`, screen.colors),
     ...fadeIn(resultFadeLabel(screen)),
+    ...catFace('cat_rest', screen.face),
+    ...placeCat(CAT_SPOTS.portrait),
 
     label(`${name}_loop`),
     ...waitFrame(),
+    ...runDma(),
     call(ref('joy_read')),
     call(ref('title_blink')),
-    ...(screen.blink ? [call(ref('cat_blink'))] : []),
+    call(ref('cat_tick')),
     ld_a_nn(MEM.JOYPAD_NEW),
     and_n(u8(JOY.START)),
     jr_cc('z', ref(`${name}_loop`)),
@@ -410,44 +402,6 @@ function buildResultScreen(screen: ResultScreen): Op[] {
     ...fadeOut(),
     ...screenOff(`${name}_to_title`),
     jp(ref('title_screen')),
-  ];
-}
-
-/** Frames between blinks (a power of two) and how long the eyes stay shut */
-const BLINK_PERIOD = 128;
-const BLINK_FRAMES = 8;
-const BLINK_START = BLINK_PERIOD - 2 * BLINK_FRAMES;
-const CAT_EYES_ROW = 3; // portrait row 1 on the title and ending screens
-
-/** When the title cat blinks, for tests and tools */
-export const CAT_BLINK_TIMING = {
-  period: BLINK_PERIOD,
-  start: BLINK_START,
-  frames: BLINK_FRAMES,
-  eyesRow: CAT_EYES_ROW,
-} as const;
-
-/** Subroutine: shut and reopen the portrait's eyes, timed by TITLE_TIMER (LCD on). */
-function buildCatBlink(): Op[] {
-  const eyes = (chars: readonly string[]): Op[] =>
-    writeCenteredRow(
-      CAT_EYES_ROW,
-      chars.map((ch) => requireTile(ch)),
-      { lcdOn: true },
-    );
-  return [
-    label('cat_blink'),
-    ld_a_nn(MEM.TITLE_TIMER),
-    and_n(u8(BLINK_PERIOD - 1)),
-    cp_n(u8(BLINK_START)),
-    jr_cc('z', ref('cat_blink_shut')),
-    cp_n(u8(BLINK_START + BLINK_FRAMES)),
-    ret_cc('nz'),
-    ...eyes(CAT_TILES.ROW1),
-    ret(),
-    label('cat_blink_shut'),
-    ...eyes(CAT_TILES.BLINK_EYES),
-    ret(),
   ];
 }
 
@@ -520,6 +474,7 @@ export function buildProgram(): Op[] {
     ),
 
     ...buildSpriteInit(),
+    ...buildCatInit(),
 
     // Enable the VBlank interrupt so HALT wakes once per frame (fades and game loops).
     // The handler at $0040 is a RETI placed by the assembler.
@@ -533,19 +488,19 @@ export function buildProgram(): Op[] {
     // Reset title animation state so the prompt always starts visible.
     ...zeroBytes(MEM.TITLE_TIMER),
 
-    // Score HUD on row 0, cat portrait, title card, and prompt frame
+    // Score HUD on row 0, title card, and prompt frame (the cat comes after the fade)
     call(ref('kana_draw_hud')),
-    ...CAT_ROWS.flatMap((tiles, i) => writeCenteredRow(2 + i, tiles)),
     ...writeCenteredRow(7, textToTiles(TITLE)),
     ...writeCenteredRow(10, textToTiles(SUBTITLE)),
     call(ref('draw_start_box')),
-    ...catPortraitColors('title_cat', TITLE_COLORS),
-
     ...fadeIn(TITLE_FADE),
+    ...catFace('cat_rest', 'neutral'),
+    ...placeCat(CAT_SPOTS.portrait),
 
     // Wait for all buttons to be released (debounce boot ROM START press)
     label('title_debounce'),
     ...waitFrame(),
+    ...runDma(),
     call(ref('joy_read')),
     ld_a_nn(MEM.JOYPAD_CUR),
     cp_n(u8(0)),
@@ -554,10 +509,11 @@ export function buildProgram(): Op[] {
     // Wait for START, blinking the prompt
     label('title_loop'),
     ...waitFrame(),
+    ...runDma(),
     call(ref('joy_read')),
 
     call(ref('title_blink')),
-    call(ref('cat_blink')),
+    call(ref('cat_tick')),
 
     ld_a_nn(MEM.JOYPAD_NEW),
     and_n(u8(JOY.START)),
@@ -693,11 +649,14 @@ export function buildProgram(): Op[] {
       packedScenes,
     ),
     call(ref('fade_in')),
+    ...catFace('cat_rest', 'neutral'),
+    ...placeCat(CAT_SPOTS.dialogue),
     ret(),
     ...buildRoundRoutines(),
     ...buildReadJoypad(),
     ...buildTitleBlink(),
-    ...buildCatBlink(),
+    ...buildCatRoutines(),
+    ...buildSpriteRoutines(),
     ...buildDrawStartBox(),
     ...buildDialogueEngine(),
     ...buildKanaEngine(),
@@ -714,6 +673,7 @@ export function buildProgram(): Op[] {
 
     // ==== Data ====
     ...buildSpriteData(),
+    ...buildCatData(),
     ...buildFadeData(),
     label('tileData'),
     db(tileData.slice(0, 2048)),

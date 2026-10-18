@@ -38,11 +38,11 @@ import { OAM_X_OFFSET, OAM_Y_OFFSET, SPRITE_SLOT, oamField } from './sprites';
 const NONE = 0xff;
 /** First sprite tile of the cast (tile 0 is the cursor) */
 export const NPC_TILE_BASE = 1;
-/** Up to 7 GBC OBJ palettes are free (0 is the cursor's) */
-export const MAX_CAST = 7;
+/** GBC OBJ palettes 1-6 are free (0 is the cursor's, 7 the cat's) */
+export const MAX_CAST = 6;
 
-/** Default stage: left of the name label, feet on the dialogue box's top edge */
-export const DEFAULT_STAGE = { x: 32, y: 56 } as const;
+/** Default stage: right of the cat, feet on the dialogue box's top edge */
+export const DEFAULT_STAGE = { x: 56, y: 56 } as const;
 /** NPC_TIMER bit that toggles the 1-pixel idle bob (upwards, off the box border) */
 const BOB_BIT = 0x10;
 

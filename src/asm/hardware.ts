@@ -135,6 +135,14 @@ export const MEM = {
   KANA_CLOCK_FRAMES: u16(0xc088), // speed round: frames left in the current second
   KANA_CLOCK_SECS: u16(0xc089), // speed round: seconds left to answer
 
+  // WRAM — the mascot sprite (see cat.ts)
+  CAT_X: u16(0xc08a), // OAM x of the cat's left column while placing it
+  CAT_COL: u16(0xc08b), // columns left in the row being placed
+  CAT_FACE: u16(0xc08c), // face showing (index into CAT_FACES)
+  CAT_REST: u16(0xc08d), // face it returns to after a reaction
+  CAT_TIMER: u16(0xc08e), // frames left in a reaction
+  CAT_BLINK: u16(0xc08f), // blink cycle counter
+
   // WRAM — scene system
   SCENE_ID: u16(0xc050), // Current scene index (0-4, 0xFF = title)
   SCENE_FLAGS: u16(0xc051), // Per-scene completion bitfield

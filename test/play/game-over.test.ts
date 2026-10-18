@@ -2,7 +2,6 @@
 
 import { describe, expect, it } from 'vitest';
 import { DialogueState, KanaState, MAX_LIVES } from '@game/state';
-import { CAT_TILES } from '@game/font-data';
 import { SCENES } from '@game/scene';
 import { SETTLE_FRAMES, checkpoint, runnerAt } from '../helpers/checkpoints';
 import { type GameRunner } from '../helpers/game-runner';
@@ -20,7 +19,8 @@ describe('Given the game over screen', () => {
     );
     expect(row(runner, 6)).toBe('ゲームオーバー');
     expect(row(runner, 10)).toBe(`とくてん ${String(runner.kanaScore).padStart(5, '0')}`);
-    expect(readText(runner, 3, 8, 4)).toBe(CAT_TILES.SAD_ROWS[1].join(''));
+    expect(runner.catVisible).toBe(true);
+    expect(runner.catFace).toBe('sad');
     const stamps = SCENES.map((scene) => scene.icon.join(''));
     expect(row(runner, 8)).toBe(asSeenOnScreen(stamps.slice(0, 3).join(' ')));
   });

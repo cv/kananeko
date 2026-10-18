@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { artChar, artVariant, mirrorHalf, sliceArt } from '@game/art';
-import { CAT_PORTRAIT, CAT_PORTRAIT_CHARS, CAT_SAD_CHARS } from '@game/glyphs-icons';
+import { CAT_FACES, catArt } from '@game/cat-art';
 
 const block = (fill: string): string[] => Array<string>(8).fill(fill.repeat(8));
 
@@ -51,9 +51,12 @@ describe('artVariant', () => {
     );
   });
 
-  it('gives the sad cat new tiles only for its eyes and mouth', () => {
-    const changed = CAT_SAD_CHARS.filter((ch, i) => ch !== CAT_PORTRAIT_CHARS[i]);
-    expect(CAT_PORTRAIT).toHaveLength(24);
-    expect(changed).toHaveLength(6);
+  it.each(CAT_FACES)('changes only the middle row of tiles for the %s cat', (face) => {
+    const neutral = sliceArt(catArt('neutral'));
+    const tiles = sliceArt(catArt(face));
+    expect(tiles).toHaveLength(12);
+    tiles.forEach((tile, i) => {
+      if (i < 4 || i >= 8) expect(tile).toEqual(neutral[i]);
+    });
   });
 });

@@ -2,11 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { JOY, MEM } from '@asm/hardware';
-import { CAT_TILES } from '@game/font-data';
-import { CAT_BLINK_TIMING } from '@game/main';
 import { DialogueState } from '@game/state';
-import { centerStartCol } from '@game/tilemap';
-import { asSeenOnScreen, readText } from '../helpers/screen';
 import { GameRunner } from '../helpers/game-runner';
 import { checkpoint, runnerAt } from '../helpers/checkpoints';
 
@@ -42,20 +38,12 @@ describe('Given the ROM boots in the emulator', () => {
 });
 
 describe('Given the title screen is idle', () => {
-  const eyes = (runner: GameRunner): string =>
-    readText(runner, CAT_BLINK_TIMING.eyesRow, centerStartCol(4), 4);
-  const waitForTimer = (runner: GameRunner, phase: number): GameRunner =>
-    runner.waitUntil(
-      () => (runner.readMem(MEM.TITLE_TIMER) & (CAT_BLINK_TIMING.period - 1)) === phase,
-      `title timer phase ${String(phase)}`,
-    );
-
-  it('makes the cat blink and open its eyes again', () => {
+  it('shows the cat, which blinks and opens its eyes again', () => {
     const runner = new GameRunner().boot();
-    waitForTimer(runner, CAT_BLINK_TIMING.start + 1).frames(3);
-    expect(eyes(runner)).toBe(asSeenOnScreen(CAT_TILES.BLINK_EYES.join('')));
-    waitForTimer(runner, CAT_BLINK_TIMING.start + CAT_BLINK_TIMING.frames + 1).frames(3);
-    expect(eyes(runner)).toBe(asSeenOnScreen(CAT_TILES.ROW1.join('')));
+    expect(runner.catVisible).toBe(true);
+    expect(runner.catFace).toBe('neutral');
+    runner.waitUntil(() => runner.catFace === 'blink', 'the cat to blink');
+    runner.waitUntil(() => runner.catFace === 'neutral', 'the cat to open its eyes');
   });
 });
 

@@ -11,6 +11,7 @@ import {
   dec_r,
   inc_rr,
   jr_cc,
+  jp,
   label,
   ld_a_de,
   ld_r_n,
@@ -33,7 +34,7 @@ const DMA_HRAM = u16(0xff80);
 export const OAM_Y_OFFSET = 16;
 export const OAM_X_OFFSET = 8;
 
-export const SPRITE_SLOT = { cursor: 0, npc: 1 } as const;
+export const SPRITE_SLOT = { cursor: 0, npc: 1, cat: 5 } as const;
 
 /** Sprite tile indices (in the sprite-only $8000-$87FF block) */
 export const SPRITE_TILES = { cursor: 0 } as const;
@@ -100,6 +101,11 @@ export function buildSpriteData(): Op[] {
 }
 
 const SPRITE_TILE_BYTES = SPRITE_GLYPHS.length * 16;
+
+/** Subroutine sprites_off: take every sprite off screen (before a fade or screen change) */
+export function buildSpriteRoutines(): Op[] {
+  return [label('sprites_off'), ...zeroPages('sprites_off_clear', SHADOW_OAM, 1), jp(DMA_HRAM)];
+}
 
 /** Copy the shadow OAM to OAM. Call right after HALT (VBlank). */
 export function runDma(): Op[] {

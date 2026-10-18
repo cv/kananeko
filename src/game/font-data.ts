@@ -9,7 +9,7 @@
  *   glyphs-latin.ts    — A-Z, 0-9, punctuation, box borders
  *   glyphs-hiragana.ts — あ-ん (Misaki Gothic)
  *   glyphs-katakana.ts — ア-ン (Misaki Gothic)
- *   glyphs-icons.ts    — Cat portrait, scene icons, UI tiles
+ *   glyphs-icons.ts    — HUD marks, scene icons, UI tiles (the cat is a sprite: cat-art.ts)
  */
 
 export type Glyph = [string, string, string, string, string, string, string, string];
@@ -17,7 +17,7 @@ export type Glyph = [string, string, string, string, string, string, string, str
 import { LATIN_UPPER, DIGITS_PUNCT, BORDER } from './glyphs-latin';
 import { HIRAGANA } from './glyphs-hiragana';
 import { KATAKANA } from './glyphs-katakana';
-import { CAT, CAT_BLINK_CHARS, CAT_SAD_CHARS, SCENE_ICONS, UI_ICONS } from './glyphs-icons';
+import { MARKS, SCENE_ICONS, UI_ICONS } from './glyphs-icons';
 
 /**
  * Latin letters the game prints: none, all labels are Japanese. Every letter is
@@ -36,26 +36,13 @@ export const ALL_GLYPHS: Record<string, Glyph> = {
   ...HIRAGANA,
   ...KATAKANA,
   ...BORDER,
-  ...CAT,
+  ...MARKS,
   ...SCENE_ICONS,
   ...UI_ICONS,
 };
 
-// Cat tile indices for easy reference
+// HUD and quiz marks
 export const CAT_TILES = {
-  // 4x3 portrait grid (row-major: [row0: 4 tiles] [row1: 4 tiles] [row2: 4 tiles])
-  ROW0: ['\uE000', '\uE001', '\uE002', '\uE003'] as const,
-  ROW1: ['\uE004', '\uE005', '\uE006', '\uE007'] as const,
-  ROW2: ['\uE008', '\uE009', '\uE00A', '\uE00B'] as const,
-  /** Sad portrait, same 4x3 layout (reuses unchanged tiles) */
-  SAD_ROWS: [CAT_SAD_CHARS.slice(0, 4), CAT_SAD_CHARS.slice(4, 8), CAT_SAD_CHARS.slice(8, 12)],
-  /** Eye row (portrait row 1) with the eyes shut */
-  BLINK_EYES: CAT_BLINK_CHARS.slice(4, 8),
-  /** Small faces for the kana round */
-  FACE_NEUTRAL: '\uE010',
-  FACE_HAPPY: '\uE052',
-  FACE_SAD: '\uE053',
-  ICON: '\uE010',
   BLANK: '\uE011',
   HEART_FULL: '\uE012',
   HEART_EMPTY: '\uE013',

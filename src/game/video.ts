@@ -363,6 +363,7 @@ export function buildFadeRoutines(): Op[] {
     ldh_a_n(HW.LCDC),
     and_n(u8(LCDC.LCD_ON)),
     ret_cc('z'),
+    call(ref('sprites_off')), // sprites don't fade: take them off first
     ...loadPointer('hl', MEM.FADE_TABLE_LO, MEM.FADE_TABLE_HI),
     ld_r_n('b', u8(0)),
     label('fade_out_step'),

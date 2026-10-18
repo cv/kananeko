@@ -7,6 +7,8 @@
 
 import Gameboy from 'serverboy';
 import { MEM } from '@asm/hardware';
+import { CAT_FACES, type CatFace, faceTile } from '@game/cat';
+import { SPRITE_SLOT, oamField } from '@game/sprites';
 import { buildRom } from '@game/main';
 import { SCENES, sceneRounds } from '@game/scene';
 import { DialogueState, END_OF_CONVERSATION, KanaMode, KanaState } from '@game/state';
@@ -218,6 +220,17 @@ export class GameRunner {
    * correctly (default) or not, for tests that want lives to stay lost.
    */
   missRedemptions = false;
+
+  /** The cat's face, from the tile of the first sprite of its middle row */
+  get catFace(): CatFace | undefined {
+    const tile = this.readMem(oamField(SPRITE_SLOT.cat + 4, 'tile'));
+    return CAT_FACES.find((face) => faceTile(face) === tile);
+  }
+
+  /** Whether the cat is on screen (its first sprite has a y position) */
+  get catVisible(): boolean {
+    return this.readMem(oamField(SPRITE_SLOT.cat, 'y')) !== 0;
+  }
 
   get kanaStreak(): number {
     return this.readMem(MEM.KANA_STREAK);
