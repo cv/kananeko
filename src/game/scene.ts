@@ -10,7 +10,7 @@ import { type KanaQuestion, buildKanaData, defineKanaQuestion } from './kana';
 import { textToTiles } from './font';
 import { SCENE_ICON_TILES } from './font-data';
 import { type Pair, type Quint } from './fixed';
-import { type ColorScheme, buildPaletteSet, paletteOfCell } from './color';
+import { type ColorScheme, attributeOfCell, buildPaletteSet } from './color';
 import { type PackedCast, packCast } from './npc';
 import { packAnimation } from './anim';
 import {
@@ -202,7 +202,7 @@ export function packScene(scene: Scene): PackedScene {
     paletteSet: buildPaletteSet(scene.colors),
     backdropAttributes: encodeAttributeRuns(
       scene.backdrop.flatMap((row) =>
-        Array.from(row).map((cell) => paletteOfCell(scene.colors, cell)),
+        Array.from(row).map((cell) => attributeOfCell(scene.colors, cell)),
       ),
     ),
   };

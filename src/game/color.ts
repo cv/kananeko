@@ -20,7 +20,12 @@ export interface ColorScheme {
   readonly ramps: { readonly ui: Ramp } & Readonly<Record<string, Ramp>>;
   /** Backdrop map character → ramp name (cells not listed use 'ui') */
   readonly cells?: Readonly<Record<string, string>>;
+  /** Backdrop map characters drawn in front of sprites (e.g. a counter people stand behind) */
+  readonly front?: string;
 }
+
+/** CGB attribute bit 7: this tile's colors 1-3 draw over sprites */
+const BG_PRIORITY = 0x80;
 
 /** Ramp shared by every screen for the HUD hearts */
 export const HEARTS: Ramp = [rgb(0xf8, 0xb8, 0xc0), rgb(0xe0, 0x48, 0x58), rgb(0x70, 0x18, 0x20)];
@@ -42,6 +47,11 @@ export function paletteOf(scheme: ColorScheme, ramp: string): number {
 /** Palette number for a backdrop map character */
 export function paletteOfCell(scheme: ColorScheme, cell: string): number {
   return paletteOf(scheme, scheme.cells?.[cell] ?? 'ui');
+}
+
+/** CGB attribute byte for a backdrop map character: palette, plus priority for front cells */
+export function attributeOfCell(scheme: ColorScheme, cell: string): number {
+  return paletteOfCell(scheme, cell) | ((scheme.front ?? '').includes(cell) ? BG_PRIORITY : 0);
 }
 
 /** Encode a scheme as [palette count, then 4 RGB555 colors (little-endian) per palette]. */

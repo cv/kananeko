@@ -20,6 +20,11 @@ const HAIR = {
 
 export interface SceneCast {
   readonly npcs: readonly NpcLook[];
+  /**
+   * Where the speaker stands (screen pixels, top-left of the 16x16 sprite).
+   * Backdrop cells listed in the scene's ColorScheme.front draw over them.
+   */
+  readonly stage?: { readonly x: number; readonly y: number };
   /** Ascending by node: from `from` on, show npcs[npc] (or nobody) */
   readonly segments: readonly { readonly from: number; readonly npc: number | null }[];
 }
@@ -32,6 +37,7 @@ const FRIEND: NpcLook = {
 };
 
 export const STATION_CAST: SceneCast = {
+  stage: { x: 72, y: 56 }, // on the platform, between the trains
   npcs: [
     { hair: 'cap', outfit: 'uniform', colors: [SKIN.light, rgb(0x38, 0x48, 0x80), HAIR.black] }, // ticket clerk
     { hair: 'long', outfit: 'dress', colors: [SKIN.light, rgb(0xe0, 0x70, 0x90), HAIR.brown] }, // みき
@@ -81,6 +87,7 @@ export const STREET_CAST: SceneCast = {
 };
 
 export const RESTAURANT_CAST: SceneCast = {
+  stage: { x: 72, y: 44 }, // in the kitchen doorway, behind the counter (GBC)
   npcs: [
     { hair: 'short', outfit: 'apron', colors: [SKIN.light, rgb(0x30, 0x30, 0x38), HAIR.black] }, // waiter
     { hair: 'bob', outfit: 'plain', colors: [SKIN.medium, rgb(0x60, 0xa8, 0x70), HAIR.brown] }, // customer

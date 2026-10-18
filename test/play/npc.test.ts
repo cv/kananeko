@@ -2,6 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { NPC_TILE_BASE } from '@game/npc';
+import { STATION_CAST } from '@game/scenes/npcs';
 import { checkpoint, runnerAt } from '../helpers/checkpoints';
 import { type GameRunner } from '../helpers/game-runner';
 
@@ -39,6 +40,11 @@ describe('Given the player meets people at the station', () => {
     const ys = new Set<number>();
     for (let f = 0; f < 40; f++) ys.add(runner.frames(1).readMem(OAM + NPC_SLOTS[0]! * 4));
     expect(ys.size).toBe(2);
+  });
+
+  it('stands them on the platform between the trains', () => {
+    const runner = runnerAt(checkpoint.sceneStart(0)).frames(4);
+    expect(runner.readMem(OAM + NPC_SLOTS[0]! * 4 + 1)).toBe(STATION_CAST.stage!.x + 8);
   });
 
   it('clears the stage for the kana round', () => {

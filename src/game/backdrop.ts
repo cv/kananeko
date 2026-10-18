@@ -50,6 +50,7 @@ export const BACKDROP_LEGEND: Readonly<Record<string, string>> = {
   '|': '\uE04E', // wallpaper
   F: '\uE04F', // wooden floor
   k: '\uE054', // tiled floor
+  K: '\uE055', // kitchen wall tiles
   r: '\uE050', // road
   N: '\uE051', // noren curtain
   T: SCENE_ICON_TILES.TRAIN[0],

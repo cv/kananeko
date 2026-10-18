@@ -204,6 +204,17 @@ export const BACKDROP_GLYPHS: Record<string, Glyph> = {
     '........',
     '........',
   ],
+  // kitchen wall: small square tiles
+  '\uE055': [
+    '-------+',
+    '-------+',
+    '-------+',
+    '++++++++',
+    '---+----',
+    '---+----',
+    '---+----',
+    '++++++++',
+  ],
   // tiled floor: large checkerboard (shop vinyl)
   '\uE054': [
     '----....',

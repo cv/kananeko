@@ -15,7 +15,14 @@ import { type DialogueNode, buildDialogueTree } from '@game/dialogue';
 import { packScene, SCENES } from '@game/scene';
 import { centerStartCol, tilemapAddr, tilePos } from '@game/tilemap';
 import { bgTileAddr, encodeAttributeRuns, rgb } from '@game/video';
-import { HEARTS, PAL, buildPaletteSet, paletteOf, paletteOfCell } from '@game/color';
+import {
+  HEARTS,
+  PAL,
+  attributeOfCell,
+  buildPaletteSet,
+  paletteOf,
+  paletteOfCell,
+} from '@game/color';
 import { MAX_CAST, packCast } from '@game/npc';
 import { packAnimation } from '@game/anim';
 import { ENDING_COLORS, GAME_OVER_COLORS, TITLE_COLORS } from '@game/scenes/colors';
@@ -198,6 +205,12 @@ describe('buildPaletteSet', () => {
     expect(color(PAL.ui, 3)).toBe(scheme.ramps.ui[2]);
     expect(color(PAL.hearts, 2)).toBe(HEARTS[1]);
     for (let p = 0; p < count; p++) expect(color(p, 0)).toBe(scheme.paper);
+  });
+
+  it('puts front cells (like the restaurant counter) over sprites', () => {
+    const restaurant = SCENES[2].colors;
+    expect(attributeOfCell(restaurant, 'n')).toBe(paletteOf(restaurant, 'wood') | 0x80);
+    expect(attributeOfCell(restaurant, 'F')).toBe(paletteOf(restaurant, 'wood'));
   });
 
   it('maps backdrop cells to their ramp, defaulting to ui', () => {

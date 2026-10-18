@@ -4,6 +4,7 @@
  *   ' ' paper   . sky    ( ) cloud   o sun/moon   ^ rooftop   B building
  *   = rails     _ ground edge   # ground   g grass   f fence   r road
  *   | wallpaper L lantern   N noren   n counter   E shelf   F wood floor   k tile floor
+ *   K kitchen wall
  *   Tt train    Hh house    Ww bowl   Ss shop   Yy tree
  */
 
@@ -31,13 +32,14 @@ export const STREET_BACKDROP: Backdrop = [
   '____________________',
 ];
 
+/** A ramen counter: staff stand in the kitchen doorway, behind the counter */
 export const RESTAURANT_BACKDROP: Backdrop = [
-  '||||||||||||||||||||',
-  '||L||||L||||L||||L||',
-  '||||NNNNNNNNNNNN||||',
-  '||||||||||||||||||||',
-  '                    ',
-  '  WwWw  WwWw  WwWw  ',
+  '||||L||||||||||L||||',
+  '||||||NNNNNNNN||||||',
+  '||||||KKKKKKKK||||||',
+  '||||||KKKKKKKK||||||',
+  '||||||KKKKKKKK||||||',
+  '  WwWw        WwWw  ',
   'nnnnnnnnnnnnnnnnnnnn',
   'FFFFFFFFFFFFFFFFFFFF',
 ];

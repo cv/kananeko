@@ -138,6 +138,8 @@ export const MEM = {
   ANIM_HI: u16(0xc066), // Current scene's tile animation (hi)
   ANIM_TIMER: u16(0xc067), // Frame counter for the tile animation
   ANIM_FRAME: u16(0xc068), // Animation frame on screen
+  NPC_X: u16(0xc069), // Speaker's OAM x (left half)
+  NPC_Y: u16(0xc06a), // Speaker's OAM y (top half, before the bob)
 } as const satisfies Record<string, U16>;
 
 // Joypad bit flags (active-high after our read routine)

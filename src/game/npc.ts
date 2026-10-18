@@ -41,10 +41,8 @@ export const NPC_TILE_BASE = 1;
 /** Up to 7 GBC OBJ palettes are free (0 is the cursor's) */
 export const MAX_CAST = 7;
 
-/** Where the speaker stands: left of the name label, feet on the dialogue box's top edge */
-export const NPC_POSITION = { x: 32, y: 56 } as const;
-const OAM_X = NPC_POSITION.x + OAM_X_OFFSET;
-const OAM_Y = NPC_POSITION.y + OAM_Y_OFFSET;
+/** Default stage: left of the name label, feet on the dialogue box's top edge */
+export const DEFAULT_STAGE = { x: 32, y: 56 } as const;
 /** NPC_TIMER bit that toggles the 1-pixel idle bob (upwards, off the box border) */
 const BOB_BIT = 0x10;
 
@@ -58,6 +56,8 @@ export interface PackedCast {
   readonly palettes: Uint8Array;
   /** [from node, npc index or $FF] pairs, ended by $FF */
   readonly table: Uint8Array;
+  /** OAM x/y of the speaker's top-left sprite */
+  readonly stage: { readonly x: number; readonly y: number };
 }
 
 export function packCast(cast: SceneCast): PackedCast {
@@ -77,10 +77,12 @@ export function packCast(cast: SceneCast): PackedCast {
     previous = from;
     return [from, npc ?? NONE];
   });
+  const { x, y } = cast.stage ?? DEFAULT_STAGE;
   return {
     tiles: Uint8Array.from(tiles),
     palettes: Uint8Array.from(palettes),
     table: Uint8Array.from([...table, NONE]),
+    stage: { x: x + OAM_X_OFFSET, y: y + OAM_Y_OFFSET },
   };
 }
 
@@ -104,6 +106,8 @@ export function loadCast(
     ld_rr_nn('hl', ref(labels.table)),
     ...storePointer('hl', MEM.NPC_TABLE_LO, MEM.NPC_TABLE_HI),
     ...storeByte(MEM.NPC_CURRENT, NONE),
+    ...storeByte(MEM.NPC_X, cast.stage.x),
+    ...storeByte(MEM.NPC_Y, cast.stage.y),
   ];
 }
 
@@ -160,8 +164,13 @@ export function buildNpcRoutines(): Op[] {
       ld_nn_a(field(i, 'tile')),
       ld_r_r('a', 'e'),
       ld_nn_a(field(i, 'attr')),
-      ...storeByte(field(i, 'x'), OAM_X + (i % 2) * 8),
     ]),
+    ld_a_nn(MEM.NPC_X),
+    ld_nn_a(field(0, 'x')),
+    ld_nn_a(field(2, 'x')),
+    add_n(u8(8)),
+    ld_nn_a(field(1, 'x')),
+    ld_nn_a(field(3, 'x')),
     ...zeroBytes(MEM.NPC_TIMER),
     // fall through to place it
 
@@ -173,7 +182,7 @@ export function buildNpcRoutines(): Op[] {
     inc_r('a'),
     ld_nn_a(MEM.NPC_TIMER),
     and_n(u8(BOB_BIT)),
-    ld_r_n('a', u8(OAM_Y)),
+    ld_a_nn(MEM.NPC_Y), // LD leaves the flags from AND
     jr_cc('z', ref('npc_bob_set')),
     dec_r('a'),
     label('npc_bob_set'),

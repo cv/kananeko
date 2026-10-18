@@ -69,8 +69,19 @@ export const RESTAURANT_COLORS: ColorScheme = {
     noren: [rgb(0xb0, 0xb8, 0xd8), rgb(0x40, 0x48, 0x88), rgb(0x18, 0x18, 0x38)],
     bowl: [rgb(0xe8, 0xd0, 0xa8), rgb(0xc0, 0x40, 0x30), rgb(0x40, 0x18, 0x10)],
     wood: WOOD,
+    kitchen: [rgb(0xd8, 0xe0, 0xe0), rgb(0xa8, 0xb8, 0xb8), rgb(0x50, 0x60, 0x60)],
   },
-  cells: { '|': 'wall', L: 'lantern', N: 'noren', W: 'bowl', w: 'bowl', n: 'wood', F: 'wood' },
+  cells: {
+    '|': 'wall',
+    L: 'lantern',
+    N: 'noren',
+    K: 'kitchen',
+    W: 'bowl',
+    w: 'bowl',
+    n: 'wood',
+    F: 'wood',
+  },
+  front: 'n', // staff stand behind the counter
 };
 
 export const CONBINI_COLORS: ColorScheme = {
