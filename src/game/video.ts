@@ -41,7 +41,7 @@ import { type Quad } from './fixed';
 import { SCREEN_COLS, centerStartCol, tilemapAddr, tileRow } from './tilemap';
 
 /** Palette numbers every screen shares (see color.ts) */
-export const PAL = { ui: 0, hearts: 1 } as const;
+export const PAL = { ui: 0, hud: 1 } as const;
 
 /** LCDC value used whenever the game turns the screen on. */
 /**
@@ -156,11 +156,12 @@ export function fillAttributes(
 }
 
 /** Hearts on the HUD row (cols 1-3) */
-const HEART_CELLS = { row: 0, col: 1, count: 3 } as const;
+/** The HUD sits on a ribbon across the top row */
+const HUD_ROW = 0;
 
 /**
  * Subroutine clear_screen: blank the BG tilemap and, on GBC, reset every cell to
- * palette 0 except the HUD hearts. LCD must be off.
+ * palette 0 except the HUD ribbon (top row, palette 1). LCD must be off.
  */
 export function buildClearScreen(): Op[] {
   return [
@@ -168,7 +169,7 @@ export function buildClearScreen(): Op[] {
     ...zeroPages('clear_screen_map', MEM.VRAM_MAP0, 4),
     ...cgbAttributes('clear_screen_attrs', [
       ...zeroPages('clear_screen_attr', MEM.VRAM_MAP0, 4),
-      ...fillAttributes(HEART_CELLS.row, HEART_CELLS.col, 1, HEART_CELLS.count, PAL.hearts),
+      ...fillAttributes(HUD_ROW, 0, 1, SCREEN_COLS, PAL.hud),
     ]),
     ret(),
   ];
