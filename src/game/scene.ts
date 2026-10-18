@@ -12,6 +12,15 @@ import { SCENE_ICON_TILES } from './font-data';
 import { type Pair, type Quint } from './fixed';
 import { type ColorScheme, buildPaletteSet, paletteOfCell } from './color';
 import { type PackedCast, packCast } from './npc';
+import { packAnimation } from './anim';
+import {
+  CONBINI_ANIMATION,
+  PARK_ANIMATION,
+  RESTAURANT_ANIMATION,
+  STATION_ANIMATION,
+  STREET_ANIMATION,
+  type TileAnimation,
+} from './scenes/animations';
 import {
   CONBINI_CAST,
   PARK_CAST,
@@ -57,6 +66,8 @@ export interface Scene {
   readonly colors: ColorScheme;
   /** Conversation partners shown as sprites */
   readonly cast: SceneCast;
+  /** One animated backdrop tile */
+  readonly animation?: TileAnimation;
   /** Illustration above the dialogue box (see backdrop.ts) */
   readonly backdrop: Backdrop;
 }
@@ -77,6 +88,7 @@ export const SCENES = defineScenes([
   {
     name: 'えき',
     icon: SCENE_ICON_TILES.TRAIN,
+    animation: STATION_ANIMATION,
     cast: STATION_CAST,
     backdrop: STATION_BACKDROP,
     colors: STATION_COLORS,
@@ -92,6 +104,7 @@ export const SCENES = defineScenes([
   {
     name: 'みち',
     icon: SCENE_ICON_TILES.HOUSE,
+    animation: STREET_ANIMATION,
     cast: STREET_CAST,
     backdrop: STREET_BACKDROP,
     colors: STREET_COLORS,
@@ -107,6 +120,7 @@ export const SCENES = defineScenes([
   {
     name: 'レストラン',
     icon: SCENE_ICON_TILES.BOWL,
+    animation: RESTAURANT_ANIMATION,
     cast: RESTAURANT_CAST,
     backdrop: RESTAURANT_BACKDROP,
     colors: RESTAURANT_COLORS,
@@ -122,6 +136,7 @@ export const SCENES = defineScenes([
   {
     name: 'コンビニ',
     icon: SCENE_ICON_TILES.SHOP,
+    animation: CONBINI_ANIMATION,
     cast: CONBINI_CAST,
     backdrop: CONBINI_BACKDROP,
     colors: CONBINI_COLORS,
@@ -137,6 +152,7 @@ export const SCENES = defineScenes([
   {
     name: 'こうえん',
     icon: SCENE_ICON_TILES.TREE,
+    animation: PARK_ANIMATION,
     cast: PARK_CAST,
     backdrop: PARK_BACKDROP,
     colors: PARK_COLORS,
@@ -165,6 +181,8 @@ export interface PackedScene {
   readonly sceneTileData: Uint8Array;
   /** NPC sprites, palettes, and who speaks when */
   readonly cast: PackedCast;
+  /** Animated backdrop tile (see packAnimation) */
+  readonly animation: Uint8Array;
   /** GBC palette set (see buildPaletteSet) */
   readonly paletteSet: Uint8Array;
   /** Run-length encoded backdrop palettes (see encodeAttributeRuns) */
@@ -180,6 +198,7 @@ export function packScene(scene: Scene): PackedScene {
     backdropData: art.backdrop,
     sceneTileData: art.tileData,
     cast: packCast(scene.cast),
+    animation: packAnimation(scene.animation, art),
     paletteSet: buildPaletteSet(scene.colors),
     backdropAttributes: encodeAttributeRuns(
       scene.backdrop.flatMap((row) =>

@@ -302,6 +302,7 @@ export function buildDialogueEngine(): Op[] {
     // =================================================================
     label('dlg_update'),
     call(ref('npc_update')), // idle bob of the speaker
+    call(ref('anim_tick')), // animated backdrop tile
     ld_a_nn(MEM.DLG_STATE),
     cp_n(u8(DialogueState.IDLE)),
     ret_cc('z'),

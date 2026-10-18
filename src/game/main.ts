@@ -36,6 +36,7 @@ import { type Op, type U16, ref, u8, u16 } from '../asm/types';
 import { buildCopyRows, drawBackdrop, loadSceneTiles } from './backdrop';
 import { buildSpriteData, buildSpriteInit, runDma } from './sprites';
 import { buildNpcRoutines, loadCast } from './npc';
+import { buildAnimRoutines, loadAnimation } from './anim';
 import { DIALOGUE_LAYOUT, buildDialogueEngine } from './dialogue';
 import { buildTileData, requireTile, requireTiles, textToTiles } from './font';
 import { CAT_TILES } from './font-data';
@@ -127,6 +128,10 @@ function resultFadeLabel(screen: { readonly name: string }): string {
 export function castLabels(sceneIndex: number): { tiles: string; palettes: string; table: string } {
   const prefix = `scene${String(sceneIndex)}_npc`;
   return { tiles: `${prefix}_tiles`, palettes: `${prefix}_palettes`, table: `${prefix}_table` };
+}
+
+export function sceneAnimationLabel(sceneIndex: number): string {
+  return `scene${String(sceneIndex)}_anim`;
 }
 
 export function sceneColorsLabel(sceneIndex: number): string {
@@ -455,6 +460,7 @@ export function buildProgram(): Op[] {
         ),
         ...drawBackdrop(sceneBackdropLabel(i)),
         ...loadCast(`scene${String(i)}_cast`, castLabels(i), packed.cast),
+        ...loadAnimation(sceneAnimationLabel(i)),
         ...cgbAttributes(`scene${String(i)}_colors`, [
           ld_rr_nn('hl', u16(tilemapAddr(BACKDROP.top, 0))),
           ld_rr_nn('de', ref(sceneColorsLabel(i))),
@@ -550,6 +556,7 @@ export function buildProgram(): Op[] {
     ...buildClearScreen(),
     ...buildAttributeRuns(),
     ...buildNpcRoutines(),
+    ...buildAnimRoutines(),
 
     // ==== Data ====
     ...buildSpriteData(),
@@ -585,6 +592,8 @@ export function buildProgram(): Op[] {
       db(packed.cast.palettes),
       label(castLabels(i).table),
       db(packed.cast.table),
+      label(sceneAnimationLabel(i)),
+      db(packed.animation),
     ]),
     ...[ENDING, GAME_OVER].flatMap((screen) => [
       label(resultFadeLabel(screen)),

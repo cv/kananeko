@@ -17,6 +17,7 @@ import { centerStartCol, tilemapAddr, tilePos } from '@game/tilemap';
 import { bgTileAddr, encodeAttributeRuns, rgb } from '@game/video';
 import { HEARTS, PAL, buildPaletteSet, paletteOf, paletteOfCell } from '@game/color';
 import { MAX_CAST, packCast } from '@game/npc';
+import { packAnimation } from '@game/anim';
 import { ENDING_COLORS, GAME_OVER_COLORS, TITLE_COLORS } from '@game/scenes/colors';
 import {
   BACKDROP,
@@ -217,6 +218,36 @@ describe('encodeAttributeRuns', () => {
   it('run-length encodes palettes and ends with a zero count', () => {
     expect([...encodeAttributeRuns([0, 0, 0, 2, 2, 5])]).toEqual([3, 0, 2, 2, 1, 5, 0]);
     expect([...encodeAttributeRuns(Array<number>(300).fill(1))]).toEqual([255, 1, 45, 1, 0]);
+  });
+});
+
+describe('packAnimation', () => {
+  const scene = SCENES[4];
+  const art = buildSceneArt(scene.backdrop);
+  const anim = scene.animation;
+
+  it('packs the tile address, frame count, period mask, and frames (base first)', () => {
+    const data = packAnimation(anim, art);
+    const tile = art.tileOfCell.get(anim.cell) ?? 0;
+    expect((data[0] ?? 0) | ((data[1] ?? 0) << 8)).toBe(bgTileAddr(tile));
+    expect(data[2]).toBe(anim.frames.length + 1);
+    expect(data[3]).toBe(anim.period - 1);
+    expect(data.length).toBe(4 + (anim.frames.length + 1) * 16);
+  });
+
+  it('encodes "no animation" as a zero frame count', () => {
+    expect([...packAnimation(undefined, art)]).toEqual([0, 0, 0]);
+  });
+
+  it('rejects cells that are not scene tiles, bad periods, and too many frames', () => {
+    expect(() => packAnimation({ ...anim, cell: 'Y' }, art)).toThrow(/isn't a scene tile/);
+    expect(() => packAnimation({ ...anim, period: 12 }, art)).toThrow(/power of two/);
+    expect(() =>
+      packAnimation(
+        { ...anim, frames: Array.from({ length: 16 }, () => anim.frames[0] ?? []) as never },
+        art,
+      ),
+    ).toThrow(/At most/);
   });
 });
 

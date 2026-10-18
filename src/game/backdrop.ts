@@ -76,6 +76,8 @@ export interface SceneArt {
   readonly backdrop: Uint8Array;
   /** Pixel data for the scene's own tiles, loaded at SCENE_TILE_BASE */
   readonly tileData: Uint8Array;
+  /** BG tile index of each kit tile the scene uses, by backdrop map character */
+  readonly tileOfCell: ReadonlyMap<string, number>;
 }
 
 /**
@@ -92,8 +94,14 @@ export function buildSceneArt(map: Backdrop): SceneArt {
     return SCENE_TILE_BASE + [...local.keys()].indexOf(ch);
   };
   const backdrop = encodeBackdrop(map, tileOf);
+  const tileOfCell = new Map(
+    Object.entries(BACKDROP_LEGEND)
+      .filter(([, ch]) => local.has(ch))
+      .map(([cell, ch]) => [cell, SCENE_TILE_BASE + [...local.keys()].indexOf(ch)] as const),
+  );
   return {
     backdrop,
+    tileOfCell,
     tileData: Uint8Array.from(
       [...local.values()].flatMap((glyph) => Array.from(encodeGlyph(glyph))),
     ),

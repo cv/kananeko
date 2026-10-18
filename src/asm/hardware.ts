@@ -134,6 +134,10 @@ export const MEM = {
   NPC_TABLE_HI: u16(0xc062), // Current scene's NPC segment table (hi)
   NPC_CURRENT: u16(0xc063), // NPC on screen ($FF = none)
   NPC_TIMER: u16(0xc064), // Frame counter for the NPC's idle bob
+  ANIM_LO: u16(0xc065), // Current scene's tile animation (lo)
+  ANIM_HI: u16(0xc066), // Current scene's tile animation (hi)
+  ANIM_TIMER: u16(0xc067), // Frame counter for the tile animation
+  ANIM_FRAME: u16(0xc068), // Animation frame on screen
 } as const satisfies Record<string, U16>;
 
 // Joypad bit flags (active-high after our read routine)
