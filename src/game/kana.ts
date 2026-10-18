@@ -73,7 +73,14 @@ import {
 } from './kana-hud';
 import { KanaState } from './state';
 import { type TilePosition, tilePos, tilemapAddr } from './tilemap';
-import { clearTilemap, screenOff, screenOn, vramPut, writeCenteredRow } from './video';
+import {
+  clearTilemap,
+  fadeInCurrent,
+  fadeOut,
+  screenOff,
+  vramPut,
+  writeCenteredRow,
+} from './video';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -352,6 +359,13 @@ export function buildKanaEngine(): Op[] {
     // kana_load_question — Read question from ROM, shuffle, draw.
     // =================================================================
     label('kana_load_question'),
+    // Out of questions? End the round with the last question still on screen.
+    ...loadPointer('hl', MEM.KANA_DATA_LO, MEM.KANA_DATA_HI),
+    ld_r_r('a', 'hl_ptr'),
+    cp_n(u8(0)),
+    jp_cc('z', ref('kana_all_done')),
+
+    ...fadeOut(),
     ...screenOff('kana_vblank'),
     ...clearTilemap('kana_clear'),
     call(ref('kana_draw_hud')),
@@ -411,7 +425,7 @@ export function buildKanaEngine(): Op[] {
       exit: 'jp',
     }),
 
-    ...screenOn(),
+    ...fadeInCurrent(),
 
     // Reset attempts and wait for input
     ...zeroBytes(MEM.KANA_ATTEMPTS),
@@ -537,7 +551,6 @@ export function buildKanaEngine(): Op[] {
     // kana_all_done — Round finished (all questions answered or out of lives).
     // =================================================================
     label('kana_all_done'),
-    ...screenOn(),
     ...zeroBytes(MEM.KANA_STATE),
     ret(),
   ];

@@ -12,6 +12,11 @@ import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { SCENES } from '@game/scene';
+import { DialogueState } from '@game/state';
+import { FADE_STEPS, FADE_STEP_FRAMES } from '@game/video';
+
+/** Long enough for a screen change to fade out and back in */
+export const SETTLE_FRAMES = 2 * FADE_STEPS * FADE_STEP_FRAMES + 10;
 import { GameRunner, type GameRunnerSnapshot, rom } from './game-runner';
 
 export type Checkpoint = `scene${string}:start` | `scene${string}:kana` | 'game:complete';
@@ -21,7 +26,7 @@ export const checkpoint = {
   sceneStart: (i: number): Checkpoint => `scene${String(i)}:start`,
   /** Scene `i`'s dialogue was finished on the good path; the first kana question awaits input */
   kanaStart: (i: number): Checkpoint => `scene${String(i)}:kana`,
-  /** All scenes completed; the game has returned to the title screen */
+  /** All scenes completed; the ending screen is showing */
   gameComplete: 'game:complete' as const,
 };
 
@@ -36,12 +41,13 @@ export function recordCheckpoints(): Checkpoints {
   const out: Checkpoints = {};
   const runner = new GameRunner().boot().start();
   SCENES.forEach((_, i) => {
+    runner.waitUntil(() => runner.dlgState !== DialogueState.IDLE, `scene ${String(i)} dialogue`);
     out[checkpoint.sceneStart(i)] = runner.snapshot();
     runner.completeDialogueTree().waitForKanaInput();
     out[checkpoint.kanaStart(i)] = runner.snapshot();
     runner.completeKanaQuestions(i);
   });
-  out[checkpoint.gameComplete] = runner.snapshot();
+  out[checkpoint.gameComplete] = runner.frames(SETTLE_FRAMES).snapshot();
   return out;
 }
 

@@ -9,6 +9,16 @@ export const SCREEN_W = 160;
 export const SCREEN_H = 144;
 const TILE = 8;
 
+/** Luminance of the darkest pixel on screen */
+export function darkestLuma(runner: GameRunner): number {
+  const screen = runner.getScreen();
+  let min = 255;
+  for (let i = 0; i < screen.length; i += 4) {
+    min = Math.min(min, luma(screen, (i / 4) % SCREEN_W, Math.floor(i / 4 / SCREEN_W)));
+  }
+  return min;
+}
+
 /** Whether the last frame was a single flat color (the LCD renders blank while off) */
 export function isBlank(runner: GameRunner): boolean {
   const screen = runner.getScreen();

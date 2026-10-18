@@ -53,9 +53,11 @@ import {
   buildVramPut,
   clearTilemap,
   rgb,
+  buildFadeRoutines,
+  buildFadeTable,
+  fadeIn,
+  fadeOut,
   screenOff,
-  screenOn,
-  setBgPalette,
   writeCenteredRow,
 } from './video';
 
@@ -93,8 +95,6 @@ const START_PROMPT_ROW = 13;
 /** TITLE_TIMER bit that toggles the START prompt (every 32 frames) */
 const BLINK_BIT = 0x20;
 
-const DMG_PALETTE = 0xe4; // shades 3,2,1,0
-
 // Ending screen content
 const ENDING_TITLE = 'おめでとう!';
 const ENDING_SCORE_LABEL = 'とくてん ';
@@ -123,6 +123,16 @@ export function sceneDialogueLabel(sceneIndex: number): string {
 
 export function sceneKanaLabel(sceneIndex: number): string {
   return `scene${String(sceneIndex)}_kana`;
+}
+
+export function sceneFadeLabel(sceneIndex: number): string {
+  return `scene${String(sceneIndex)}_fade`;
+}
+
+const TITLE_FADE = 'title_fade';
+
+function resultFadeLabel(screen: { readonly name: string }): string {
+  return `${screen.name}_fade`;
 }
 
 export function sceneBackdropLabel(sceneIndex: number): string {
@@ -224,9 +234,9 @@ function buildResultScreen(screen: ResultScreen): Op[] {
   const scoreCol = centerStartCol(labelTiles.length + SCORE_DIGITS);
   return [
     label(name),
+    ...fadeOut(),
     ...screenOff(`${name}_vblank`),
     ...clearTilemap(`${name}_clear`),
-    ...setBgPalette(screen.palette),
     ...zeroBytes(MEM.TITLE_TIMER), // prompt starts visible
 
     call(ref('kana_draw_hud')),
@@ -237,10 +247,8 @@ function buildResultScreen(screen: ResultScreen): Op[] {
     ...labelTiles.flatMap((tile) => [ld_r_n('a', u8(tile)), ldi_hl_a()]),
     call(ref('score_digits')),
     ...buildDrawScoreDigits(ENDING_ROWS.score, scoreCol + labelTiles.length),
-    ...writeCenteredRow(START_PROMPT_ROW - 1, START_BOX_TOP),
-    ...writeCenteredRow(START_PROMPT_ROW, START_BOX_ON),
-    ...writeCenteredRow(START_PROMPT_ROW + 1, START_BOX_BOTTOM),
-    ...screenOn(),
+    call(ref('draw_start_box')),
+    ...fadeIn(resultFadeLabel(screen)),
 
     label(`${name}_loop`),
     ...waitFrame(),
@@ -251,8 +259,20 @@ function buildResultScreen(screen: ResultScreen): Op[] {
     jr_cc('z', ref(`${name}_loop`)),
 
     ...resetRunState(MEM.SCENE_FLAGS),
+    ...fadeOut(),
     ...screenOff(`${name}_to_title`),
     jp(ref('title_screen')),
+  ];
+}
+
+/** Subroutine: draw the framed PRESS START prompt (LCD off). */
+function buildDrawStartBox(): Op[] {
+  return [
+    label('draw_start_box'),
+    ...writeCenteredRow(START_PROMPT_ROW - 1, START_BOX_TOP),
+    ...writeCenteredRow(START_PROMPT_ROW, START_BOX_ON),
+    ...writeCenteredRow(START_PROMPT_ROW + 1, START_BOX_BOTTOM),
+    ret(),
   ];
 }
 
@@ -299,10 +319,10 @@ export function buildProgram(): Op[] {
     ...screenOff('init_vblank'),
     ...copyPages('init_copy', MEM.VRAM_TILES, ref('tileData'), Math.ceil(tileData.length / 256)),
 
-    // Set DMG palette (for original GB compatibility) and GBC palette (ignored on DMG)
-    ld_r_n('a', u8(DMG_PALETTE)),
-    ldh_n_a(HW.BGP),
-    ...setBgPalette(TITLE_PALETTE),
+    // Enable the VBlank interrupt so HALT wakes once per frame (fades and game loops).
+    // The handler at $0040 is a RETI placed by the assembler.
+    ...storeByte(MEM.IE, 0x01), // bit 0 = VBlank
+    ei(),
 
     // ==== Title Screen (entered with the LCD off) ====
     label('title_screen'),
@@ -316,16 +336,9 @@ export function buildProgram(): Op[] {
     ...CAT_ROWS.flatMap((tiles, i) => writeCenteredRow(2 + i, tiles)),
     ...writeCenteredRow(7, textToTiles(TITLE)),
     ...writeCenteredRow(10, textToTiles(SUBTITLE)),
-    ...writeCenteredRow(START_PROMPT_ROW - 1, START_BOX_TOP),
-    ...writeCenteredRow(START_PROMPT_ROW, START_BOX_ON),
-    ...writeCenteredRow(START_PROMPT_ROW + 1, START_BOX_BOTTOM),
+    call(ref('draw_start_box')),
 
-    ...screenOn(),
-
-    // Enable VBlank interrupt — required for HALT on real hardware.
-    // Handler at $0040 (RETI) is placed by the assembler.
-    ...storeByte(MEM.IE, 0x01), // bit 0 = VBlank
-    ei(),
+    ...fadeIn(TITLE_FADE),
 
     // Wait for all buttons to be released (debounce boot ROM START press)
     label('title_debounce'),
@@ -354,6 +367,7 @@ export function buildProgram(): Op[] {
 
     // ==== Scene load ====
     label('scene_load'),
+    ...fadeOut(),
     ...screenOff('scene_vblank'),
     ...clearTilemap('scene_clear'),
 
@@ -364,11 +378,14 @@ export function buildProgram(): Op[] {
       (_s, _p, i) => drawBackdrop(sceneBackdropLabel(i)),
       packedScenes,
     ),
-    ...sceneSwitch('scene_palette', (scene) => setBgPalette(scene.palette), packedScenes),
-
     call(ref('kana_draw_hud')), // hearts + score on row 0
     call(ref('dlg_draw_box')),
-    ...screenOn(),
+    ...sceneSwitch(
+      'scene_fade',
+      (_s, _p, i) => [ld_rr_nn('hl', ref(sceneFadeLabel(i)))],
+      packedScenes,
+    ),
+    call(ref('fade_in')),
 
     // ==== Dialogue ====
     ...sceneSwitch(
@@ -422,6 +439,7 @@ export function buildProgram(): Op[] {
     // ==== Subroutines ====
     ...buildReadJoypad(),
     ...buildTitleBlink(),
+    ...buildDrawStartBox(),
     ...buildDialogueEngine(),
     ...buildKanaEngine(),
     ...buildDrawHudOps(),
@@ -429,6 +447,7 @@ export function buildProgram(): Op[] {
     ...buildScoreDigits(),
     ...buildCopyRows(),
     ...buildVramPut(),
+    ...buildFadeRoutines(),
 
     // ==== Data ====
     label('tileData'),
@@ -442,6 +461,15 @@ export function buildProgram(): Op[] {
       db(scene.kanaData),
       label(sceneBackdropLabel(i)),
       db(scene.backdropData),
+    ]),
+
+    // Fade tables for every palette
+    label(TITLE_FADE),
+    db(buildFadeTable(TITLE_PALETTE)),
+    ...SCENES.flatMap((scene, i) => [label(sceneFadeLabel(i)), db(buildFadeTable(scene.palette))]),
+    ...[ENDING, GAME_OVER].flatMap((screen) => [
+      label(resultFadeLabel(screen)),
+      db(buildFadeTable(screen.palette)),
     ]),
   ];
 }

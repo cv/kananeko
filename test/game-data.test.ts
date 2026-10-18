@@ -12,7 +12,7 @@ import {
 import { MAX_KANA_WORD_LENGTH, buildKanaData, defineKanaQuestion } from '@game/kana';
 import { packScene, SCENES } from '@game/scene';
 import { centerStartCol, tilemapAddr, tilePos } from '@game/tilemap';
-import { rgb } from '@game/video';
+import { FADE_STEPS, buildFadeTable, rgb } from '@game/video';
 import { BACKDROP, BACKDROP_LEGEND, encodeBackdrop } from '@game/backdrop';
 
 describe('font', () => {
@@ -117,6 +117,30 @@ describe('encodeBackdrop', () => {
     expect(() => encodeBackdrop(blank.slice(1))).toThrow(/rows/);
     expect(() => encodeBackdrop([blankRow + ' ', ...blank.slice(1)])).toThrow(/wide/);
     expect(() => encodeBackdrop(['?' + blankRow.slice(1), ...blank.slice(1)])).toThrow(/Unknown/);
+  });
+});
+
+describe('buildFadeTable', () => {
+  const palette = SCENES[0].palette;
+  const table = buildFadeTable(palette);
+  const step = (k: number): number[] => Array.from(table.slice(k * 9, k * 9 + 9));
+  const colors = (k: number): number[] =>
+    [0, 1, 2, 3].map((i) => (step(k)[1 + i * 2] ?? 0) | ((step(k)[2 + i * 2] ?? 0) << 8));
+
+  it('starts at white and ends at the palette itself', () => {
+    expect(table.length).toBe(FADE_STEPS * 9);
+    expect(step(0)[0]).toBe(0x00); // DMG: every shade white
+    expect(colors(0)).toEqual([0x7fff, 0x7fff, 0x7fff, 0x7fff]);
+    expect(step(FADE_STEPS - 1)[0]).toBe(0xe4);
+    expect(colors(FADE_STEPS - 1)).toEqual([...palette]);
+  });
+
+  it('darkens every color at each step', () => {
+    for (let k = 1; k < FADE_STEPS; k++) {
+      colors(k).forEach((c, i) => {
+        expect(c & 0x1f).toBeLessThanOrEqual((colors(k - 1)[i] ?? 0) & 0x1f);
+      });
+    }
   });
 });
 

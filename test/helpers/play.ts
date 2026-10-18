@@ -6,9 +6,11 @@ import { expect } from 'vitest';
 import { type DialogueNode } from '@game/dialogue';
 import { SCENES } from '@game/scene';
 import { DialogueState, END_OF_CONVERSATION, KanaState, MAX_LIVES } from '@game/state';
+import { FADE_STEPS, FADE_STEP_FRAMES } from '@game/video';
 import { type GameRunner } from './game-runner';
 
-const GAME_OVER_RESET_FRAMES = 10;
+/** Frames for the game over screen to fade in (and out again after START) */
+const GAME_OVER_RESET_FRAMES = 2 * FADE_STEPS * FADE_STEP_FRAMES + 10;
 const MAX_DIALOGUE_STEPS = 500;
 
 /** Non-default choices by node id; every other node takes choice 0 (the good answer). */

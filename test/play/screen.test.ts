@@ -3,12 +3,14 @@
 import { describe, expect, it } from 'vitest';
 import { SCENES } from '@game/scene';
 import { checkpoint, runnerAt } from '../helpers/checkpoints';
+import { GameRunner } from '../helpers/game-runner';
 import { BACKDROP } from '@game/backdrop';
 import { DialogueState } from '@game/state';
 import {
   SCREEN_W,
   inkBounds,
   inkCount,
+  darkestLuma,
   isBlank,
   readText,
   waitForPicture,
@@ -18,6 +20,24 @@ const SCENE_NAME_ROW = 1;
 const NPC_TEXT = { row: 12, col: 2 };
 const CHOICES = { row: 14, col: 3 };
 const TEXT_WIDTH = 17;
+
+describe('Given the screen changes', () => {
+  it('fades the first scene in from white after START', () => {
+    const runner = new GameRunner().boot().pressStart();
+    const darkest: number[] = [];
+    for (let f = 0; f < 60; f++) {
+      runner.frames(1);
+      darkest.push(darkestLuma(runner));
+    }
+    const final = darkest.at(-1) ?? 0;
+    expect(final).toBeLessThan(100);
+    // Some frame shows the scene nearly white before it settles
+    expect(darkest.some((l) => l > 200)).toBe(true);
+    // ...and the scene gets darker step by step as it fades in
+    const fadeIn = darkest.slice(darkest.lastIndexOf(Math.max(...darkest)));
+    expect(new Set(fadeIn).size).toBeGreaterThanOrEqual(3);
+  });
+});
 
 describe('Given the player is talking to someone', () => {
   it('never flashes a blank screen between dialogue nodes', () => {
