@@ -21,6 +21,10 @@ function word(runner: GameRunner): string {
   return readText(runner, row, col, width).trim();
 }
 
+function catFace(runner: GameRunner): string {
+  return readText(runner, KANA_LAYOUT.cat.row, KANA_LAYOUT.cat.col, 1);
+}
+
 function options(runner: GameRunner): string[] {
   return KANA_LAYOUT.options.map(({ row, col }) => readText(runner, row, col, 1));
 }
@@ -51,6 +55,7 @@ describe.each(SCENES.map((scene, i) => [scene.name, i] as const))(
       const shown = options(runner);
       expect([...shown].sort()).toEqual([question.correct, ...question.distractors].sort());
       expect(shown[runner.kanaCorrectPos]).toBe(question.correct);
+      expect(catFace(runner)).toBe(CAT_TILES.FACE_NEUTRAL);
     });
   },
 );
@@ -63,15 +68,18 @@ describe('Given the player answers the first station question', () => {
     const runner = atRound().pressKanaAnswer(true).frames(FEEDBACK_SHOWN);
     expect(prompt(runner)).toBe(KANA_MESSAGES.correct);
     expect(word(runner)).toBe(question.word);
+    expect(catFace(runner)).toBe(CAT_TILES.FACE_HAPPY);
   });
 
   it('asks again after a wrong answer, keeping the blank', () => {
     const runner = atRound().pressKanaAnswer(false).frames(FEEDBACK_SHOWN);
     expect(prompt(runner)).toBe(KANA_MESSAGES.retry);
     expect(word(runner)).toBe(withBlank(question.word, question.blankIndex));
+    expect(catFace(runner)).toBe(CAT_TILES.FACE_SAD);
 
     runner.waitForKanaInput().frames(FEEDBACK_SHOWN);
     expect(prompt(runner)).toBe(KANA_MESSAGES.prompt);
+    expect(catFace(runner)).toBe(CAT_TILES.FACE_NEUTRAL);
   });
 
   it('reveals the answer after the third miss', () => {

@@ -35,7 +35,7 @@ import {
 import { type Op, type U16, ref, u8, u16 } from '../asm/types';
 import { buildCopyRows, drawBackdrop } from './backdrop';
 import { buildDialogueEngine } from './dialogue';
-import { buildTileData, requireTiles, textToTiles } from './font';
+import { buildTileData, requireTile, requireTiles, textToTiles } from './font';
 import { CAT_TILES } from './font-data';
 import { buildReadJoypad } from './joypad';
 import { buildKanaEngine } from './kana';
@@ -84,6 +84,7 @@ const CAT_ROWS = [
   requireTiles(CAT_TILES.ROW1),
   requireTiles(CAT_TILES.ROW2),
 ] as const;
+const CAT_SAD_ROWS = CAT_TILES.SAD_ROWS.map((row) => row.map((ch) => requireTile(ch)));
 const START_BOX_TOP = textToTiles('┌─────────────┐');
 const START_BOX_ON = textToTiles('│ PRESS START │');
 const START_BOX_OFF = textToTiles('│             │');
@@ -104,6 +105,12 @@ const ENDING_PALETTE: Palette = [
   rgb(0x3b, 0x24, 0x10),
 ];
 const ENDING_ROWS = { cat: 2, title: 6, stamps: 8, score: 10 } as const;
+const GAME_OVER_PALETTE: Palette = [
+  rgb(0xe0, 0xe0, 0xe8),
+  rgb(0xa0, 0xa8, 0xc0),
+  rgb(0x58, 0x60, 0x80),
+  rgb(0x18, 0x18, 0x28),
+];
 const SCORE_DIGITS = 4;
 
 // ---------------------------------------------------------------------------
@@ -169,57 +176,82 @@ function engineLoop(name: string, update: string, stateAddr: U16): Op[] {
   ];
 }
 
-/** Block until START is newly pressed. */
-function waitForStart(name: string): Op[] {
+interface ResultScreen {
+  /** Label the game jumps to; also the prefix for internal labels */
+  readonly name: string;
+  readonly cat: readonly (readonly number[])[];
+  readonly title: string;
+  readonly palette: Palette;
+}
+
+const ENDING: ResultScreen = {
+  name: 'game_complete',
+  cat: CAT_ROWS,
+  title: ENDING_TITLE,
+  palette: ENDING_PALETTE,
+};
+
+const GAME_OVER: ResultScreen = {
+  name: 'game_over',
+  cat: CAT_SAD_ROWS,
+  title: 'GAME OVER',
+  palette: GAME_OVER_PALETTE,
+};
+
+/** Width of the stamp row: each scene icon is 2 tiles, one blank tile apart */
+const STAMP_ROW_WIDTH = SCENES.length * 3 - 1;
+
+/** Draw the icon of every scene whose SCENE_FLAGS bit is set (LCD off) */
+function drawClearedStamps(name: string, row: number): Op[] {
+  const startCol = centerStartCol(STAMP_ROW_WIDTH);
+  return SCENES.flatMap((scene, i) => {
+    const skip = `${name}_stamp${String(i)}_skip`;
+    return [
+      ld_a_nn(MEM.SCENE_FLAGS),
+      and_n(u8(1 << i)),
+      jr_cc('z', ref(skip)),
+      ld_rr_nn('hl', u16(tilemapAddr(row, startCol + i * 3))),
+      ...requireTiles(scene.icon).flatMap((tile) => [ld_r_n('a', u8(tile)), ldi_hl_a()]),
+      label(skip),
+    ];
+  });
+}
+
+/** End-of-run screen: cat, title, cleared-scene stamps, final score; START returns to the title. */
+function buildResultScreen(screen: ResultScreen): Op[] {
+  const { name } = screen;
+  const labelTiles = textToTiles(ENDING_SCORE_LABEL);
+  const scoreCol = centerStartCol(labelTiles.length + SCORE_DIGITS);
   return [
     label(name),
-    ...waitFrame(),
-    call(ref('joy_read')),
-    ld_a_nn(MEM.JOYPAD_NEW),
-    and_n(u8(JOY.START)),
-    jr_cc('z', ref(name)),
-  ];
-}
-
-/** Scene icons side by side, one blank tile apart, as "stamps" for every cleared scene */
-function sceneStampTiles(): number[] {
-  return SCENES.flatMap((scene, i) => [...(i > 0 ? [0] : []), ...requireTiles(scene.icon)]);
-}
-
-/** Celebrate a completed run: cat, stamps, final score, then START returns to the title. */
-function buildEndingScreen(): Op[] {
-  const scoreRowLength = textToTiles(ENDING_SCORE_LABEL).length + SCORE_DIGITS;
-  const scoreCol = centerStartCol(scoreRowLength);
-  return [
-    label('game_complete'),
-    ...screenOff('ending_vblank'),
-    ...clearTilemap('ending_clear'),
-    ...setBgPalette(ENDING_PALETTE),
+    ...screenOff(`${name}_vblank`),
+    ...clearTilemap(`${name}_clear`),
+    ...setBgPalette(screen.palette),
     ...zeroBytes(MEM.TITLE_TIMER), // prompt starts visible
 
     call(ref('kana_draw_hud')),
-    ...CAT_ROWS.flatMap((tiles, i) => writeCenteredRow(ENDING_ROWS.cat + i, tiles)),
-    ...writeCenteredRow(ENDING_ROWS.title, textToTiles(ENDING_TITLE)),
-    ...writeCenteredRow(ENDING_ROWS.stamps, sceneStampTiles()),
+    ...screen.cat.flatMap((tiles, i) => writeCenteredRow(ENDING_ROWS.cat + i, tiles)),
+    ...writeCenteredRow(ENDING_ROWS.title, textToTiles(screen.title)),
+    ...drawClearedStamps(name, ENDING_ROWS.stamps),
     ld_rr_nn('hl', u16(tilemapAddr(ENDING_ROWS.score, scoreCol))),
-    ...textToTiles(ENDING_SCORE_LABEL).flatMap((tile) => [ld_r_n('a', u8(tile)), ldi_hl_a()]),
+    ...labelTiles.flatMap((tile) => [ld_r_n('a', u8(tile)), ldi_hl_a()]),
     call(ref('score_digits')),
-    ...buildDrawScoreDigits(ENDING_ROWS.score, scoreCol + textToTiles(ENDING_SCORE_LABEL).length),
+    ...buildDrawScoreDigits(ENDING_ROWS.score, scoreCol + labelTiles.length),
     ...writeCenteredRow(START_PROMPT_ROW - 1, START_BOX_TOP),
     ...writeCenteredRow(START_PROMPT_ROW, START_BOX_ON),
     ...writeCenteredRow(START_PROMPT_ROW + 1, START_BOX_BOTTOM),
     ...screenOn(),
 
-    label('ending_loop'),
+    label(`${name}_loop`),
     ...waitFrame(),
     call(ref('joy_read')),
     call(ref('title_blink')),
     ld_a_nn(MEM.JOYPAD_NEW),
     and_n(u8(JOY.START)),
-    jr_cc('z', ref('ending_loop')),
+    jr_cc('z', ref(`${name}_loop`)),
 
     ...resetRunState(MEM.SCENE_FLAGS),
-    ...screenOff('ending_to_title'),
+    ...screenOff(`${name}_to_title`),
     jp(ref('title_screen')),
   ];
 }
@@ -381,20 +413,10 @@ export function buildProgram(): Op[] {
     jp_cc('c', ref('scene_load')), // more scenes to go
 
     // ==== Game complete — ending screen, then back to the title ====
-    ...buildEndingScreen(),
+    ...buildResultScreen(ENDING),
 
     // ==== Game Over ====
-    label('game_over'),
-    ...screenOff('gameover_vblank'),
-    ...clearTilemap('gameover_clear'),
-    ...writeCenteredRow(6, textToTiles('GAME OVER')),
-    call(ref('kana_draw_hud')), // show final score + empty hearts
-    ...screenOn(),
-
-    ...waitForStart('gameover_loop'),
-    ...resetRunState(),
-    ...screenOff('gameover_to_title'),
-    jp(ref('title_screen')),
+    ...buildResultScreen(GAME_OVER),
 
     // ==== Subroutines ====
     ...buildReadJoypad(),

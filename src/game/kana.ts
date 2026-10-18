@@ -154,6 +154,7 @@ export const KANA_LAYOUT = {
   promptRow: PROMPT_ROW,
   word: { row: WORD_ROW, col: WORD_INNER_COL, width: WORD_BOX.innerWidth },
   options: OPTION_POSITIONS,
+  cat: DPAD_CENTER,
 } as const;
 
 /** Messages shown on the prompt row, all padded to the same width */
@@ -195,7 +196,20 @@ const ANSWER_LAYOUTS = [
 
 // Tile constants
 const BLANK_TILE: TileIndex = requireTile(CAT_TILES.BLANK);
-const CAT_ICON: TileIndex = requireTile(CAT_TILES.ICON);
+const CAT_FACES = {
+  neutral: requireTile(CAT_TILES.FACE_NEUTRAL),
+  happy: requireTile(CAT_TILES.FACE_HAPPY),
+  sad: requireTile(CAT_TILES.FACE_SAD),
+} as const;
+
+/** Change the cat's face in the middle of the d-pad (LCD on) */
+function showFace(face: keyof typeof CAT_FACES): Op[] {
+  return [
+    ld_rr_nn('hl', u16(tilemapAddr(DPAD_CENTER))),
+    ld_r_n('a', u8(CAT_FACES[face])),
+    ...vramPut(),
+  ];
+}
 const ARROW_TILES = requireTiles(UI_TILES.ARROWS);
 
 /** Prompt-row message, centered and padded so every message fully replaces the last */
@@ -234,7 +248,7 @@ function buildRoundFrame(): Op[] {
     ...tileAt(tilePos(top + 1, right), requireTile('│')),
     ...horizontal(top + 2, '└', '┘'),
     ...ARROW_POSITIONS.flatMap((pos, dir) => tileAt(pos, at(ARROW_TILES, dir))),
-    ...tileAt(DPAD_CENTER, CAT_ICON),
+    ...tileAt(DPAD_CENTER, CAT_FACES.neutral),
   ];
 }
 
@@ -452,6 +466,7 @@ export function buildKanaEngine(): Op[] {
 
     label('kana_correct_done'),
     ...showMessage(KANA_MESSAGES.correct),
+    ...showFace('happy'),
     call(ref('kana_reveal')),
     ...enterFeedback(KanaState.ADVANCE_FEEDBACK),
     ret(),
@@ -467,6 +482,7 @@ export function buildKanaEngine(): Op[] {
     ld_nn_a(MEM.KANA_ATTEMPTS),
     ...buildClearDelta(),
     ...showMessage(KANA_MESSAGES.retry),
+    ...showFace('sad'),
     ...enterFeedback(KanaState.RETRY_FEEDBACK),
     ret(),
 
@@ -475,6 +491,7 @@ export function buildKanaEngine(): Op[] {
     ...buildSubScore(SCORE_DEATH_PENALTY),
     ...buildSetDelta(DELTA_MINUS_100),
     ...showMessage(KANA_MESSAGES.reveal),
+    ...showFace('sad'),
     call(ref('kana_reveal')), // show the answer before moving on
 
     ld_a_nn(MEM.KANA_LIVES),
@@ -503,6 +520,7 @@ export function buildKanaEngine(): Op[] {
     label('kana_wrong_fb'),
     ...countDownOrReturn(MEM.KANA_FEEDBACK_TIMER),
     ...showMessage(KANA_MESSAGES.prompt),
+    ...showFace('neutral'),
     ...storeByte(MEM.KANA_STATE, KanaState.AWAITING),
     ret(),
 
