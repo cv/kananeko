@@ -6,6 +6,7 @@ import {
   TILE_COUNT,
   buildTileData,
   encodeGlyph,
+  glyphOf,
   requireTile,
   textToTiles,
 } from '@game/font';
@@ -13,7 +14,7 @@ import { MAX_KANA_WORD_LENGTH, buildKanaData, defineKanaQuestion } from '@game/k
 import { type DialogueNode, buildDialogueTree } from '@game/dialogue';
 import { packScene, SCENES } from '@game/scene';
 import { centerStartCol, tilemapAddr, tilePos } from '@game/tilemap';
-import { FADE_STEPS, buildFadeTable, rgb } from '@game/video';
+import { FADE_STEPS, bgTileAddr, buildFadeTable, rgb } from '@game/video';
 import { BACKDROP, BACKDROP_LEGEND, encodeBackdrop } from '@game/backdrop';
 
 describe('font', () => {
@@ -56,6 +57,11 @@ describe('font', () => {
     expect(() => encodeGlyph(['x.......', '', '', '', '', '', '', ''])).toThrow(
       /Invalid glyph pixel/,
     );
+  });
+
+  it('looks up glyph art by character', () => {
+    expect(glyphOf('▶')).toHaveLength(8);
+    expect(() => glyphOf('漢')).toThrow(/Character not in font/);
   });
 
   it('rejects characters that are not in the font', () => {
@@ -198,6 +204,13 @@ describe('layout helpers', () => {
     expect(tilemapAddr(tilePos(2, 3))).toBe(0x9800 + 2 * 32 + 3);
     expect(() => tilePos(32, 0)).toThrow(RangeError);
     expect(() => centerStartCol(21)).toThrow(RangeError);
+  });
+
+  it('locates BG tiles in $8800 addressing', () => {
+    expect(bgTileAddr(0)).toBe(0x9000);
+    expect(bgTileAddr(127)).toBe(0x97f0);
+    expect(bgTileAddr(128)).toBe(0x8800);
+    expect(bgTileAddr(255)).toBe(0x8ff0);
   });
 
   it('packs 8-bit RGB into GBC RGB555', () => {

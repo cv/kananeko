@@ -3,8 +3,8 @@
  * frame (right after HALT, inside VBlank). Writing the shadow is always safe.
  */
 
-import { HW } from '../asm/hardware';
-import { zeroPages } from '../asm/macros';
+import { HW, MEM } from '../asm/hardware';
+import { copyBytes, zeroPages } from '../asm/macros';
 import {
   call,
   db,
@@ -20,6 +20,7 @@ import {
 } from '../asm/ops';
 import { type Op, type U16, ref, u8, u16 } from '../asm/types';
 import { hi } from '../asm/util';
+import { encodeGlyph, glyphOf } from './font';
 import { type Palette, rgb } from './video';
 
 /** Shadow OAM: 40 sprites x 4 bytes, page-aligned for DMA */
@@ -31,6 +32,12 @@ export const OAM_Y_OFFSET = 16;
 export const OAM_X_OFFSET = 8;
 
 export const SPRITE_SLOT = { cursor: 0 } as const;
+
+/** Sprite tile indices (in the sprite-only $8000-$87FF block) */
+export const SPRITE_TILES = { cursor: 0 } as const;
+
+/** Glyphs copied into sprite tile memory at boot, in SPRITE_TILES order */
+const SPRITE_GLYPHS = ['▶'] as const;
 
 const FIELD_OFFSET = { y: 0, x: 1, tile: 2, attr: 3 } as const;
 
@@ -65,6 +72,7 @@ const OBJ_PALETTE: Palette = [
 export function buildSpriteInit(): Op[] {
   return [
     ...zeroPages('sprite_clear', SHADOW_OAM, 1),
+    ...copyBytes('sprite_tile_copy', MEM.OBJ_TILES, ref('sprite_tiles'), SPRITE_TILE_BYTES),
     ld_rr_nn('hl', DMA_HRAM),
     ld_rr_nn('de', ref('dma_routine')),
     ld_r_n('b', u8(DMA_ROUTINE.length)),
@@ -88,10 +96,13 @@ export function buildSpriteInit(): Op[] {
   ];
 }
 
-/** The DMA routine's bytes, copied to HRAM at boot */
-export function buildDmaRoutineData(): Op[] {
-  return [label('dma_routine'), db([...DMA_ROUTINE])];
+/** The DMA routine's bytes, copied to HRAM at boot, and the sprite tiles */
+export function buildSpriteData(): Op[] {
+  const tiles = SPRITE_GLYPHS.flatMap((ch) => Array.from(encodeGlyph(glyphOf(ch))));
+  return [label('dma_routine'), db([...DMA_ROUTINE]), label('sprite_tiles'), db(tiles)];
 }
+
+const SPRITE_TILE_BYTES = SPRITE_GLYPHS.length * 16;
 
 /** Copy the shadow OAM to OAM. Call right after HALT (VBlank). */
 export function runDma(): Op[] {

@@ -14,12 +14,13 @@ const BOOT_FRAMES = 120;
 const TILE_BYTES = 16;
 
 describe('Given the ROM boots in the emulator', () => {
-  it('copies tile data into VRAM, keeping tile 0 blank', () => {
+  it('copies BG tiles to $9000/$8800 (blank tile 0) and sprite tiles to $8000', () => {
     const mem = new GameRunner().frames(BOOT_FRAMES).getMemory();
-    const tile0 = mem.slice(MEM.VRAM_TILES, MEM.VRAM_TILES + TILE_BYTES);
-    const tile1 = mem.slice(MEM.VRAM_TILES + TILE_BYTES, MEM.VRAM_TILES + 2 * TILE_BYTES);
-    expect(tile0.every((b) => b === 0)).toBe(true);
-    expect(tile1.some((b) => b !== 0)).toBe(true);
+    const tile = (addr: number): Uint8Array => mem.slice(addr, addr + TILE_BYTES);
+    expect(tile(MEM.BG_TILES_LOW).every((b) => b === 0)).toBe(true);
+    expect(tile(MEM.BG_TILES_LOW + TILE_BYTES).some((b) => b !== 0)).toBe(true);
+    expect(tile(MEM.BG_TILES_HIGH).some((b) => b !== 0)).toBe(true); // BG tile 128
+    expect(tile(MEM.OBJ_TILES).some((b) => b !== 0)).toBe(true); // sprite tile 0: cursor
   });
 
   it('renders a non-blank screen', () => {

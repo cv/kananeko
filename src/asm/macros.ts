@@ -114,6 +114,23 @@ export function zeroPages(name: string, dst: U16, pages: number): Op[] {
   ];
 }
 
+/** Copy `count` (1-256) bytes from `src` to `dst`. Clobbers A, B, DE, HL. */
+export function copyBytes(name: string, dst: U16, src: U16 | LabelRef, count: number): Op[] {
+  if (count < 1 || count > 256)
+    throw new RangeError(`copyBytes count must be 1-256, got ${String(count)}`);
+  return [
+    ld_rr_nn('hl', dst),
+    ld_rr_nn('de', src),
+    ld_r_n('b', u8(count & 0xff)), // 256 wraps to 0, which DEC/JR NZ treats as 256
+    label(name),
+    ld_a_de(),
+    ldi_hl_a(),
+    inc_rr('de'),
+    dec_r('b'),
+    jr_cc('nz', ref(name)),
+  ];
+}
+
 /** Copy `pages` × 256 bytes from `src` to `dst`. Clobbers A, BC, DE, HL. */
 export function copyPages(name: string, dst: U16, src: U16 | LabelRef, pages: number): Op[] {
   return [

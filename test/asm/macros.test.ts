@@ -2,6 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  copyBytes,
   copyPages,
   countDownOrReturn,
   loadPointer,
@@ -93,6 +94,23 @@ describe('block operations', () => {
       [label('source'), db(source)],
     );
     expect(zeroed.slice(SCRATCH, SCRATCH + 256).every((b) => b === 0)).toBe(true);
+  });
+});
+
+describe('copyBytes', () => {
+  it('copies an exact number of bytes, including a full 256', () => {
+    const source = Array.from({ length: 256 }, (_, i) => (255 - i) & 0xff);
+    const mem = runProgram(
+      [...copyBytes('cb', at(0), ref('src'), 256), ...copyBytes('cb3', at(0x200), ref('src'), 3)],
+      [label('src'), db(source)],
+    );
+    expect(Array.from(mem.slice(SCRATCH, SCRATCH + 256))).toEqual(source);
+    expect(Array.from(mem.slice(SCRATCH + 0x200, SCRATCH + 0x204))).toEqual([255, 254, 253, 0]);
+  });
+
+  it('rejects counts outside 1-256', () => {
+    expect(() => copyBytes('x', at(0), ref('src'), 0)).toThrow(RangeError);
+    expect(() => copyBytes('x', at(0), ref('src'), 257)).toThrow(RangeError);
   });
 });
 

@@ -55,7 +55,9 @@ export const LCDC = {
 // Memory map
 export const MEM = {
   VRAM: u16(0x8000),
-  VRAM_TILES: u16(0x8000), // Tile data start (mode $8000)
+  OBJ_TILES: u16(0x8000), // Sprite tiles 0-127 (sprites always use $8000 addressing)
+  BG_TILES_HIGH: u16(0x8800), // BG tiles 128-255 in $8800 addressing (LCDC bit 4 clear)
+  BG_TILES_LOW: u16(0x9000), // BG tiles 0-127 in $8800 addressing
   VRAM_MAP0: u16(0x9800), // BG tilemap 0
   VRAM_MAP1: u16(0x9c00), // BG tilemap 1
   OAM: u16(0xfe00),

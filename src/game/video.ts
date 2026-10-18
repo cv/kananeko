@@ -29,7 +29,16 @@ import { type Quad } from './fixed';
 import { centerStartCol, tilemapAddr, tileRow } from './tilemap';
 
 /** LCDC value used whenever the game turns the screen on. */
-export const SCREEN_ON_FLAGS = LCDC.LCD_ON | LCDC.TILE_DATA_8000 | LCDC.BG_ON | LCDC.OBJ_ON;
+/**
+ * The background uses $8800 tile addressing (LCDC bit 4 clear): BG tiles 0-127 live at
+ * $9000 and 128-255 at $8800, which leaves $8000-$87FF to sprites alone.
+ */
+export const SCREEN_ON_FLAGS = LCDC.LCD_ON | LCDC.BG_ON | LCDC.OBJ_ON;
+
+/** VRAM address of a background tile's pixel data */
+export function bgTileAddr(index: number): number {
+  return index < 128 ? MEM.BG_TILES_LOW + index * 16 : MEM.BG_TILES_HIGH + (index - 128) * 16;
+}
 
 /** Wait for VBlank and turn the LCD off. `name` labels the wait loop. */
 export function screenOff(name: string): Op[] {

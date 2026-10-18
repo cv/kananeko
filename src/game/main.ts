@@ -34,7 +34,7 @@ import {
 } from '../asm/ops';
 import { type Op, type U16, ref, u8, u16 } from '../asm/types';
 import { buildCopyRows, drawBackdrop } from './backdrop';
-import { buildDmaRoutineData, buildSpriteInit, runDma } from './sprites';
+import { buildSpriteData, buildSpriteInit, runDma } from './sprites';
 import { DIALOGUE_LAYOUT, buildDialogueEngine } from './dialogue';
 import { buildTileData, requireTile, requireTiles, textToTiles } from './font';
 import { CAT_TILES } from './font-data';
@@ -362,7 +362,14 @@ export function buildProgram(): Op[] {
 
     // Copy all tile data to VRAM with the LCD off
     ...screenOff('init_vblank'),
-    ...copyPages('init_copy', MEM.VRAM_TILES, ref('tileData'), Math.ceil(tileData.length / 256)),
+    // BG tiles 0-127 go to $9000 and 128+ to $8800 ($8800 addressing)
+    ...copyPages('init_copy_low', MEM.BG_TILES_LOW, ref('tileData'), 2048 / 256),
+    ...copyPages(
+      'init_copy_high',
+      MEM.BG_TILES_HIGH,
+      ref('tileDataHigh'),
+      Math.ceil((tileData.length - 2048) / 256),
+    ),
 
     ...buildSpriteInit(),
 
@@ -510,9 +517,11 @@ export function buildProgram(): Op[] {
     ...buildFadeRoutines(),
 
     // ==== Data ====
-    ...buildDmaRoutineData(),
+    ...buildSpriteData(),
     label('tileData'),
-    db(tileData),
+    db(tileData.slice(0, 2048)),
+    label('tileDataHigh'),
+    db(tileData.slice(2048)),
 
     // Per-scene dialogue and kana data
     ...packedScenes.flatMap((scene, i) => [

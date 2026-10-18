@@ -63,6 +63,13 @@ export function requireTile(ch: string): TileIndex {
   return idx;
 }
 
+/** The pixel art for a character, throwing if it isn't in the font. */
+export function glyphOf(ch: string): Glyph {
+  const glyph = ALL_GLYPHS[ch];
+  if (glyph === undefined) throw new Error(`Character not in font: "${ch}"`);
+  return glyph;
+}
+
 /** All tile data as a flat byte array, starting with tile 0 (blank) */
 export function buildTileData(): Uint8Array {
   const blank = new Uint8Array(16);

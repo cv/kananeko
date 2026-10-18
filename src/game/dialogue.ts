@@ -65,7 +65,7 @@ import {
 } from './kana-hud';
 import { DialogueState, END_OF_CONVERSATION, MAX_LIVES } from './state';
 import { SCREEN_COLS, type TilePosition, tilePos, tilemapAddr } from './tilemap';
-import { OAM_X_OFFSET, OAM_Y_OFFSET, SPRITE_SLOT, oamField } from './sprites';
+import { OAM_X_OFFSET, OAM_Y_OFFSET, SPRITE_SLOT, SPRITE_TILES, oamField } from './sprites';
 import { vramPut } from './video';
 
 // Re-export data types and encoder from dialogue-data.ts
@@ -113,7 +113,6 @@ const BORDER_BL = requireTile('└');
 const BORDER_BR = requireTile('┘');
 const BORDER_H = requireTile('─');
 const BORDER_V = requireTile('│');
-const CURSOR_TILE = requireTile('▶');
 /** Cursor sprite position for the first choice row (OAM coordinates) */
 const CURSOR_Y = CHOICE_START_ROW * 8 + OAM_Y_OFFSET;
 const CURSOR_X = CHOICE_CURSOR_COL * 8 + OAM_X_OFFSET;
@@ -555,7 +554,7 @@ export function buildDialogueEngine(): Op[] {
     add_n(u8(CURSOR_Y)),
     ld_nn_a(oamField(SPRITE_SLOT.cursor, 'y')),
     ...storeByte(oamField(SPRITE_SLOT.cursor, 'x'), CURSOR_X),
-    ...storeByte(oamField(SPRITE_SLOT.cursor, 'tile'), CURSOR_TILE),
+    ...storeByte(oamField(SPRITE_SLOT.cursor, 'tile'), SPRITE_TILES.cursor),
     ...zeroBytes(oamField(SPRITE_SLOT.cursor, 'attr')),
     ret(),
 
