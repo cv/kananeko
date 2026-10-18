@@ -50,7 +50,7 @@ async function play(page: Page, isMobile: boolean): Promise<string[]> {
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(message.text());
   });
-  await page.goto('/');
+  await page.goto('./');
   const start = page.locator('#start');
   await expect(start).toBeEnabled();
   if (isMobile) await start.tap();

@@ -175,6 +175,8 @@ let gamepadSeen = false;
 
 /** Mirror the first connected gamepad onto the joypad */
 function pollGamepads(joypad: Joypad): void {
+  // The Gamepad API only exists in secure contexts (and some browsers lack it)
+  if (typeof navigator.getGamepads !== 'function') return;
   const pad = Array.from(navigator.getGamepads()).find((p) => p !== null);
   if (pad === undefined) {
     if (gamepadSeen) joypad.releaseAll('gamepad');
