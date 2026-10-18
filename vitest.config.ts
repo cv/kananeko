@@ -6,6 +6,7 @@ export default defineConfig({
     tsconfigPaths: true,
   },
   test: {
+    include: ['test/**/*.test.ts'], // site-tests/ are Playwright's (npm run test:site)
     testTimeout: 30000,
     maxWorkers: '100%',
     slowTestThreshold: 1000,

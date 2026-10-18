@@ -3,3 +3,6 @@ dist
 build
 coverage
 package-lock.json
+site/vendor
+test-results
+playwright-report

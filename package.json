@@ -21,13 +21,18 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "npm run typecheck && npm run lint && npm run format:check && npm test",
-    "hooks:install": "prek install -t pre-commit -t commit-msg"
+    "hooks:install": "prek install -t pre-commit -t commit-msg",
+    "site": "tsx scripts/build-site.ts",
+    "site:serve": "tsx scripts/serve-site.ts",
+    "test:site": "npm run site && playwright test"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@j178/prek": "^0.5.5",
+    "@playwright/test": "^1.64.1",
     "@types/node": "^25.9.9",
     "@vitest/coverage-v8": "^5.0.5",
+    "esbuild": "^0.28.2",
     "eslint": "^10.13.0",
     "prettier": "^3.9.10",
     "serverboy": "^0.0.7",

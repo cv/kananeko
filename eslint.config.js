@@ -27,7 +27,7 @@ export default defineConfig(
     },
   },
   {
-    files: ['src/build.ts', 'scripts/**/*.ts'],
+    files: ['src/build.ts', 'scripts/**/*.ts', 'site-tests/**/*.ts'],
     rules: {
       'no-console': 'off',
     },
@@ -39,6 +39,15 @@ export default defineConfig(
     },
   },
   {
-    ignores: ['dist/', 'build/', 'coverage/', 'node_modules/', 'eslint.config.js'],
+    ignores: [
+      'dist/',
+      'build/',
+      'coverage/',
+      'node_modules/',
+      'eslint.config.js',
+      'site/vendor/',
+      'test-results/',
+      'playwright-report/',
+    ],
   },
 );

@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#fff4e0" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <title>カナネコ Kananeko · a tiny Game Boy game about kana</title>
+    <meta
+      name="description"
+      content="Play Kananeko in your browser: a tiny Game Boy Color game where a cool cat in sunglasses helps you read Japanese kana."
+    />
+    <meta property="og:title" content="カナネコ Kananeko" />
+    <meta
+      property="og:description"
+      content="A tiny Game Boy Color game where a cool cat in sunglasses helps you read Japanese kana. Play it in your browser."
+    />
+    <meta property="og:image" content="screenshots/title.png" />
+    <link rel="icon" type="image/png" href="icon.png" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="hero">
+      <h1><span lang="ja">カナネコ</span> <span class="romaji">Kananeko</span></h1>
+      <p>
+        A tiny Game Boy Color game where a cool cat in sunglasses helps you read Japanese kana. Chat
+        your way through a day in town, then pick the missing kana.
+      </p>
+    </header>
+
+    <main>
+      <section class="console" aria-label="Play Kananeko">
+        <div class="screen">
+          <canvas id="screen" width="160" height="144" aria-label="Game screen"></canvas>
+          <button id="start" class="start" type="button" disabled>▶ Play</button>
+        </div>
+        <p id="status" class="status" role="status">Loading…</p>
+
+        <div id="controls" class="controls">
+          <div class="dpad" data-dpad aria-label="D-pad" role="group">
+            <span class="arm up"></span>
+            <span class="arm left"></span>
+            <span class="hub"></span>
+            <span class="arm right"></span>
+            <span class="arm down"></span>
+          </div>
+          <div class="ab">
+            <button type="button" class="round b" data-button="b" aria-label="B">B</button>
+            <button type="button" class="round a" data-button="a" aria-label="A">A</button>
+          </div>
+          <div class="pills">
+            <button type="button" class="pill" data-button="select">SELECT</button>
+            <button type="button" class="pill" data-button="start">START</button>
+          </div>
+        </div>
+
+        <div class="toolbar">
+          <button id="mute" type="button" class="toggle" aria-pressed="false">🔊 Sound on</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>How to play</h2>
+        <p>
+          Tap the buttons under the screen, or use a keyboard or a gamepad. Pick replies with the
+          d-pad and <kbd>A</kbd>; in a kana quiz, press the d-pad toward the missing kana.
+        </p>
+        <table class="keys">
+          <tbody>
+            <tr>
+              <th>D-pad</th>
+              <td>
+                <kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd> or <kbd>W</kbd><kbd>A</kbd
+                ><kbd>S</kbd><kbd>D</kbd>
+              </td>
+            </tr>
+            <tr>
+              <th>A</th>
+              <td><kbd>X</kbd> or <kbd>K</kbd></td>
+            </tr>
+            <tr>
+              <th>B</th>
+              <td><kbd>Z</kbd> or <kbd>J</kbd></td>
+            </tr>
+            <tr>
+              <th>START</th>
+              <td><kbd>Enter</kbd></td>
+            </tr>
+            <tr>
+              <th>SELECT</th>
+              <td><kbd>Shift</kbd> or <kbd>Backspace</kbd></td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="hint">On iPhone, sound plays only with the ringer switch on.</p>
+      </section>
+
+      <section class="card">
+        <h2>About the game</h2>
+        <p>
+          Kananeko follows you through five places in town: the station, a street, a ramen counter,
+          a convenience store, and an evening park. Everyone you meet speaks Japanese in kana; pick
+          the friendly reply. After each conversation, a short quiz asks about the words you just
+          read, and the day ends with a speed round.
+        </p>
+        <div class="shots">
+          <img
+            src="screenshots/scene1-choices.png"
+            alt="Talking to someone on the street"
+            width="160"
+            height="144"
+            loading="lazy"
+          />
+          <img
+            src="screenshots/kana-correct.png"
+            alt="A kana quiz, answered correctly"
+            width="160"
+            height="144"
+            loading="lazy"
+          />
+          <img
+            src="screenshots/scene2-intro.png"
+            alt="The ramen counter"
+            width="160"
+            height="144"
+            loading="lazy"
+          />
+          <img
+            src="screenshots/scene4-choices.png"
+            alt="The evening park"
+            width="160"
+            height="144"
+            loading="lazy"
+          />
+        </div>
+        <p>
+          It's a real Game Boy Color ROM, assembled entirely from TypeScript.
+          <a href="kananeko.gb" download>Download the ROM</a> to play it in any emulator, or read
+          the <a href="https://github.com/cv/kananeko">source on GitHub</a>.
+        </p>
+      </section>
+    </main>
+
+    <footer>
+      <p>
+        Emulation by <a href="https://github.com/binji/binjgb">binjgb</a> (MIT, Ben Smith). Kana
+        glyphs from <a href="https://littlelimit.net/misaki.htm">Misaki Gothic</a> by Num Kadoma.
+      </p>
+    </footer>
+
+    <script src="vendor/binjgb.js"></script>
+    <script src="play.js"></script>
+  </body>
+</html>

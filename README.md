@@ -6,6 +6,8 @@ You wander through five little locations — a train station, a street, a restau
 
 The whole thing is hand-assembled from TypeScript. No engine, no SDK — just raw opcodes wired into a 32 KB ROM.
 
+**▶ [Play it in your browser](https://cv.github.io/kananeko/)**, on a computer (keyboard or gamepad) or a phone (touch controls).
+
 ## 🗾 Locations
 
 | Scene      | Name              | Vibe                   |
@@ -67,6 +69,18 @@ describeScene(0, [
 ]);
 ```
 
+## 🌐 Website
+
+The [GitHub Pages site](https://cv.github.io/kananeko/) runs the ROM in [binjgb](https://github.com/binji/binjgb), a Game Boy emulator compiled to WebAssembly (vendored in `site/vendor/`), with a small player of our own (`site/src/`): touch controls, keyboard and gamepad input, and sound.
+
+```bash
+npm run site          # build/site: the page, the player, binjgb, and the ROM built from source
+npm run site:serve    # serve it at http://localhost:4173
+npm run test:site     # build it and test it in Chrome and in WebKit on an iPhone-sized screen
+```
+
+The browser tests (`site-tests/`) use Playwright; install its browsers once with `npx playwright install chromium webkit`. Every push to `main` rebuilds, tests, and publishes the site (`.github/workflows/pages.yml`).
+
 ## 📁 Project layout
 
 ```
@@ -76,8 +90,10 @@ src/
     scenes/      station, street, restaurant, conbini, park
   build.ts       ROM entry point
 test/            unit, integration, and emulator-driven tests
-scripts/         utility scripts
-build/           ROM output
+scripts/         utility scripts (screenshots, the site build)
+site/            the web player: page, styles, player source, vendored binjgb
+site-tests/      browser tests for the site (Playwright)
+build/           ROM and site output
 ```
 
 ## 🤓 Nerd notes

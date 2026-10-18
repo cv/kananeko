@@ -3,3 +3,5 @@ dist/
 build/
 coverage/
 .claude/worktrees/
+test-results/
+playwright-report/

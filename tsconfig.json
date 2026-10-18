@@ -17,5 +17,13 @@
       "@game/*": ["./src/game/*"]
     }
   },
-  "include": ["src/**/*.ts", "test/**/*.ts", "scripts/**/*.ts", "vitest.config.ts"]
+  "include": [
+    "src/**/*.ts",
+    "test/**/*.ts",
+    "scripts/**/*.ts",
+    "site/src/**/*.ts",
+    "site-tests/**/*.ts",
+    "vitest.config.ts",
+    "playwright.config.ts"
+  ]
 }
