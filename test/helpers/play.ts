@@ -69,6 +69,7 @@ export function playDialoguePath(
 export function loseDialogueLives(runner: GameRunner, sceneIdx: number, count: number): GameRunner {
   const tree = sceneDialogue(sceneIdx);
   const target = Math.max(0, runner.kanaLives - count);
+  runner.missRedemptions = true; // keep the lives lost
   for (let step = 0; step < MAX_DIALOGUE_STEPS && runner.kanaLives > target; step++) {
     const node = tree[runner.dlgNodeId];
     if (node === undefined) {

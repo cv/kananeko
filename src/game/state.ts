@@ -20,6 +20,19 @@ export const KanaState = {
   RETRY_FEEDBACK: 4,
 } as const;
 
+/** Values of MEM.KANA_MODE */
+export const KanaMode = {
+  /** Three tries per question, a life lost on the third miss */
+  NORMAL: 0,
+  /** One try: filling in your own reply scores like a first-try answer */
+  SAY_IT: 1,
+  /** One try: right after a bad answer, a correct kana wins the life back */
+  REDEEM: 2,
+} as const;
+
+/** Bit of MEM.DLG_PICK set when the last choice was a bad answer */
+export const BAD_PICK = 0x80;
+
 /** MEM.DLG_NODE_ID value meaning "conversation over" (also the encoded `next: null`). */
 export const END_OF_CONVERSATION = 0xff;
 

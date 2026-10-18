@@ -71,7 +71,7 @@ import {
   buildSetDelta,
   buildSubScore,
 } from './kana-hud';
-import { KanaState } from './state';
+import { KanaMode, KanaState, MAX_LIVES } from './state';
 import { type TilePosition, tilePos, tilemapAddr } from './tilemap';
 import { clearScreen, fadeInCurrent, fadeOut, screenOff, vramPut, writeCenteredRow } from './video';
 
@@ -453,7 +453,10 @@ export function buildKanaEngine(): Op[] {
     cp_r('b'),
     jr_cc('nz', ref('kana_wrong')),
 
-    // === CORRECT: score depends on the attempt number ===
+    // === CORRECT: a won-back life, or a score that depends on the attempt number ===
+    ld_a_nn(MEM.KANA_MODE),
+    cp_n(u8(KanaMode.REDEEM)),
+    jp_cc('z', ref('kana_redeem_win')),
     ld_a_nn(MEM.KANA_ATTEMPTS),
     cp_n(u8(0)),
     jr_cc('nz', ref('kana_score_attempt1')),
@@ -480,6 +483,9 @@ export function buildKanaEngine(): Op[] {
 
     // === WRONG ===
     label('kana_wrong'),
+    ld_a_nn(MEM.KANA_MODE),
+    cp_n(u8(KanaMode.NORMAL)),
+    jp_cc('nz', ref('kana_chance_miss')), // one-try rounds just show the answer
     ld_a_nn(MEM.KANA_ATTEMPTS),
     cp_n(u8(MAX_ATTEMPTS)),
     jr_cc('z', ref('kana_death')),
@@ -508,6 +514,25 @@ export function buildKanaEngine(): Op[] {
     jp_cc('z', ref('kana_all_done')), // no lives left: end the round now
 
     // Show feedback, then move on to the next question
+    ...enterFeedback(KanaState.ADVANCE_FEEDBACK),
+    ret(),
+
+    // === One-try rounds ===
+    label('kana_redeem_win'), // the life lost to a bad answer comes back
+    ld_a_nn(MEM.KANA_LIVES),
+    cp_n(u8(MAX_LIVES)),
+    jr_cc('nc', ref('kana_redeem_full')),
+    inc_r('a'),
+    ld_nn_a(MEM.KANA_LIVES),
+    label('kana_redeem_full'),
+    ...buildClearDelta(),
+    jp(ref('kana_correct_done')),
+
+    label('kana_chance_miss'), // no penalty: reveal and move on
+    ...buildClearDelta(),
+    ...showMessage(KANA_MESSAGES.reveal),
+    ...showFace('sad'),
+    call(ref('kana_reveal')),
     ...enterFeedback(KanaState.ADVANCE_FEEDBACK),
     ret(),
 

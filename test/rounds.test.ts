@@ -5,13 +5,15 @@ import {
   QUESTIONS_PER_BREAK,
   buildRoundsData,
   conversationBreaks,
-  planRounds,
+  REDEEM_KEY,
+  planQuiz,
 } from '@game/rounds';
 import { type DialogueNode } from '@game/dialogue';
 import { CHAR_MAP } from '@game/font';
 import { phrasesOf } from '@game/quiz';
 import { type KanaQuestion, buildKanaData } from '@game/kana';
-import { END_OF_CONVERSATION } from '@game/state';
+import { BAD_PICK, END_OF_CONVERSATION } from '@game/state';
+import { BAD_CHOICE_FLAG } from '@game/dialogue-data';
 import { type SceneCast } from '@game/scenes/npcs';
 
 const q = (word: string): KanaQuestion => ({
@@ -20,6 +22,8 @@ const q = (word: string): KanaQuestion => ({
   correct: 'あ',
   distractors: ['い', 'う', 'え'],
 });
+
+const line = (text: string): DialogueNode => ({ text, choices: [{ text: 'はい', next: null }] });
 
 const CAST: SceneCast = {
   npcs: [],
@@ -42,18 +46,58 @@ describe('conversationBreaks', () => {
 });
 
 describe('planRounds', () => {
-  const line = (text: string): DialogueNode => ({ text, choices: [{ text: 'はい', next: null }] });
   const dialogue = Array.from({ length: 24 }, (_, i) =>
     line(i < 10 ? 'おはよう ございます' : i < 20 ? 'さくらが きれい' : 'たのしい ですね'),
   );
 
   it('asks about each conversation after it, then the review at the end', () => {
     const review = [q('あい')];
-    const rounds = planRounds(CAST, dialogue, review);
+    const { rounds } = planQuiz(CAST, dialogue, review);
     expect(rounds.map((r) => r.at)).toEqual([10, 20, END_OF_CONVERSATION]);
     expect(rounds[0]?.questions.map((x) => x.word)).toEqual(['おはよう', 'ございます']);
     expect(rounds[1]?.questions.map((x) => x.word)).toEqual(['さくらが', 'きれい']);
     expect(rounds[2]?.questions).toBe(review);
+  });
+});
+
+describe('planQuiz chances', () => {
+  const bad = (text: string): DialogueNode => ({
+    text,
+    choices: [
+      { text: 'はい', next: 1 },
+      { text: 'いいえ', next: 1, rating: 'bad' },
+    ],
+  });
+
+  it('asks about the line a bad answer was given to', () => {
+    const dialogue = [bad('おはよう ございます'), line('さくらが きれい')];
+    const { chances } = planQuiz({ npcs: [], segments: [{ from: 0, npc: 0 }] }, dialogue, [
+      q('あい'),
+    ]);
+    expect(chances.map((c) => c.key)).toEqual([0 | REDEEM_KEY]);
+    expect(['おはよう', 'ございます']).toContain(chances[0]?.questions[0]?.word);
+  });
+
+  it('falls back to the rest of the conversation when the line has nothing to ask', () => {
+    const dialogue = [line('さくらが きれい'), bad('え?')];
+    const { chances } = planQuiz({ npcs: [], segments: [{ from: 0, npc: 0 }] }, dialogue, [
+      q('あい'),
+    ]);
+    expect(chances.map((c) => c.key)).toEqual([1 | REDEEM_KEY]);
+    expect(['さくらが', 'きれい']).toContain(chances[0]?.questions[0]?.word);
+  });
+
+  it('skips a bad answer when there is nothing left to ask', () => {
+    const { chances } = planQuiz(
+      { npcs: [], segments: [{ from: 0, npc: 0 }] },
+      [bad('え?')],
+      [q('あい')],
+    );
+    expect(chances).toEqual([]);
+  });
+
+  it('marks bad picks the way the dialogue data marks bad answers', () => {
+    expect(BAD_PICK).toBe(BAD_CHOICE_FLAG);
   });
 });
 

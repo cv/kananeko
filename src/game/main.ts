@@ -41,6 +41,7 @@ import {
   ldh_n_a,
   ldi_a_hl,
   ldi_hl_a,
+  or_n,
   or_r,
   pop,
   push,
@@ -67,7 +68,8 @@ import {
 } from './kana-hud';
 import { centerStartCol, tilemapAddr } from './tilemap';
 import { type PackedScene, type Scene, SCENES, buildSceneData } from './scene';
-import { END_OF_CONVERSATION, MAX_LIVES } from './state';
+import { BAD_PICK, END_OF_CONVERSATION, KanaMode, MAX_LIVES } from './state';
+import { REDEEM_KEY } from './rounds';
 import { type ColorScheme, buildPaletteSet, paletteOf } from './color';
 import { ENDING_COLORS, GAME_OVER_COLORS, TITLE_COLORS } from './scenes/colors';
 import { BACKDROP } from './backdrop';
@@ -126,6 +128,10 @@ const SCORE_DIGITS = 4;
 
 export function sceneDialogueLabel(sceneIndex: number): string {
   return `scene${String(sceneIndex)}_dlg`;
+}
+
+export function sceneChancesLabel(sceneIndex: number): string {
+  return `scene${String(sceneIndex)}_chances`;
 }
 
 export function sceneRoundsLabel(sceneIndex: number): string {
@@ -212,56 +218,97 @@ function engineLoop(name: string, update: string, stateAddr: U16): Op[] {
 }
 
 /**
- * round_check — if the scene has an unplayed kana round at DLG_NODE_ID, play it.
- * Returns NZ if a round ran (the screen then shows the round, not the scene).
+ * Kana rounds inside a scene:
+ * - table_find: HL = question table (see buildQuestionTable), D = key.
+ *   Z if absent; NZ with DE = the question list and C = the entry's bit (1 << index).
+ * - round_check: play the unplayed round at DLG_NODE_ID, if any.
+ * - chance_check: after a bad answer, a chance to win the life back; after picking a
+ *   reply to fill in, the fill-in.
+ * - play_round: DE = question list, KANA_MODE set; hides the speaker, plays, sets ROUND_RAN.
  */
-function buildRoundCheck(): Op[] {
+function buildRoundRoutines(): Op[] {
   return [
-    label('round_check'),
-    ...loadPointer('hl', MEM.ROUNDS_LO, MEM.ROUNDS_HI),
-    ldi_a_hl(), // round count
-    ld_r_r('b', 'a'),
-    ld_r_n('c', u8(1)), // this round's ROUNDS_DONE bit
-    ld_a_nn(MEM.DLG_NODE_ID),
-    ld_r_r('d', 'a'),
-    label('round_scan'),
+    label('table_find'),
+    push('hl'), // table start, for the offset
+    ldi_a_hl(),
+    ld_r_r('b', 'a'), // entries left
+    ld_r_n('c', u8(1)),
+    label('table_scan'),
     ld_r_r('a', 'b'),
     or_r('a'),
-    ret_cc('z'), // no round at this node
+    jr_cc('z', ref('table_absent')),
     ldi_a_hl(),
     cp_r('d'),
-    jr_cc('z', ref('round_found')),
+    jr_cc('z', ref('table_found')),
     inc_rr('hl'), // skip the offset
     inc_rr('hl'),
     sla('c'),
     dec_r('b'),
-    jr(ref('round_scan')),
-
-    label('round_found'),
-    ld_a_nn(MEM.ROUNDS_DONE),
-    and_r('c'),
-    jr_cc('z', ref('round_fresh')),
-    xor_r('a'), // already played (dialogue looped back): Z
+    jr(ref('table_scan')),
+    label('table_absent'),
+    pop('hl'),
+    xor_r('a'), // Z
     ret(),
-    label('round_fresh'),
-    ld_a_nn(MEM.ROUNDS_DONE),
-    or_r('c'),
-    ld_nn_a(MEM.ROUNDS_DONE),
-    // DE = rounds data + offset of this round's questions
+    label('table_found'),
     ldi_a_hl(),
     ld_r_r('e', 'a'),
-    ld_r_r('d', 'hl_ptr'),
-    ...loadPointer('hl', MEM.ROUNDS_LO, MEM.ROUNDS_HI),
+    ld_r_r('d', 'hl_ptr'), // DE = offset
+    pop('hl'),
     add_hl_rr('de'),
     ld_r_r('d', 'h'),
     ld_r_r('e', 'l'),
+    ld_r_n('a', u8(1)),
+    or_r('a'), // NZ
+    ret(),
+
+    label('round_check'),
+    ...loadPointer('hl', MEM.ROUNDS_LO, MEM.ROUNDS_HI),
+    ld_a_nn(MEM.DLG_NODE_ID),
+    ld_r_r('d', 'a'),
+    call(ref('table_find')),
+    ret_cc('z'),
+    ld_a_nn(MEM.ROUNDS_DONE),
+    and_r('c'),
+    ret_cc('nz'), // already played (the dialogue looped back)
+    ld_a_nn(MEM.ROUNDS_DONE),
+    or_r('c'),
+    ld_nn_a(MEM.ROUNDS_DONE),
+    ...storeByte(MEM.KANA_MODE, KanaMode.NORMAL),
+    jr(ref('play_round')),
+
+    label('chance_check'),
+    ld_a_nn(MEM.DLG_PICK),
+    ld_r_r('b', 'a'),
+    and_n(u8(BAD_PICK)),
+    jr_cc('z', ref('chance_not_bad')),
+    ld_a_nn(MEM.KANA_LIVES),
+    or_r('a'),
+    ret_cc('z'), // the conversation is over anyway
+    ld_a_nn(MEM.DLG_FROM_NODE),
+    or_n(u8(REDEEM_KEY)),
+    ld_r_r('d', 'a'),
+    ld_r_n('a', u8(KanaMode.REDEEM)),
+    jr(ref('chance_find')),
+    label('chance_not_bad'),
+    ld_r_r('a', 'b'),
+    or_r('a'),
+    ret_cc('nz'), // only the first reply can be a fill-in
+    ld_a_nn(MEM.DLG_FROM_NODE),
+    ld_r_r('d', 'a'),
+    ld_r_n('a', u8(KanaMode.SAY_IT)),
+    label('chance_find'),
+    ld_nn_a(MEM.KANA_MODE),
+    ...loadPointer('hl', MEM.CHANCES_LO, MEM.CHANCES_HI),
+    call(ref('table_find')),
+    ret_cc('z'),
+
+    label('play_round'),
     push('de'),
     call(ref('npc_hide')),
     pop('de'),
     call(ref('kana_start')),
     ...engineLoop('round_loop', 'kana_update', MEM.KANA_STATE),
-    ld_r_n('a', u8(1)),
-    or_r('a'), // NZ: a round ran
+    ...storeByte(MEM.ROUND_RAN, 1),
     ret(),
   ];
 }
@@ -524,6 +571,12 @@ export function buildProgram(): Op[] {
       packedScenes,
     ),
     ...storePointer('hl', MEM.ROUNDS_LO, MEM.ROUNDS_HI),
+    ...sceneSwitch(
+      'scene_chances_ptr',
+      (_s, _p, i) => [ld_rr_nn('hl', ref(sceneChancesLabel(i)))],
+      packedScenes,
+    ),
+    ...storePointer('hl', MEM.CHANCES_LO, MEM.CHANCES_HI),
     call(ref('scene_draw')),
 
     // ==== Dialogue, with a kana round after each conversation ====
@@ -536,7 +589,11 @@ export function buildProgram(): Op[] {
 
     // Process nodes until the conversation ends
     ...engineLoop('scene_dlg_loop', 'dlg_update', MEM.DLG_STATE),
-    call(ref('round_check')), // a kana round before this node?
+    ...zeroBytes(MEM.ROUND_RAN),
+    call(ref('chance_check')), // a one-question chance after this choice?
+    call(ref('round_check')), // a kana round before the next node?
+    ld_a_nn(MEM.ROUND_RAN),
+    or_r('a'),
     jr_cc('z', ref('scene_no_round')),
     // Out of lives → game over
     ld_a_nn(MEM.KANA_LIVES),
@@ -622,7 +679,7 @@ export function buildProgram(): Op[] {
     ),
     call(ref('fade_in')),
     ret(),
-    ...buildRoundCheck(),
+    ...buildRoundRoutines(),
     ...buildReadJoypad(),
     ...buildTitleBlink(),
     ...buildCatBlink(),
@@ -654,6 +711,8 @@ export function buildProgram(): Op[] {
       db(scene.dialogueData),
       label(sceneRoundsLabel(i)),
       db(scene.roundsData),
+      label(sceneChancesLabel(i)),
+      db(scene.chancesData),
       label(sceneBackdropLabel(i)),
       db(scene.backdropData),
       label(sceneTilesLabel(i)),

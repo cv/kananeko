@@ -7,7 +7,13 @@
 
 import { type DialogueNode, buildDialogueTree } from './dialogue';
 import { type KanaQuestion, defineKanaQuestion } from './kana';
-import { type KanaCheckpoint, buildRoundsData, planRounds } from './rounds';
+import {
+  type KanaCheckpoint,
+  type QuizPlan,
+  buildQuestionTable,
+  buildRoundsData,
+  planQuiz,
+} from './rounds';
 import { textToTiles } from './font';
 import { SCENE_ICON_TILES } from './font-data';
 import { type Pair, type Quint } from './fixed';
@@ -178,6 +184,8 @@ export interface PackedScene {
   readonly dialogueData: Uint8Array;
   /** Kana rounds and their questions (see buildRoundsData) */
   readonly roundsData: Uint8Array;
+  /** One-question kana chances after particular choices (see planQuiz) */
+  readonly chancesData: Uint8Array;
   readonly backdropData: Uint8Array;
   /** Pixel data of the scene's own BG tiles (see SCENE_TILE_BASE) */
   readonly sceneTileData: Uint8Array;
@@ -193,10 +201,12 @@ export interface PackedScene {
 
 export function packScene(scene: Scene): PackedScene {
   const art = buildSceneArt(scene.backdrop);
+  const quiz = sceneQuiz(scene);
   return {
     nameRow: textToTiles(scene.name),
     dialogueData: buildDialogueTree(scene.dialogue),
-    roundsData: buildRoundsData(sceneRounds(scene)),
+    roundsData: buildRoundsData(quiz.rounds),
+    chancesData: buildQuestionTable(quiz.chances),
     backdropData: art.backdrop,
     sceneTileData: art.tileData,
     cast: packCast(scene.cast),
@@ -210,9 +220,14 @@ export function packScene(scene: Scene): PackedScene {
   };
 }
 
+/** When the scene's kana rounds and chances happen and what they ask */
+export function sceneQuiz(scene: Scene): QuizPlan {
+  return planQuiz(scene.cast, scene.dialogue, scene.kanaQuestions);
+}
+
 /** When the scene's kana rounds happen and what they ask */
 export function sceneRounds(scene: Scene): readonly KanaCheckpoint[] {
-  return planRounds(scene.cast, scene.dialogue, scene.kanaQuestions);
+  return sceneQuiz(scene).rounds;
 }
 
 export function buildSceneData(): PackedScene[] {

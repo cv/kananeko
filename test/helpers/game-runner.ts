@@ -9,7 +9,7 @@ import Gameboy from 'serverboy';
 import { MEM } from '@asm/hardware';
 import { buildRom } from '@game/main';
 import { SCENES, sceneRounds } from '@game/scene';
-import { DialogueState, END_OF_CONVERSATION, KanaState } from '@game/state';
+import { DialogueState, END_OF_CONVERSATION, KanaMode, KanaState } from '@game/state';
 
 // Build the ROM once per worker — shared across all tests
 const { rom, symbols } = buildRom();
@@ -209,6 +209,16 @@ export class GameRunner {
     return this.readMem(MEM.KANA_LIVES);
   }
 
+  get kanaMode(): number {
+    return this.readMem(MEM.KANA_MODE);
+  }
+
+  /**
+   * How dialogue helpers answer a chance to win a life back after a bad answer:
+   * correctly (default) or not, for tests that want lives to stay lost.
+   */
+  missRedemptions = false;
+
   /** Test shortcut: set the lives left by writing WRAM directly */
   setLives(lives: number): this {
     this.getMemory()[MEM.KANA_LIVES] = lives;
@@ -275,7 +285,7 @@ export class GameRunner {
       );
       if (choosing()) break;
       if (round > 16) throw new Error('Kana round never gave way to the dialogue');
-      this.answerKanaCorrectly();
+      this.answerKana(!(this.missRedemptions && this.kanaMode === KanaMode.REDEEM));
     }
     return this.frames(GameRunner.INPUT_DEBOUNCE);
   }

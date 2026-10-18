@@ -48,6 +48,7 @@ import {
   ret,
   ret_cc,
   sub_n,
+  or_r,
   xor_r,
 } from '../asm/ops';
 import { type Op, ref, u8, u16 } from '../asm/types';
@@ -491,12 +492,19 @@ export function buildDialogueEngine(): Op[] {
     ld_a_nn(MEM.DLG_CURSOR),
     ...buildLoadLogicalChoiceFromCursor('dlg_choice_logical'),
     ld_r_r('c', 'a'), // C = logical choice
+    ld_a_nn(MEM.DLG_NODE_ID),
+    ld_nn_a(MEM.DLG_FROM_NODE),
 
     ...loadPointer('hl', MEM.DLG_META0_LO, MEM.DLG_META0_HI),
     ld_r_n('b', u8(0)),
     add_hl_rr('bc'), // HL = table_base + logical_choice
     ldi_a_hl(),
     ld_r_r('b', 'a'), // B = raw next byte (bit 7 = bad answer)
+    // Remember what was picked (bad flag | logical choice) for kana chances
+    and_n(u8(BAD_CHOICE_FLAG)),
+    or_r('c'),
+    ld_nn_a(MEM.DLG_PICK),
+    ld_r_r('a', 'b'),
     and_n(u8(0xff ^ BAD_CHOICE_FLAG)),
     cp_n(u8(NEXT_END)),
     jr_cc('nz', ref('dlg_next_store')),

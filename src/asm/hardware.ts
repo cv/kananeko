@@ -124,6 +124,12 @@ export const MEM = {
   ROUNDS_LO: u16(0xc078), // pointer to the scene's rounds data (lo)
   ROUNDS_HI: u16(0xc079), // pointer to the scene's rounds data (hi)
   ROUNDS_DONE: u16(0xc07a), // bit i set = round i already played
+  ROUND_RAN: u16(0xc07b), // a round ran since the last dialogue choice (the scene needs redrawing)
+  CHANCES_LO: u16(0xc07c), // pointer to the scene's chances table (lo)
+  CHANCES_HI: u16(0xc07d), // pointer to the scene's chances table (hi)
+  KANA_MODE: u16(0xc07e), // KanaMode of the running round
+  DLG_FROM_NODE: u16(0xc07f), // node the last choice was made at
+  DLG_PICK: u16(0xc080), // last choice: logical index, bit 7 = bad answer
 
   // WRAM — scene system
   SCENE_ID: u16(0xc050), // Current scene index (0-4, 0xFF = title)
