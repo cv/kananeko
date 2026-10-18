@@ -204,7 +204,7 @@ export function packScene(scene: Scene): PackedScene {
   const quiz = sceneQuiz(scene);
   return {
     nameRow: textToTiles(scene.name),
-    dialogueData: buildDialogueTree(scene.dialogue),
+    dialogueData: buildDialogueTree(quiz.dialogue),
     roundsData: buildRoundsData(quiz.rounds),
     chancesData: buildQuestionTable(quiz.chances),
     backdropData: art.backdrop,

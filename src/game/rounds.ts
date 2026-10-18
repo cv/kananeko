@@ -11,6 +11,7 @@
 
 import { type DialogueNode } from './dialogue';
 import { choiceRating } from './dialogue-data';
+import { CAT_TILES } from './font-data';
 import { buildKanaData, type KanaQuestion } from './kana';
 import { type QuizHistory, generateQuestions } from './quiz';
 import { type SceneCast } from './scenes/npcs';
@@ -43,12 +44,18 @@ export interface QuizPlan {
   readonly rounds: readonly KanaCheckpoint[];
   /** One-question rounds keyed by the node a choice was made at (see REDEEM_KEY) */
   readonly chances: readonly KeyedQuestions[];
+  /** The dialogue as packed: each fill-in reply shows its blank */
+  readonly dialogue: readonly DialogueNode[];
 }
+
+/** The tile shown in place of the kana to fill in */
+export const FILL_IN_BLANK = CAT_TILES.BLANK;
 
 /**
  * Plan a scene's kana: a round after each conversation asking about phrases from it,
- * the authored review questions at the end, and a chance to win a life back after
- * each node's bad answer, asking about that node's line.
+ * the authored review questions at the end, a reply per conversation that the player
+ * fills in themselves, and a chance to win a life back after each bad answer, asking
+ * about the line it was given to.
  */
 export function planQuiz(
   cast: SceneCast,
@@ -75,14 +82,57 @@ export function planQuiz(
     ),
   }));
 
-  const chances = dialogue.flatMap((node, n) => {
+  const sayIts = [0, ...breaks].flatMap((start, i) => {
+    const end = breaks[i] ?? dialogue.length;
+    const middle = (start + end) / 2;
+    const candidates = dialogue
+      .map((node, n) => ({ node, n }))
+      .slice(start, end)
+      .filter(({ node, n }) => n > 0 && isFillInCandidate(node))
+      .sort((x, y) => Math.abs(x.n - middle) - Math.abs(y.n - middle) || x.n - y.n);
+    for (const { node, n } of candidates) {
+      const replies = node.choices.slice(0, 1).map(({ text }) => ({ text, choices: [] }));
+      const [question] = generateQuestions(replies, 1, history);
+      if (question !== undefined) return [{ key: n, questions: [question] }];
+    }
+    return [];
+  });
+
+  const redemptions = dialogue.flatMap((node, n) => {
     if (!node.choices.some((choice, i) => choiceRating(choice, i) === 'bad')) return [];
     const own = generateQuestions([node], 1, history);
     const questions = own.length > 0 ? own : generateQuestions(conversation(n), 1, history);
     return questions.length > 0 ? [{ key: n | REDEEM_KEY, questions }] : [];
   });
 
-  return { rounds: [...rounds, { at: END_OF_CONVERSATION, questions: review }], chances };
+  const fillIns = new Map(sayIts.map((sayIt) => [sayIt.key, sayIt]));
+  return {
+    rounds: [...rounds, { at: END_OF_CONVERSATION, questions: review }],
+    chances: [...sayIts.map(({ key, questions }) => ({ key, questions })), ...redemptions],
+    dialogue: dialogue.map((node, n) => {
+      const fillIn = fillIns.get(n);
+      const [first, ...others] = node.choices;
+      const question = fillIn?.questions[0];
+      if (first === undefined || question === undefined) return node;
+      return { ...node, choices: [{ ...first, text: blankOut(first.text, question) }, ...others] };
+    }),
+  };
+}
+
+/** A node whose good reply can become a fill-in: it has no bad answer and leads on */
+function isFillInCandidate(node: DialogueNode): boolean {
+  return (
+    (node.choices[0]?.next ?? null) !== null &&
+    !node.choices.some((choice, i) => choiceRating(choice, i) === 'bad')
+  );
+}
+
+/** The reply with the question's kana replaced by the blank */
+function blankOut(reply: string, question: KanaQuestion): string {
+  const chars = Array.from(reply);
+  const at = Array.from(reply.slice(0, reply.indexOf(question.word))).length + question.blankIndex;
+  chars[at] = FILL_IN_BLANK;
+  return chars.join('');
 }
 
 /** A question list found by a one-byte key (see buildQuestionTable) */

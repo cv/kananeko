@@ -4,7 +4,9 @@ import { describe, expect, it } from 'vitest';
 import { type DialogueNode } from '@game/dialogue';
 import { choiceRating } from '@game/dialogue-data';
 import { SCENES, sceneQuiz } from '@game/scene';
-import { REDEEM_KEY } from '@game/rounds';
+import { FILL_IN_BLANK, REDEEM_KEY } from '@game/rounds';
+import { DIALOGUE_LAYOUT } from '@game/dialogue';
+import { asSeenOnScreen, readText } from '../helpers/screen';
 import { KanaMode, KanaState, MAX_LIVES } from '@game/state';
 import { checkpoint, runnerAt } from '../helpers/checkpoints';
 import { type GameRunner } from '../helpers/game-runner';
@@ -20,6 +22,64 @@ function afterBadAnswer(): GameRunner {
   expect(runner.kanaLives).toBe(MAX_LIVES - 1);
   return runner;
 }
+
+const SAY_IT = sceneQuiz(STATION).chances.find((chance) => (chance.key & REDEEM_KEY) === 0);
+if (SAY_IT === undefined) throw new Error('the station has no fill-in reply');
+const FILL_IN_REPLY = sceneQuiz(STATION).dialogue[SAY_IT.key]?.choices[0]?.text ?? '';
+
+/** Choices (logical indices) leading from node 0 to `target`, shortest first */
+function routeTo(tree: readonly DialogueNode[], target: number): number[] {
+  const routes = new Map<number, number[]>([[0, []]]);
+  const queue = [0];
+  for (let node = queue.shift(); node !== undefined; node = queue.shift()) {
+    const route = routes.get(node) ?? [];
+    if (node === target) return route;
+    tree[node]?.choices.forEach((choice, i) => {
+      if (choice.next !== null && !routes.has(choice.next)) {
+        routes.set(choice.next, [...route, i]);
+        queue.push(choice.next);
+      }
+    });
+  }
+  throw new Error(`Node ${String(target)} is unreachable`);
+}
+
+/** Play up to the first fill-in reply */
+function atFillIn(): GameRunner {
+  const runner = runnerAt(checkpoint.sceneStart(0));
+  for (const choice of routeTo(STATION.dialogue, SAY_IT?.key ?? 0))
+    runner.chooseDialogueChoice(choice);
+  return runner.waitForDialogueChoices();
+}
+
+describe('Given a reply to fill in', () => {
+  it('shows the reply with a kana blanked out', () => {
+    expect(FILL_IN_REPLY).toContain(FILL_IN_BLANK);
+    const runner = atFillIn();
+    const rows = DIALOGUE_LAYOUT.choiceRows.map((row) =>
+      readText(runner, row, DIALOGUE_LAYOUT.choiceCol, Array.from(FILL_IN_REPLY).length),
+    );
+    expect(rows).toContain(asSeenOnScreen(FILL_IN_REPLY));
+  });
+
+  it('asks for the missing kana once the reply is picked, scoring a first-try answer', () => {
+    const runner = atFillIn().chooseDialogueChoice(0).waitForKanaInput();
+    expect(runner.kanaMode).toBe(KanaMode.SAY_IT);
+    const score = runner.kanaScore;
+    runner.answerKanaCorrectly();
+    expect(runner.kanaScore - score).toBe(100);
+  });
+
+  it('just shows the answer after a miss, and the conversation goes on', () => {
+    const runner = atFillIn().chooseDialogueChoice(0).waitForKanaInput();
+    const { kanaScore, kanaLives } = runner;
+    runner.answerKanaWrong();
+    expect(runner.kanaScore).toBe(kanaScore);
+    expect(runner.kanaLives).toBe(kanaLives);
+    runner.waitForDialogueChoices();
+    expect(runner.dlgNodeId).toBe(STATION.dialogue[SAY_IT.key]?.choices[0]?.next);
+  });
+});
 
 describe('Given a bad answer in a conversation', () => {
   it('offers one kana question about that line', () => {
