@@ -48,6 +48,14 @@ const CAT_SAD_ROWS: Readonly<Record<number, string>> = {
   19: '..#-----------#-',
 };
 
+/** Rows that change while the cat blinks: eyes shut */
+const CAT_BLINK_ROWS: Readonly<Record<number, string>> = {
+  11: '.#--------------',
+  12: '.#--------------',
+  13: '.#---#####------',
+  14: '.#--------------',
+};
+
 export const CAT_PORTRAIT = mirrorHalf(CAT_LEFT);
 export const CAT_PORTRAIT_SAD = mirrorHalf(CAT_LEFT.map((row, i) => CAT_SAD_ROWS[i] ?? row));
 
@@ -57,6 +65,15 @@ const CAT_SAD = artVariant(CAT_PORTRAIT_CHARS, CAT_PORTRAIT, CAT_PORTRAIT_SAD, 0
 /** Characters of the sad portrait (shares unchanged tiles with the happy one) */
 export const CAT_SAD_CHARS = CAT_SAD.chars;
 
+const CAT_BLINK = artVariant(
+  CAT_PORTRAIT_CHARS,
+  CAT_PORTRAIT,
+  mirrorHalf(CAT_LEFT.map((row, i) => CAT_BLINK_ROWS[i] ?? row)),
+  0xe070,
+);
+/** Characters of the portrait with its eyes shut */
+export const CAT_BLINK_CHARS = CAT_BLINK.chars;
+
 const CAT_PORTRAIT_GLYPHS: Record<string, Glyph> = {};
 sliceArt(CAT_PORTRAIT).forEach((glyph, i) => {
   CAT_PORTRAIT_GLYPHS[artChar(0xe000 + i)] = glyph;
@@ -65,6 +82,7 @@ sliceArt(CAT_PORTRAIT).forEach((glyph, i) => {
 export const CAT: Record<string, Glyph> = {
   ...CAT_PORTRAIT_GLYPHS,
   ...CAT_SAD.glyphs,
+  ...CAT_BLINK.glyphs,
 
   // Small cat faces (kana round): neutral, happy, sad
   '\uE010': [

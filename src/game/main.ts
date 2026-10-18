@@ -194,6 +194,8 @@ interface ResultScreen {
   readonly cat: readonly (readonly number[])[];
   readonly title: string;
   readonly palette: Palette;
+  /** Whether the (happy) portrait blinks */
+  readonly blink: boolean;
 }
 
 const ENDING: ResultScreen = {
@@ -201,6 +203,7 @@ const ENDING: ResultScreen = {
   cat: CAT_ROWS,
   title: ENDING_TITLE,
   palette: ENDING_PALETTE,
+  blink: true,
 };
 
 const GAME_OVER: ResultScreen = {
@@ -208,6 +211,7 @@ const GAME_OVER: ResultScreen = {
   cat: CAT_SAD_ROWS,
   title: 'GAME OVER',
   palette: GAME_OVER_PALETTE,
+  blink: false, // the sad portrait keeps its own eyes
 };
 
 /** Width of the stamp row: each scene icon is 2 tiles, one blank tile apart */
@@ -256,6 +260,7 @@ function buildResultScreen(screen: ResultScreen): Op[] {
     ...waitFrame(),
     call(ref('joy_read')),
     call(ref('title_blink')),
+    ...(screen.blink ? [call(ref('cat_blink'))] : []),
     ld_a_nn(MEM.JOYPAD_NEW),
     and_n(u8(JOY.START)),
     jr_cc('z', ref(`${name}_loop`)),
@@ -264,6 +269,44 @@ function buildResultScreen(screen: ResultScreen): Op[] {
     ...fadeOut(),
     ...screenOff(`${name}_to_title`),
     jp(ref('title_screen')),
+  ];
+}
+
+/** Frames between blinks (a power of two) and how long the eyes stay shut */
+const BLINK_PERIOD = 128;
+const BLINK_FRAMES = 8;
+const BLINK_START = BLINK_PERIOD - 2 * BLINK_FRAMES;
+const CAT_EYES_ROW = 3; // portrait row 1 on the title and ending screens
+
+/** When the title cat blinks, for tests and tools */
+export const CAT_BLINK_TIMING = {
+  period: BLINK_PERIOD,
+  start: BLINK_START,
+  frames: BLINK_FRAMES,
+  eyesRow: CAT_EYES_ROW,
+} as const;
+
+/** Subroutine: shut and reopen the portrait's eyes, timed by TITLE_TIMER (LCD on). */
+function buildCatBlink(): Op[] {
+  const eyes = (chars: readonly string[]): Op[] =>
+    writeCenteredRow(
+      CAT_EYES_ROW,
+      chars.map((ch) => requireTile(ch)),
+      { lcdOn: true },
+    );
+  return [
+    label('cat_blink'),
+    ld_a_nn(MEM.TITLE_TIMER),
+    and_n(u8(BLINK_PERIOD - 1)),
+    cp_n(u8(BLINK_START)),
+    jr_cc('z', ref('cat_blink_shut')),
+    cp_n(u8(BLINK_START + BLINK_FRAMES)),
+    ret_cc('nz'),
+    ...eyes(CAT_TILES.ROW1),
+    ret(),
+    label('cat_blink_shut'),
+    ...eyes(CAT_TILES.BLINK_EYES),
+    ret(),
   ];
 }
 
@@ -358,6 +401,7 @@ export function buildProgram(): Op[] {
     call(ref('joy_read')),
 
     call(ref('title_blink')),
+    call(ref('cat_blink')),
 
     ld_a_nn(MEM.JOYPAD_NEW),
     and_n(u8(JOY.START)),
@@ -443,6 +487,7 @@ export function buildProgram(): Op[] {
     // ==== Subroutines ====
     ...buildReadJoypad(),
     ...buildTitleBlink(),
+    ...buildCatBlink(),
     ...buildDrawStartBox(),
     ...buildDialogueEngine(),
     ...buildKanaEngine(),
