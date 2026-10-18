@@ -15,26 +15,28 @@
 
 import { type Op, type TileIndex, type U16, ref, u8, u16 } from '../asm/types';
 import {
+  adc_n,
+  add_n,
+  add_r,
+  call,
+  cp_n,
+  cp_r,
+  dec_r,
+  inc_r,
+  jp_cc,
+  jr,
+  jr_cc,
   label,
+  ld_a_nn,
+  ld_nn_a,
   ld_r_n,
   ld_r_r,
   ld_rr_nn,
-  ld_a_nn,
-  ld_nn_a,
-  and_n,
-  cp_n,
-  cp_r,
-  add_n,
-  adc_n,
-  sub_n,
-  sbc_n,
-  dec_r,
-  inc_r,
-  jr,
-  jr_cc,
-  jp,
-  jp_cc,
   ret,
+  ret_cc,
+  sbc_n,
+  sub_n,
+  sub_r,
 } from '../asm/ops';
 import { MEM } from '../asm/hardware';
 import { switchCases, zeroBytes } from '../asm/macros';
@@ -91,7 +93,6 @@ const MINUS_TILE: TileIndex = requireTile('-');
 const SPACE_TILE: TileIndex = requireTile(' ');
 
 const [d0, d1, , , , d5] = DIGIT_TILES;
-const SCORE_ZERO_TILES: HudTileRun = [d0, d0, d0, d0];
 const DELTA_CLEAR_TILES: HudTileRun = [SPACE_TILE, SPACE_TILE, SPACE_TILE, SPACE_TILE];
 const DELTA_TILE_RUNS: Record<DeltaType, HudTileRun> = {
   [DELTA_PLUS_100]: [PLUS_TILE, d1, d0, d0],
@@ -105,26 +106,56 @@ const DELTA_TILE_RUNS: Record<DeltaType, HudTileRun> = {
 // ---------------------------------------------------------------------------
 
 /** Generate 16-bit score add: SCORE += delta */
+/** Highest score the 4-digit HUD can show */
+export const MAX_SCORE = 9999;
+
+/** Add to the score, capped at MAX_SCORE (clobbers A, B). */
 export function buildAddScore(delta: ScoreDelta): Op[] {
+  return [ld_r_n('a', u8(delta)), call(ref('score_add'))];
+}
+
+/** Generate 16-bit score subtract: SCORE -= delta */
+/** Subtract from the score, stopping at zero (clobbers A, B). */
+export function buildSubScore(delta: ScoreDelta): Op[] {
+  return [ld_r_n('a', u8(delta)), call(ref('score_sub'))];
+}
+
+/** Subroutines score_add / score_sub: A = amount; the score stays within 0..MAX_SCORE. */
+export function buildScoreRoutines(): Op[] {
   return [
+    label('score_add'),
+    ld_r_r('b', 'a'),
     ld_a_nn(MEM.KANA_SCORE_LO),
-    add_n(u8(delta)),
+    add_r('b'),
     ld_nn_a(MEM.KANA_SCORE_LO),
     ld_a_nn(MEM.KANA_SCORE_HI),
     adc_n(u8(0)),
     ld_nn_a(MEM.KANA_SCORE_HI),
-  ];
-}
-
-/** Generate 16-bit score subtract: SCORE -= delta */
-export function buildSubScore(delta: ScoreDelta): Op[] {
-  return [
+    // Cap: HI > hi(MAX) or (HI == hi(MAX) and LO > lo(MAX))
+    cp_n(u8(MAX_SCORE >> 8)),
+    ret_cc('c'),
+    jr_cc('nz', ref('score_cap')),
     ld_a_nn(MEM.KANA_SCORE_LO),
-    sub_n(u8(delta)),
+    cp_n(u8((MAX_SCORE & 0xff) + 1)),
+    ret_cc('c'),
+    label('score_cap'),
+    ld_r_n('a', u8(MAX_SCORE & 0xff)),
+    ld_nn_a(MEM.KANA_SCORE_LO),
+    ld_r_n('a', u8(MAX_SCORE >> 8)),
+    ld_nn_a(MEM.KANA_SCORE_HI),
+    ret(),
+
+    label('score_sub'),
+    ld_r_r('b', 'a'),
+    ld_a_nn(MEM.KANA_SCORE_LO),
+    sub_r('b'),
     ld_nn_a(MEM.KANA_SCORE_LO),
     ld_a_nn(MEM.KANA_SCORE_HI),
     sbc_n(u8(0)),
     ld_nn_a(MEM.KANA_SCORE_HI),
+    ret_cc('nc'),
+    ...zeroBytes(MEM.KANA_SCORE_LO, MEM.KANA_SCORE_HI), // went below zero
+    ret(),
   ];
 }
 
@@ -253,14 +284,6 @@ export function buildDrawHudOps(): Op[] {
     ...Array.from({ length: MAX_LIVES }, (_, i) => buildHeart(i + 1)).flat(),
 
     // --- Score at cols 8-11 (centered) ---
-    // If negative, show 0000
-    ld_a_nn(MEM.KANA_SCORE_HI),
-    and_n(u8(0x80)),
-    jr_cc('z', ref('kana_score_positive')),
-    ...buildDrawTilesAt(0, SCORE_COL, SCORE_ZERO_TILES),
-    jp(ref('kana_score_done')),
-
-    label('kana_score_positive'),
     ld_a_nn(MEM.KANA_SCORE_HI),
     ld_r_r('d', 'a'),
     ld_a_nn(MEM.KANA_SCORE_LO),

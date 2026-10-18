@@ -68,6 +68,13 @@ describe('Given the player picks good or bad answers', () => {
     expect(runner.deltaType).toBe(DELTA_PLUS_10);
   });
 
+  it('never lets the score drop below zero', () => {
+    const runner = openingDialogue().chooseDialogueChoice(1);
+    expect(runner.kanaScore).toBe(0);
+    runner.chooseDialogueChoice(0);
+    expect(runner.kanaScore).toBe(10);
+  });
+
   it('never raises lives above the cap', () => {
     const runner = openingDialogue().chooseDialogueChoice(0);
     expect(runner.kanaLives).toBe(MAX_LIVES);
