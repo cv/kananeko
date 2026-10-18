@@ -80,7 +80,8 @@ import { centerStartCol, tilemapAddr } from './tilemap';
 import { type PackedScene, type Scene, SCENES, SPEED_ROUND, buildSceneData } from './scene';
 import { BAD_PICK, END_OF_CONVERSATION, KanaMode, MAX_LIVES } from './state';
 import { REDEEM_KEY } from './rounds';
-import { type ColorScheme, buildPaletteSet } from './color';
+import { type ColorScheme, buildPaletteSet, paletteOf } from './color';
+import { LOGO_ROWS } from './logo';
 import { ENDING_COLORS, GAME_OVER_COLORS, TITLE_COLORS } from './scenes/colors';
 import { BACKDROP } from './backdrop';
 import {
@@ -93,6 +94,7 @@ import {
   clearScreen,
   fadeIn,
   fadeOut,
+  fillAttributes,
   screenOff,
   writeCenteredRow,
 } from './video';
@@ -107,7 +109,9 @@ export const ROM_HEADER: ROMHeader = {
 // Title screen content
 // ---------------------------------------------------------------------------
 
-const TITLE = 'カナネコ';
+/** Rows of the two-row カナネコ logo */
+const LOGO_TOP_ROW = 6;
+const LOGO_WIDTH = Array.from(LOGO_ROWS[0]).length;
 const SUBTITLE = 'ねこと にほんごの たび';
 
 const START_BOX_TOP = textToTiles('┌────────────┐');
@@ -490,7 +494,17 @@ export function buildProgram(): Op[] {
 
     // Score HUD on row 0, title card, and prompt frame (the cat comes after the fade)
     call(ref('kana_draw_hud')),
-    ...writeCenteredRow(7, textToTiles(TITLE)),
+    ...LOGO_ROWS.flatMap((row, i) => writeCenteredRow(LOGO_TOP_ROW + i, textToTiles(row))),
+    ...cgbAttributes(
+      'title_logo_colors',
+      fillAttributes(
+        LOGO_TOP_ROW,
+        centerStartCol(LOGO_WIDTH),
+        LOGO_ROWS.length,
+        LOGO_WIDTH,
+        paletteOf(TITLE_COLORS, 'cat'),
+      ),
+    ),
     ...writeCenteredRow(10, textToTiles(SUBTITLE)),
     call(ref('draw_start_box')),
     ...fadeIn(TITLE_FADE),
