@@ -65,6 +65,7 @@ import {
   buildDrawScoreDigits,
   buildScoreDigits,
   buildScoreRoutines,
+  SCORE_DIGIT_COUNT,
 } from './kana-hud';
 import { centerStartCol, tilemapAddr } from './tilemap';
 import { type PackedScene, type Scene, SCENES, buildSceneData } from './scene';
@@ -120,7 +121,6 @@ const BLINK_BIT = 0x20;
 const ENDING_TITLE = 'おめでとう!';
 const ENDING_SCORE_LABEL = 'とくてん ';
 const ENDING_ROWS = { cat: 2, title: 6, stamps: 8, score: 10 } as const;
-const SCORE_DIGITS = 4;
 
 // ---------------------------------------------------------------------------
 // Program helpers
@@ -185,7 +185,7 @@ function sceneSwitch(
   return [ld_a_nn(MEM.SCENE_ID), ...switchCases(cases, { name, branch: 'jp', exit: 'jp' })];
 }
 
-/** Reset score, delta flash, and lives (plus any extra bytes to zero) for a new run. */
+/** Reset score, delta flash, streak, and lives (plus any extra bytes to zero) for a new run. */
 function resetRunState(...alsoZero: U16[]): Op[] {
   return [
     ...zeroBytes(
@@ -194,6 +194,7 @@ function resetRunState(...alsoZero: U16[]): Op[] {
       MEM.KANA_SCORE_HI,
       MEM.DELTA_TYPE,
       MEM.DELTA_TIMER,
+      MEM.KANA_STREAK,
     ),
     ...storeByte(MEM.KANA_LIVES, MAX_LIVES),
   ];
@@ -370,7 +371,7 @@ function drawClearedStamps(name: string, row: number): Op[] {
 function buildResultScreen(screen: ResultScreen): Op[] {
   const { name } = screen;
   const labelTiles = textToTiles(ENDING_SCORE_LABEL);
-  const scoreCol = centerStartCol(labelTiles.length + SCORE_DIGITS);
+  const scoreCol = centerStartCol(labelTiles.length + SCORE_DIGIT_COUNT);
   return [
     label(name),
     ...fadeOut(),

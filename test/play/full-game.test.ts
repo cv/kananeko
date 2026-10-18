@@ -49,7 +49,7 @@ describe('Given the player has finished the game', () => {
 
   it('shows the final score', () => {
     const runner = ending();
-    expect(row(runner, 10)).toBe(`とくてん ${String(runner.kanaScore).padStart(4, '0')}`);
+    expect(row(runner, 10)).toBe(`とくてん ${String(runner.kanaScore).padStart(5, '0')}`);
   });
 
   it('waits on the ending screen until START', () => {

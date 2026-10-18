@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { CAT_TILES } from '@game/font-data';
-import { KANA_LAYOUT, KANA_MESSAGES, type KanaQuestion } from '@game/kana';
+import { KANA_LAYOUT, KANA_MESSAGES, type KanaQuestion, STREAK_BONUS } from '@game/kana';
 import { SCENES, sceneRounds } from '@game/scene';
 import { checkpoint, runnerAt } from '../helpers/checkpoints';
 import { type GameRunner } from '../helpers/game-runner';
@@ -62,12 +62,31 @@ describe.each(SCENES.map((scene, i) => [scene.name, i] as const))(
   },
 );
 
+describe('Given the player answers three in a row on the first try', () => {
+  it('cheers the streak and pays a bonus', () => {
+    const runner = waitForPicture(runnerAt(checkpoint.kanaStart(0)).frames(4)).resetStreak();
+    runner.answerKanaCorrectly().answerKanaCorrectly();
+    const before = runner.kanaScore;
+    runner.pressKanaAnswer(true).frames(FEEDBACK_SHOWN);
+    expect(prompt(runner)).toBe(KANA_MESSAGES.streak);
+    expect(runner.kanaScore - before).toBe(100 + STREAK_BONUS);
+    expect(runner.kanaStreak).toBe(0);
+  });
+
+  it('starts counting again after a miss', () => {
+    const runner = waitForPicture(runnerAt(checkpoint.kanaStart(0)).frames(4)).resetStreak();
+    runner.answerKanaCorrectly().answerKanaCorrectly();
+    runner.answerKanaWrong();
+    expect(runner.kanaStreak).toBe(0);
+  });
+});
+
 describe('Given the player answers the first station question', () => {
   const question = firstQuestion(0);
   const atRound = (): GameRunner => waitForPicture(runnerAt(checkpoint.kanaStart(0)).frames(4));
 
   it('celebrates a correct answer and fills in the word', () => {
-    const runner = atRound().pressKanaAnswer(true).frames(FEEDBACK_SHOWN);
+    const runner = atRound().resetStreak().pressKanaAnswer(true).frames(FEEDBACK_SHOWN);
     expect(prompt(runner)).toBe(KANA_MESSAGES.correct);
     expect(word(runner)).toBe(question.word);
     expect(catFace(runner)).toBe(CAT_TILES.FACE_HAPPY);

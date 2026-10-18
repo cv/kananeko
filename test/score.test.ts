@@ -28,8 +28,8 @@ function scoreAfter(start: number, ops: ReturnType<typeof buildAddScore>): numbe
 }
 
 describe('score_digits', () => {
-  it.each([0, 7, 10, 99, 100, 255, 256, 1000, 1009, 4860, 9990, MAX_SCORE])(
-    'converts %i into four digit tiles',
+  it.each([0, 7, 10, 99, 100, 255, 256, 1000, 1009, 4860, 9990, 10_000, 12_345, MAX_SCORE])(
+    'converts %i into five digit tiles',
     (score) => {
       const mem = runProgram(
         [
@@ -39,8 +39,8 @@ describe('score_digits', () => {
         ],
         buildScoreDigits(),
       );
-      expect(Array.from(mem.slice(MEM.SCORE_DIGITS, MEM.SCORE_DIGITS + 4))).toEqual(
-        textToTiles(String(score).padStart(4, '0')),
+      expect(Array.from(mem.slice(MEM.SCORE_DIGITS, MEM.SCORE_DIGITS + 5))).toEqual(
+        textToTiles(String(score).padStart(5, '0')),
       );
     },
   );
@@ -51,6 +51,7 @@ describe('score arithmetic', () => {
     [0, 10, 10],
     [250, 10, 260], // carries into the high byte
     [520, 100, 620],
+    [9990, 100, 10_090], // past the old four-digit cap
     [MAX_SCORE - 50, 100, MAX_SCORE],
     [MAX_SCORE, 5, MAX_SCORE],
   ] as const)('%i + %i = %i', (start, amount, expected) => {

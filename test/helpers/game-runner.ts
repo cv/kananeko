@@ -219,6 +219,16 @@ export class GameRunner {
    */
   missRedemptions = false;
 
+  get kanaStreak(): number {
+    return this.readMem(MEM.KANA_STREAK);
+  }
+
+  /** Test shortcut: start counting first-try answers in a row from zero */
+  resetStreak(): this {
+    this.getMemory()[MEM.KANA_STREAK] = 0;
+    return this;
+  }
+
   /** Test shortcut: set the lives left by writing WRAM directly */
   setLives(lives: number): this {
     this.getMemory()[MEM.KANA_LIVES] = lives;

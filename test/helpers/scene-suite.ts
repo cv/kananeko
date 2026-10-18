@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import { SCENES, sceneRounds } from '@game/scene';
 import { checkpoint, runnerAt } from './checkpoints';
-import { type Detours, answerKanaAndCheckDelta, playDialoguePath } from './play';
+import { type Detours, answerKanaAndCheckDelta, firstTryPoints, playDialoguePath } from './play';
 
 export interface DialoguePath {
   /** What the path explores, e.g. "tired clerk" */
@@ -42,7 +42,7 @@ export function describeScene(sceneIdx: number, paths: readonly DialoguePath[]):
         sceneRounds(scene)
           .at(-1)
           ?.questions.forEach(() => {
-            answerKanaAndCheckDelta(runner, FIRST_TRY_POINTS);
+            answerKanaAndCheckDelta(runner, firstTryPoints(runner));
           });
         runner.frames(SCENE_ADVANCE_FRAMES);
         expect(runner.sceneFlags & doneFlags).toBe(doneFlags);

@@ -64,6 +64,7 @@ export const DELTA_PLUS_100 = 1;
 export const DELTA_PLUS_10 = 2;
 export const DELTA_MINUS_5 = 3;
 export const DELTA_MINUS_100 = 4;
+export const DELTA_PLUS_150 = 5;
 
 /**
  * Jump to hud_redraw if what the HUD shows (`shownAddr`) differs from the current
@@ -75,12 +76,17 @@ function redrawIfChanged(shownAddr: U16, current: U16 | 'b'): Op[] {
 }
 
 /** Dispatch order for the delta flash; the last entry is the fallback */
-const DELTA_TYPES = [DELTA_PLUS_100, DELTA_PLUS_10, DELTA_MINUS_5, DELTA_MINUS_100] as const;
+const DELTA_TYPES = [
+  DELTA_PLUS_100,
+  DELTA_PLUS_10,
+  DELTA_MINUS_5,
+  DELTA_PLUS_150,
+  DELTA_MINUS_100,
+] as const;
 
-export type DeltaType =
-  typeof DELTA_PLUS_100 | typeof DELTA_PLUS_10 | typeof DELTA_MINUS_5 | typeof DELTA_MINUS_100;
+export type DeltaType = (typeof DELTA_TYPES)[number];
 
-export type ScoreDelta = 5 | 10 | 100;
+export type ScoreDelta = 5 | 10 | 50 | 100;
 
 type HudTileExpr = TileIndex | 'from_a';
 type HudTileRun = Quad<TileIndex>;
@@ -99,15 +105,15 @@ const DELTA_TILE_RUNS: Record<DeltaType, HudTileRun> = {
   [DELTA_PLUS_10]: [SPACE_TILE, PLUS_TILE, d1, d0],
   [DELTA_MINUS_5]: [SPACE_TILE, SPACE_TILE, MINUS_TILE, d5],
   [DELTA_MINUS_100]: [MINUS_TILE, d1, d0, d0],
+  [DELTA_PLUS_150]: [PLUS_TILE, d1, d5, d0],
 };
 
 // ---------------------------------------------------------------------------
 // Score arithmetic helpers
 // ---------------------------------------------------------------------------
 
-/** Generate 16-bit score add: SCORE += delta */
-/** Highest score the 4-digit HUD can show */
-export const MAX_SCORE = 9999;
+/** Highest score (the HUD shows SCORE_DIGIT_COUNT digits) */
+export const MAX_SCORE = 50_000; // well past a perfect run; adding at most 255 can't wrap 16 bits
 
 /** Add to the score, capped at MAX_SCORE (clobbers A, B). */
 export function buildAddScore(delta: ScoreDelta): Op[] {
@@ -121,15 +127,15 @@ export function buildSubScore(delta: ScoreDelta): Op[] {
 }
 
 /** Decimal places converted by score_digits (the ones digit is what remains) */
-const DIGIT_PLACES = [1000, 100, 10] as const;
-const SCORE_DIGIT_COUNT = DIGIT_PLACES.length + 1;
+const DIGIT_PLACES = [10_000, 1000, 100, 10] as const;
+export const SCORE_DIGIT_COUNT = DIGIT_PLACES.length + 1;
 
 function scoreDigitAddr(i: number): U16 {
   return u16(MEM.SCORE_DIGITS + i);
 }
 
 /**
- * Subroutine score_digits: convert the score into four digit tiles at
+ * Subroutine score_digits: convert the score into SCORE_DIGIT_COUNT digit tiles at
  * MEM.SCORE_DIGITS by repeated 16-bit subtraction. Clobbers A, C, DE, L.
  */
 export function buildScoreDigits(): Op[] {
@@ -169,7 +175,7 @@ export function buildScoreDigits(): Op[] {
   ];
 }
 
-/** Draw the four tiles computed by score_digits at (row, col); safe with the LCD on. */
+/** Draw the digit tiles computed by score_digits at (row, col); safe with the LCD on. */
 export function buildDrawScoreDigits(row: number, col: number): Op[] {
   return [
     ld_rr_nn('hl', u16(tilemapAddr(row, col))),

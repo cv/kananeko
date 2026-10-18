@@ -12,7 +12,7 @@ const kanaRound = (): GameRunner => runnerAt(checkpoint.kanaStart(0));
 describe('Given the player answers kana prompts', () => {
   it('awards 100 points and moves on after a correct first answer', () => {
     const runner = kanaRound();
-    answerKanaAndCheckDelta(runner, 100);
+    answerKanaAndCheckDelta(runner.resetStreak(), 100);
     expect(runner.deltaType).toBe(DELTA_PLUS_100);
     expect(runner.kanaQuestionIdx).toBe(1);
     expect(runner.kanaState).toBe(KanaState.AWAITING);

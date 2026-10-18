@@ -64,6 +64,7 @@ import { CAT_TILES, UI_TILES } from './font-data';
 import {
   DELTA_MINUS_100,
   DELTA_PLUS_10,
+  DELTA_PLUS_150,
   DELTA_PLUS_100,
   buildAddScore,
   buildClearDelta,
@@ -163,6 +164,7 @@ export const KANA_MESSAGES = {
   correct: 'せいかい!',
   retry: 'もう いちど!',
   reveal: 'ざんねん...',
+  streak: 'れんぞく!',
 } as const;
 const MESSAGE_WIDTH = Math.max(...Object.values(KANA_MESSAGES).map((m) => Array.from(m).length));
 
@@ -171,6 +173,9 @@ const FEEDBACK_FRAMES = 40;
 const SCORE_FIRST_TRY = 100;
 const SCORE_SECOND_TRY = 10;
 const SCORE_DEATH_PENALTY = 100;
+/** Every STREAK_LENGTH-th first-try answer in a row earns STREAK_BONUS more */
+export const STREAK_LENGTH = 3;
+export const STREAK_BONUS = 50;
 const MAX_ATTEMPTS = 2; // 0-indexed: attempt 0, 1, 2 = 3 tries
 
 // D-pad buttons in direction-index order (0=UP, 1=DOWN, 2=LEFT, 3=RIGHT),
@@ -451,7 +456,7 @@ export function buildKanaEngine(): Op[] {
     ld_r_r('b', 'a'),
     ld_a_nn(MEM.KANA_CORRECT_POS),
     cp_r('b'),
-    jr_cc('nz', ref('kana_wrong')),
+    jp_cc('nz', ref('kana_wrong')),
 
     // === CORRECT: a won-back life, or a score that depends on the attempt number ===
     ld_a_nn(MEM.KANA_MODE),
@@ -462,6 +467,11 @@ export function buildKanaEngine(): Op[] {
     jr_cc('nz', ref('kana_score_attempt1')),
     ...buildAddScore(SCORE_FIRST_TRY),
     ...buildSetDelta(DELTA_PLUS_100),
+    ld_a_nn(MEM.KANA_STREAK),
+    inc_r('a'),
+    cp_n(u8(STREAK_LENGTH)),
+    jp_cc('z', ref('kana_streak')),
+    ld_nn_a(MEM.KANA_STREAK),
     jr(ref('kana_correct_done')),
 
     label('kana_score_attempt1'),
@@ -483,6 +493,7 @@ export function buildKanaEngine(): Op[] {
 
     // === WRONG ===
     label('kana_wrong'),
+    ...zeroBytes(MEM.KANA_STREAK),
     ld_a_nn(MEM.KANA_MODE),
     cp_n(u8(KanaMode.NORMAL)),
     jp_cc('nz', ref('kana_chance_miss')), // one-try rounds just show the answer
@@ -514,6 +525,17 @@ export function buildKanaEngine(): Op[] {
     jp_cc('z', ref('kana_all_done')), // no lives left: end the round now
 
     // Show feedback, then move on to the next question
+    ...enterFeedback(KanaState.ADVANCE_FEEDBACK),
+    ret(),
+
+    // === Streak: bonus points and a cheer instead of the usual message ===
+    label('kana_streak'),
+    ...zeroBytes(MEM.KANA_STREAK),
+    ...buildAddScore(STREAK_BONUS),
+    ...buildSetDelta(DELTA_PLUS_150),
+    ...showMessage(KANA_MESSAGES.streak),
+    ...showFace('happy'),
+    call(ref('kana_reveal')),
     ...enterFeedback(KanaState.ADVANCE_FEEDBACK),
     ret(),
 

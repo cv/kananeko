@@ -118,7 +118,7 @@ export const MEM = {
   HUD_SHOWN_SCORE_LO: u16(0xc059),
   HUD_SHOWN_SCORE_HI: u16(0xc05a),
   HUD_SHOWN_DELTA: u16(0xc05b), // delta type on screen (0 = cleared)
-  SCORE_DIGITS: u16(0xc05c), // 4 digit tiles of the score, most significant first ($C05C-$C05F)
+  SCORE_DIGITS: u16(0xc082), // 5 digit tiles of the score, most significant first ($C082-$C086)
 
   // WRAM — kana rounds of the current scene (see rounds.ts)
   ROUNDS_LO: u16(0xc078), // pointer to the scene's rounds data (lo)
@@ -130,6 +130,7 @@ export const MEM = {
   KANA_MODE: u16(0xc07e), // KanaMode of the running round
   DLG_FROM_NODE: u16(0xc07f), // node the last choice was made at
   DLG_PICK: u16(0xc080), // last choice: logical index, bit 7 = bad answer
+  KANA_STREAK: u16(0xc081), // first-try answers in a row toward the next streak bonus
 
   // WRAM — scene system
   SCENE_ID: u16(0xc050), // Current scene index (0-4, 0xFF = title)

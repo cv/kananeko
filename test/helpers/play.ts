@@ -8,6 +8,7 @@ import { choiceRating } from '@game/dialogue-data';
 import { SCENES } from '@game/scene';
 import { DialogueState, END_OF_CONVERSATION, KanaState, MAX_LIVES } from '@game/state';
 import { FADE_STEPS, FADE_STEP_FRAMES } from '@game/video';
+import { STREAK_BONUS, STREAK_LENGTH } from '@game/kana';
 import { type GameRunner } from './game-runner';
 
 /** Frames for the game over screen to fade in (and out again after START) */
@@ -91,6 +92,11 @@ export function loseDialogueLives(runner: GameRunner, sceneIdx: number, count: n
   }
   expect(runner.kanaLives).toBe(target);
   return runner;
+}
+
+/** Points for answering the current kana question right on the first try (streaks pay a bonus) */
+export function firstTryPoints(runner: GameRunner): number {
+  return runner.kanaStreak + 1 === STREAK_LENGTH ? 100 + STREAK_BONUS : 100;
 }
 
 /** Answer kana correctly and check the score changed by the expected amount. */
