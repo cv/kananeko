@@ -18,11 +18,13 @@ The whole thing is hand-assembled from TypeScript. No engine, no SDK — just ra
 
 ## 🎮 How it works
 
-1. Title screen → pick a scene
-2. Read through a short dialogue (in Japanese!)
-3. Answer kana quiz questions
-4. Keep your lives — gain your score
-5. Advance to the next location
+1. Press START on the title screen and arrive at the station
+2. Chat with the people you meet (in Japanese!): good replies earn points and hearts, rude ones cost a heart
+3. After each conversation, a short kana quiz asks about phrases you just read: pick the missing kana with the d-pad
+4. Some replies have a kana missing (はい みえ□す!): pick one to say it and fill in the blank
+5. Gave a bad answer? Get the next kana right to win the heart back
+6. Each location ends with a review round, closing with a word to write in katakana; three first tries in a row pay a streak bonus
+7. Clear all five locations, then beat the clock in a speed round before the ending
 
 ## 🖼️ Screenshots
 
