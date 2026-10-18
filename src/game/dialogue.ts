@@ -22,6 +22,7 @@ import {
 import {
   adc_r,
   add_hl_rr,
+  add_n,
   add_r,
   and_n,
   call,
@@ -63,7 +64,7 @@ import {
 } from './kana-hud';
 import { DialogueState, END_OF_CONVERSATION, MAX_LIVES } from './state';
 import { SCREEN_COLS, type TilePosition, tilePos, tilemapAddr } from './tilemap';
-import { screenOff, screenOn, vramPut } from './video';
+import { vramPut } from './video';
 
 // Re-export data types and encoder from dialogue-data.ts
 export { buildDialogueTree, defineDialogueTree } from './dialogue-data';
@@ -213,14 +214,44 @@ function buildTextboxRow(row: number, left: number, fill: number | 'clear', righ
   ];
 }
 
-/** Draw the textbox border and clear its interior (LCD must be off) */
+/** Subroutine dlg_draw_box: draw the whole textbox, border and blank interior (LCD off) */
 function buildDrawTextbox(): Op[] {
   const bottomRow = BOX_TOP_ROW + BOX_ROWS - 1;
   const middleRows = Array.from({ length: BOX_ROWS - 2 }, (_, i) => BOX_TOP_ROW + 1 + i);
   return [
+    label('dlg_draw_box'),
     ...buildTextboxRow(BOX_TOP_ROW, BORDER_TL, BORDER_H, BORDER_TR),
     ...middleRows.flatMap((row) => buildTextboxRow(row, BORDER_V, 'clear', BORDER_V)),
     ...buildTextboxRow(bottomRow, BORDER_BL, BORDER_H, BORDER_BR),
+    ret(),
+  ];
+}
+
+const BOX_INTERIOR_COLS = SCREEN_COLS - 2;
+
+/** Subroutine dlg_clear_box: blank the textbox interior with the LCD on (via vram_put) */
+function buildClearTextbox(): Op[] {
+  return [
+    label('dlg_clear_box'),
+    ld_rr_nn('hl', u16(tilemapAddr(BOX_TOP_ROW + 1, 1))),
+    ld_r_n('b', u8(BOX_ROWS - 2)),
+    label('dlg_clear_row'),
+    ld_r_n('c', u8(BOX_INTERIOR_COLS)),
+    label('dlg_clear_cell'),
+    xor_r('a'),
+    ...vramPut(),
+    dec_r('c'),
+    jr_cc('nz', ref('dlg_clear_cell')),
+    // Skip to column 1 of the next row
+    ld_r_r('a', 'l'),
+    add_n(u8(32 - BOX_INTERIOR_COLS)),
+    ld_r_r('l', 'a'),
+    jr_cc('nc', ref('dlg_clear_nc')),
+    inc_r('h'),
+    label('dlg_clear_nc'),
+    dec_r('b'),
+    jr_cc('nz', ref('dlg_clear_row')),
+    ret(),
   ];
 }
 
@@ -240,14 +271,10 @@ export function buildDialogueEngine(): Op[] {
   return [
     // =================================================================
     // dlg_open — Start showing a dialogue node. DE = pointer to node data.
-    // Turns LCD off, draws textbox, turns LCD back on, sets up state.
+    // Clears the textbox (drawn at scene load) without turning the LCD off.
     // =================================================================
     label('dlg_open'),
-
-    // Redraw the textbox with the LCD off
-    ...screenOff('dlg_open_vblank'),
-    ...buildDrawTextbox(),
-    ...screenOn(),
+    call(ref('dlg_clear_box')),
 
     // Store node data pointer
     ...storePointer('de', MEM.DLG_STR_LO, MEM.DLG_STR_HI),
@@ -336,8 +363,7 @@ export function buildDialogueEngine(): Op[] {
     ...storeByte(MEM.DLG_STATE, DialogueState.CHOOSING),
     ...buildInitChoiceOrder(),
 
-    // Draw each choice on its shuffled row (LCD off for bulk write)
-    ...screenOff('dlg_draw_choices_vblank'),
+    // Draw each choice on its shuffled row
     ...loadPointer('de', MEM.DLG_STR_LO, MEM.DLG_STR_HI),
 
     ld_a_nn(MEM.DLG_CHOICE_CNT),
@@ -354,7 +380,7 @@ export function buildDialogueEngine(): Op[] {
     inc_rr('de'),
     cp_n(u8(TEXT_END)),
     jr_cc('z', ref('dlg_choice_str_done')),
-    ldi_hl_a(),
+    ...vramPut(),
     jr(ref('dlg_choice_char')),
 
     label('dlg_choice_str_done'),
@@ -365,9 +391,7 @@ export function buildDialogueEngine(): Op[] {
     // Draw cursor at first choice
     ld_rr_nn('hl', u16(tilemapAddr(CHOICE_CURSOR_POSITIONS[0]))),
     ld_r_n('a', u8(CURSOR_TILE)),
-    ldi_hl_a(),
-
-    ...screenOn(),
+    ...vramPut(),
 
     // Init cursor position
     ...zeroBytes(MEM.DLG_CURSOR),
@@ -553,5 +577,8 @@ export function buildDialogueEngine(): Op[] {
     ld_r_r('d', 'a'),
     // DE = absolute ROM pointer to node data
     jp(ref('dlg_open')),
+
+    ...buildDrawTextbox(),
+    ...buildClearTextbox(),
   ];
 }

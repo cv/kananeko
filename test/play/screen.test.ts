@@ -4,12 +4,39 @@ import { describe, expect, it } from 'vitest';
 import { SCENES } from '@game/scene';
 import { checkpoint, runnerAt } from '../helpers/checkpoints';
 import { BACKDROP } from '@game/backdrop';
-import { SCREEN_W, inkBounds, inkCount, readText, waitForPicture } from '../helpers/screen';
+import { DialogueState } from '@game/state';
+import {
+  SCREEN_W,
+  inkBounds,
+  inkCount,
+  isBlank,
+  readText,
+  waitForPicture,
+} from '../helpers/screen';
 
 const SCENE_NAME_ROW = 1;
 const NPC_TEXT = { row: 12, col: 2 };
 const CHOICES = { row: 14, col: 3 };
 const TEXT_WIDTH = 17;
+
+describe('Given the player is talking to someone', () => {
+  it('never flashes a blank screen between dialogue nodes', () => {
+    const runner = waitForPicture(runnerAt(checkpoint.sceneStart(0)));
+    let blankFrames = 0;
+    for (let node = 0; node < 3; node++) {
+      runner.waitUntil(() => {
+        if (isBlank(runner)) blankFrames++;
+        return runner.dlgState === DialogueState.CHOOSING;
+      }, 'choices');
+      for (let f = 0; f < 6; f++) {
+        runner.frames(1);
+        if (isBlank(runner)) blankFrames++;
+      }
+      runner.chooseDialogueChoice(0);
+    }
+    expect(blankFrames).toBe(0);
+  });
+});
 
 describe('Given a scene has loaded', () => {
   it.each(SCENES.map((scene, i) => [scene.name, i] as const))(

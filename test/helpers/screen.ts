@@ -9,12 +9,15 @@ export const SCREEN_W = 160;
 export const SCREEN_H = 144;
 const TILE = 8;
 
-/** Advance until the LCD shows something (it renders blank while switched off). */
+/** Whether the last frame was a single flat color (the LCD renders blank while off) */
+export function isBlank(runner: GameRunner): boolean {
+  const screen = runner.getScreen();
+  return screen.every((value, i) => value === screen[i % 4]);
+}
+
+/** Advance until the LCD shows something. */
 export function waitForPicture(runner: GameRunner): GameRunner {
-  return runner.waitUntil(() => {
-    const screen = runner.getScreen();
-    return screen.some((value, i) => value !== screen[i % 4]);
-  }, 'a non-blank screen');
+  return runner.waitUntil(() => !isBlank(runner), 'a non-blank screen');
 }
 
 /** Luminance of the pixel at (x, y) */

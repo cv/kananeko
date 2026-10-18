@@ -367,6 +367,7 @@ export function buildProgram(): Op[] {
     ...sceneSwitch('scene_palette', (scene) => setBgPalette(scene.palette), packedScenes),
 
     call(ref('kana_draw_hud')), // hearts + score on row 0
+    call(ref('dlg_draw_box')),
     ...screenOn(),
 
     // ==== Dialogue ====
