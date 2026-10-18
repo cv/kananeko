@@ -205,7 +205,7 @@ export const PARK_DIALOGUE = defineDialogueTree([
   },
   {
     // 22: sunset
-    text: 'ゆうやけきれい!',
+    text: 'つきが きれい!',
     choices: [
       { text: 'きれいだね!', next: 23 },
       { text: 'すてき!', next: 23 },
@@ -280,7 +280,7 @@ export const PARK_DIALOGUE = defineDialogueTree([
     text: 'コンビニたのしかった?',
     choices: [
       { text: 'たのしかった!', next: 31 },
-      { text: 'おかしかった!', next: 31 },
+      { text: 'おかし かった!', next: 31 },
       { text: 'やすかった!', next: 32 },
     ],
   },
@@ -377,7 +377,7 @@ export const PARK_DIALOGUE = defineDialogueTree([
   },
   {
     // 41
-    text: 'はしりちゅう!',
+    text: 'ランニングちゅう!',
     choices: [
       { text: 'すごいですね!', next: 42 },
       { text: 'がんばって!', next: 42 },
@@ -525,8 +525,8 @@ export const PARK_DIALOGUE = defineDialogueTree([
     text: 'ありがとう! うれしい',
     choices: [
       { text: 'おんがくすき?', next: 58 },
-      { text: 'すごいひと?', next: 59 },
-      { text: 'まいにちひく?', next: 58 },
+      { text: 'ゆうめいなひと?', next: 59 },
+      { text: 'まいにち ふく?', next: 58 },
     ],
   },
   {
@@ -539,7 +539,7 @@ export const PARK_DIALOGUE = defineDialogueTree([
     ],
   },
   {
-    // 59: すごいひと
+    // 59: ゆうめいなひと
     text: 'まだまだだけど!',
     choices: [
       { text: 'じょうずです!', next: 60 },

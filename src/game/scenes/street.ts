@@ -250,7 +250,7 @@ export const STREET_DIALOGUE = defineDialogueTree([
   },
   {
     // 27: こうえん info
-    text: 'きれいなはなが!',
+    text: 'きれいな はなが あるよ!',
     choices: [
       { text: 'すてきですね!', next: 30 },
       { text: 'みたい!', next: 30 },
@@ -551,7 +551,7 @@ export const STREET_DIALOGUE = defineDialogueTree([
     // 60: しりとり start
     text: 'りんご!',
     choices: [
-      { text: 'ごりら!', next: 62 },
+      { text: 'ゴリラ!', next: 62 },
       { text: 'ごはん!', next: 62 },
       { text: 'ごま!', next: 62 },
     ],
@@ -569,9 +569,9 @@ export const STREET_DIALOGUE = defineDialogueTree([
     // 62: しりとり continue
     text: 'じょうず! らっぱ!',
     choices: [
-      { text: 'ぱんだ!', next: 63 },
-      { text: 'ぱん!', next: 63 },
-      { text: 'ぱいなっぷる!', next: 63 },
+      { text: 'パンダ!', next: 63 },
+      { text: 'パン!', next: 63 },
+      { text: 'パイナップル!', next: 63 },
     ],
   },
   {

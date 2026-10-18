@@ -131,21 +131,21 @@ export const CONBINI_DIALOGUE = defineDialogueTree([
     ],
   },
   {
-    // 14: converge - total
-    text: 'ぜんぶで いくら?',
+    // 14: converge - checkout
+    text: 'おかいけい しますね!',
     choices: [
-      { text: 'いくらですか?', next: 15 },
       { text: 'おねがいします', next: 15 },
-      { text: 'はい どうぞ', next: 15 },
+      { text: 'カードで!', next: 15 },
+      { text: 'げんきんで!', next: 15 },
     ],
   },
   {
     // 15: payment
-    text: 'さんびゃくえん!',
+    text: 'はい できました!',
     choices: [
-      { text: 'はい どうぞ', next: 16 },
-      { text: 'やすいですね!', next: 16 },
-      { text: 'ちょうどいい!', next: 16 },
+      { text: 'ありがとう!', next: 16 },
+      { text: 'はやい!', next: 16 },
+      { text: 'どうも!', next: 16 },
     ],
   },
   {
@@ -159,7 +159,7 @@ export const CONBINI_DIALOGUE = defineDialogueTree([
   },
   {
     // 17: レシート
-    text: 'レシートはいる?',
+    text: 'レシートは いりますか?',
     choices: [
       { text: 'だいじょうぶです', next: 18 },
       { text: 'はい ください', next: 18 },
@@ -198,9 +198,9 @@ export const CONBINI_DIALOGUE = defineDialogueTree([
     // 21: what did you buy
     text: 'なにかった?',
     choices: [
-      { text: 'おにぎりかった', next: 22 },
-      { text: 'おかしかった', next: 23 },
-      { text: 'パンかった', next: 24 },
+      { text: 'おにぎり かった', next: 22 },
+      { text: 'おかし かった', next: 23 },
+      { text: 'パン かった', next: 24 },
     ],
   },
   {
@@ -268,7 +268,7 @@ export const CONBINI_DIALOGUE = defineDialogueTree([
   },
   {
     // 29: converge - compare
-    text: 'わたしはガムかった!',
+    text: 'わたしは ガム かった!',
     choices: [
       { text: 'おいしそう!', next: 30 },
       { text: 'ガム すき!', next: 30 },

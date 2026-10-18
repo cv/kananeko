@@ -15,7 +15,7 @@ export const RESTAURANT_DIALOGUE = defineDialogueTree([
   },
   {
     // 1: seating
-    text: 'なんめいですか?',
+    text: 'なんめいさまですか?',
     choices: [
       { text: 'ひとりです', next: 2 },
       { text: 'ふたりです', next: 3 },
@@ -150,7 +150,7 @@ export const RESTAURANT_DIALOGUE = defineDialogueTree([
   },
   {
     // 16: taste check
-    text: 'おあじはどう?',
+    text: 'おあじは いかがですか?',
     choices: [
       { text: 'おいしい!', next: 17 },
       { text: 'からい!', next: 18, hint: 'みずをどうぞ' },
@@ -615,7 +615,7 @@ export const RESTAURANT_DIALOGUE = defineDialogueTree([
     text: 'しゃしん とろう!',
     choices: [
       { text: 'いいね!', next: 68 },
-      { text: 'はい ニコリ!', next: 68 },
+      { text: 'はい チーズ!', next: 68 },
       { text: 'たのしい!', next: 68 },
     ],
   },

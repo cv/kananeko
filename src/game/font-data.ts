@@ -20,8 +20,19 @@ import { KATAKANA } from './glyphs-katakana';
 import { CAT, CAT_BLINK_CHARS, CAT_SAD_CHARS, SCENE_ICONS, UI_ICONS } from './glyphs-icons';
 import { BACKDROP_GLYPHS } from './glyphs-backdrop';
 
+/**
+ * Latin letters the game actually prints (PRESS START, GAME OVER). Every letter is
+ * defined in glyphs-latin.ts, but only these take up tiles and ROM; add a letter
+ * here if new UI text needs it (the build fails with "Character not in font").
+ */
+const LATIN_IN_ROM = 'AEGMOPRSTV';
+
+function pick(glyphs: Record<string, Glyph>, chars: string): Record<string, Glyph> {
+  return Object.fromEntries(Object.entries(glyphs).filter(([ch]) => chars.includes(ch)));
+}
+
 export const ALL_GLYPHS: Record<string, Glyph> = {
-  ...LATIN_UPPER,
+  ...pick(LATIN_UPPER, LATIN_IN_ROM),
   ...DIGITS_PUNCT,
   ...HIRAGANA,
   ...KATAKANA,

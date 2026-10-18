@@ -105,7 +105,7 @@ export const STATION_DIALOGUE = defineDialogueTree([
   },
   {
     // 11: きっぷ
-    text: 'きっぷはいりますか?',
+    text: 'きっぷは いりますか?',
     choices: [
       { text: 'はい ください', next: 12 },
       { text: 'いくらですか?', next: 13 },
@@ -377,7 +377,7 @@ export const STATION_DIALOGUE = defineDialogueTree([
   },
   {
     // 41
-    text: 'えきのあんないです',
+    text: 'えきの あんないがかりです',
     choices: [
       { text: 'よろしく!', next: 42 },
       { text: 'あんない?', next: 42, hint: 'みちをおしえます' },
@@ -449,20 +449,20 @@ export const STATION_DIALOGUE = defineDialogueTree([
   },
   {
     // 49: converge - schedule
-    text: 'つぎは なんじ?',
+    text: 'つぎは さんじです!',
     choices: [
-      { text: 'さんじです', next: 50 },
-      { text: 'わかりません', next: 51 },
+      { text: 'まにあいます!', next: 50 },
+      { text: 'なんぷんご?', next: 51 },
       { text: 'もうすぐ?', next: 51 },
     ],
   },
   {
-    // 50: さんじ
-    text: 'さんじ? もうすぐ!',
+    // 50: まにあう
+    text: 'まだ じかんが ありますよ',
     choices: [
       { text: 'よかった!', next: 52 },
-      { text: 'はやい!', next: 52 },
-      { text: 'まにあう!', next: 52 },
+      { text: 'ゆっくりできる', next: 52 },
+      { text: 'ありがとう!', next: 52 },
     ],
   },
   {
