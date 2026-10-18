@@ -26,6 +26,7 @@ import {
   ld_r_r,
   ld_rr_nn,
   ldh_n_a,
+  ldi_hl_a,
   or_r,
   ret,
   ret_cc,
@@ -37,7 +38,13 @@ import { buildTileData, requireTiles, textToTiles } from './font';
 import { CAT_TILES } from './font-data';
 import { buildReadJoypad } from './joypad';
 import { buildKanaEngine } from './kana';
-import { buildDrawHudOps, buildScoreDigits, buildScoreRoutines } from './kana-hud';
+import {
+  buildDrawHudOps,
+  buildDrawScoreDigits,
+  buildScoreDigits,
+  buildScoreRoutines,
+} from './kana-hud';
+import { centerStartCol, tilemapAddr } from './tilemap';
 import { type PackedScene, type Scene, SCENES, buildSceneData } from './scene';
 import { END_OF_CONVERSATION, MAX_LIVES } from './state';
 import {
@@ -85,6 +92,18 @@ const START_PROMPT_ROW = 13;
 const BLINK_BIT = 0x20;
 
 const DMG_PALETTE = 0xe4; // shades 3,2,1,0
+
+// Ending screen content
+const ENDING_TITLE = 'おめでとう!';
+const ENDING_SCORE_LABEL = 'とくてん ';
+const ENDING_PALETTE: Palette = [
+  rgb(0xff, 0xf6, 0xd5),
+  rgb(0xf2, 0xc1, 0x4e),
+  rgb(0xb0, 0x6c, 0x1d),
+  rgb(0x3b, 0x24, 0x10),
+];
+const ENDING_ROWS = { cat: 2, title: 6, stamps: 8, score: 10 } as const;
+const SCORE_DIGITS = 4;
 
 // ---------------------------------------------------------------------------
 // Program helpers
@@ -154,6 +173,49 @@ function waitForStart(name: string): Op[] {
     ld_a_nn(MEM.JOYPAD_NEW),
     and_n(u8(JOY.START)),
     jr_cc('z', ref(name)),
+  ];
+}
+
+/** Scene icons side by side, one blank tile apart, as "stamps" for every cleared scene */
+function sceneStampTiles(): number[] {
+  return SCENES.flatMap((scene, i) => [...(i > 0 ? [0] : []), ...requireTiles(scene.icon)]);
+}
+
+/** Celebrate a completed run: cat, stamps, final score, then START returns to the title. */
+function buildEndingScreen(): Op[] {
+  const scoreRowLength = textToTiles(ENDING_SCORE_LABEL).length + SCORE_DIGITS;
+  const scoreCol = centerStartCol(scoreRowLength);
+  return [
+    label('game_complete'),
+    ...screenOff('ending_vblank'),
+    ...clearTilemap('ending_clear'),
+    ...setBgPalette(ENDING_PALETTE),
+    ...zeroBytes(MEM.TITLE_TIMER), // prompt starts visible
+
+    call(ref('kana_draw_hud')),
+    ...CAT_ROWS.flatMap((tiles, i) => writeCenteredRow(ENDING_ROWS.cat + i, tiles)),
+    ...writeCenteredRow(ENDING_ROWS.title, textToTiles(ENDING_TITLE)),
+    ...writeCenteredRow(ENDING_ROWS.stamps, sceneStampTiles()),
+    ld_rr_nn('hl', u16(tilemapAddr(ENDING_ROWS.score, scoreCol))),
+    ...textToTiles(ENDING_SCORE_LABEL).flatMap((tile) => [ld_r_n('a', u8(tile)), ldi_hl_a()]),
+    call(ref('score_digits')),
+    ...buildDrawScoreDigits(ENDING_ROWS.score, scoreCol + textToTiles(ENDING_SCORE_LABEL).length),
+    ...writeCenteredRow(START_PROMPT_ROW - 1, START_BOX_TOP),
+    ...writeCenteredRow(START_PROMPT_ROW, START_BOX_ON),
+    ...writeCenteredRow(START_PROMPT_ROW + 1, START_BOX_BOTTOM),
+    ...screenOn(),
+
+    label('ending_loop'),
+    ...waitFrame(),
+    call(ref('joy_read')),
+    call(ref('title_blink')),
+    ld_a_nn(MEM.JOYPAD_NEW),
+    and_n(u8(JOY.START)),
+    jr_cc('z', ref('ending_loop')),
+
+    ...resetRunState(MEM.SCENE_FLAGS),
+    ...screenOff('ending_to_title'),
+    jp(ref('title_screen')),
   ];
 }
 
@@ -247,7 +309,8 @@ export function buildProgram(): Op[] {
     and_n(u8(JOY.START)),
     jr_cc('z', ref('title_loop')),
 
-    // START pressed — begin scene 0
+    // START pressed — begin a fresh run at scene 0
+    ...resetRunState(MEM.SCENE_FLAGS),
     xor_r('a'),
     ldh_n_a(HW.DIV), // reset entropy timing so gameplay remains deterministic after title idling
     ld_nn_a(MEM.SCENE_ID),
@@ -312,9 +375,8 @@ export function buildProgram(): Op[] {
     cp_n(u8(SCENES.length)),
     jp_cc('c', ref('scene_load')), // more scenes to go
 
-    // ==== Game complete — back to title ====
-    ...screenOff('game_complete_vblank'),
-    jp(ref('title_screen')),
+    // ==== Game complete — ending screen, then back to the title ====
+    ...buildEndingScreen(),
 
     // ==== Game Over ====
     label('game_over'),

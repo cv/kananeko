@@ -30,9 +30,11 @@ describe('Given the player runs out of lives', () => {
     expect(runner.dlgState).not.toBe(DialogueState.IDLE);
   });
 
-  it('shows the game over screen in a later scene too', () => {
+  it('forgets cleared scenes when a new run starts after a later game over', () => {
     const runner = loseAllKanaLives(runnerAt(checkpoint.kanaStart(3)));
     expect(runner.kanaState).toBe(KanaState.IDLE);
-    returnToTitleAfterGameOver(runner);
+    returnToTitleAfterGameOver(runner).start();
+    expect(runner.sceneId).toBe(0);
+    expect(runner.sceneFlags).toBe(0);
   });
 });

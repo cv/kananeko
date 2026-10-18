@@ -80,6 +80,11 @@ const SHOTS: Shot[] = [
     capture: () => runnerAt(checkpoint.kanaStart(0)).pressKanaAnswer(false).frames(10),
   },
   {
+    file: 'ending',
+    caption: 'Ending: every scene cleared',
+    capture: () => runnerAt(checkpoint.gameComplete),
+  },
+  {
     file: 'game-over',
     caption: 'Game over',
     capture: (): GameRunner => {

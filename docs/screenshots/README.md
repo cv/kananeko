@@ -16,5 +16,7 @@ Captured from the real ROM in the test emulator by `npm run screenshots`.
 | コンビニ: choices                                  | コンビニ: kana round                           | こうえん: text revealing                                            |
 | ![こうえん: choices](scene4-choices.png)           | ![こうえん: kana round](scene4-kana.png)       | ![After a bad choice: -5 and a lost heart](dialogue-bad-choice.png) |
 | こうえん: choices                                  | こうえん: kana round                           | After a bad choice: -5 and a lost heart                             |
-| ![Kana: correct answer feedback](kana-correct.png) | ![Kana: wrong answer feedback](kana-wrong.png) | ![Game over](game-over.png)                                         |
-| Kana: correct answer feedback                      | Kana: wrong answer feedback                    | Game over                                                           |
+| ![Kana: correct answer feedback](kana-correct.png) | ![Kana: wrong answer feedback](kana-wrong.png) | ![Ending: every scene cleared](ending.png)                          |
+| Kana: correct answer feedback                      | Kana: wrong answer feedback                    | Ending: every scene cleared                                         |
+| ![Game over](game-over.png)                        |
+| Game over                                          |
