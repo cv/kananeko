@@ -113,7 +113,7 @@ describe.each(SCENES.map((scene, index) => ({ scene, index })))(
         expect(decoded).toEqual(
           tree.map((node) => ({
             text: node.text,
-            choices: node.choices.map((c, i) => ({ text: c.text, next: c.next, good: i === 0 })),
+            choices: node.choices.map((c) => ({ text: c.text, next: c.next })),
           })),
         );
       });

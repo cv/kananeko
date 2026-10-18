@@ -97,7 +97,6 @@ export const TEXT_END = 0xfe;
  *   [text_tiles...] 0xFE
  *   [choice_count]
  *   [next_node × choice_count]           ← compact lookup table
- *   [good_flag × choice_count]           ← 1 = good answer (+10), 0 = bad (-5)
  *   [choice_0_text...] 0xFE
  *   [choice_1_text...] 0xFE
  *   ...
@@ -118,11 +117,6 @@ export function buildDialogueTree(tree: DialogueTree): Uint8Array {
     // Next-node lookup table (one byte per choice, right after count)
     for (const choice of node.choices) {
       chunk.push(choice.next ?? END_OF_CONVERSATION);
-    }
-
-    // Good-answer flags (first choice = good, rest = bad)
-    for (let ci = 0; ci < node.choices.length; ci++) {
-      chunk.push(ci === 0 ? 1 : 0);
     }
 
     // Choice texts, each null-terminated

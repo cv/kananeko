@@ -315,12 +315,11 @@ export function buildDialogueEngine(): Op[] {
     // HL now points to the next_node lookup table. Save this position.
     ...storePointer('hl', MEM.DLG_META0_LO, MEM.DLG_META0_HI),
 
-    // Skip past next_node table + good_flag table (choice_count * 2 bytes)
+    // Skip past the next_node table (choice_count bytes)
     ld_a_nn(MEM.DLG_CHOICE_CNT),
-    add_r('a'), // A = choice_count * 2
     ld_r_r('c', 'a'),
     ld_r_n('b', u8(0)),
-    add_hl_rr('bc'), // HL += choice_count * 2
+    add_hl_rr('bc'),
 
     // Save pointer to first choice text
     ...storePointer('hl', MEM.DLG_STR_LO, MEM.DLG_STR_HI),
@@ -462,17 +461,10 @@ export function buildDialogueEngine(): Op[] {
     ldi_a_hl(),
     ld_nn_a(MEM.DLG_NODE_ID),
 
-    // Read good_flag = table_base[choice_count + logical_choice]
-    ...loadPointer('hl', MEM.DLG_META0_LO, MEM.DLG_META0_HI),
-    ld_a_nn(MEM.DLG_CHOICE_CNT),
-    add_r('c'), // A = choice_count + logical choice
-    ld_r_r('c', 'a'),
-    ld_r_n('b', u8(0)),
-    add_hl_rr('bc'),
-    ldi_a_hl(), // A = good_flag (1 = good, 0 = bad)
-
-    // Score + lives: good = +10 & regain life, bad = -5 & lose life
-    cp_n(u8(1)),
+    // Score + lives: the first authored choice (logical 0) is the good answer:
+    // good = +10 & regain a life, bad = -5 & lose a life
+    ld_r_r('a', 'c'),
+    cp_n(u8(0)),
     jr_cc('nz', ref('dlg_bad_choice')),
     // Good: +10 score, +1 life (capped at MAX_LIVES)
     ...buildAddScore(10),

@@ -12,7 +12,6 @@ const END_OF_CONVERSATION = 0xff;
 export interface DecodedChoice {
   text: string;
   next: number | null;
-  good: boolean;
 }
 
 export interface DecodedNode {
@@ -56,11 +55,9 @@ export function decodeDialogueTree(data: Uint8Array): DecodedNode[] {
     const text = r.text();
     const choiceCount = r.byte();
     const next = Array.from({ length: choiceCount }, () => r.byte());
-    const good = Array.from({ length: choiceCount }, () => r.byte() === 1);
-    const choices = next.map((n, i) => ({
+    const choices = next.map((n) => ({
       text: r.text(),
       next: n === END_OF_CONVERSATION ? null : n,
-      good: good[i] ?? false,
     }));
     return { text, choices };
   });
