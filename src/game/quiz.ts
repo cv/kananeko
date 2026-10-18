@@ -11,6 +11,9 @@ import { CHAR_MAP } from './font';
 import { type KanaQuestion, MAX_KANA_WORD_LENGTH } from './kana';
 import { type DialogueNode } from './dialogue';
 
+/** Anything with words in it: a dialogue node, or a reply */
+export type Line = Pick<DialogueNode, 'text'>;
+
 /** Kana that are easy to mix up, most similar first */
 const LOOKALIKES: readonly string[] = [
   // Hiragana
@@ -166,7 +169,7 @@ export interface QuizHistory {
 }
 
 /** Phrases of the NPC's lines, in order: split on spaces and punctuation, kana only, short enough */
-export function phrasesOf(nodes: readonly DialogueNode[]): string[] {
+export function phrasesOf(nodes: readonly Line[]): string[] {
   const phrases = nodes.flatMap((node) => node.text.split(/[\s!?、。…・.,「」]+/u));
   return [
     ...new Set(
@@ -188,7 +191,7 @@ export function phrasesOf(nodes: readonly DialogueNode[]): string[] {
  * 4-7 kana; ties are spread over the conversation by hash.
  */
 export function generateQuestions(
-  nodes: readonly DialogueNode[],
+  nodes: readonly Line[],
   count: number,
   history: QuizHistory,
 ): KanaQuestion[] {

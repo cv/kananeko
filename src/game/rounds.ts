@@ -91,8 +91,7 @@ export function planQuiz(
       .filter(({ node, n }) => n > 0 && isFillInCandidate(node))
       .sort((x, y) => Math.abs(x.n - middle) - Math.abs(y.n - middle) || x.n - y.n);
     for (const { node, n } of candidates) {
-      const replies = node.choices.slice(0, 1).map(({ text }) => ({ text, choices: [] }));
-      const [question] = generateQuestions(replies, 1, history);
+      const [question] = generateQuestions(node.choices.slice(0, 1), 1, history);
       if (question !== undefined) return [{ key: n, questions: [question] }];
     }
     return [];

@@ -16,6 +16,13 @@ repos:
         language: system
         files: \.ts$
 
+      - id: typecheck
+        name: typecheck
+        entry: bash -c '. "$NVM_DIR/nvm.sh" && node node_modules/.bin/tsc --noEmit'
+        language: system
+        pass_filenames: false
+        files: \.ts$
+
       - id: coverage-ratchet
         name: test coverage ratchet
         entry: bash -c '. "$NVM_DIR/nvm.sh" && node node_modules/.bin/vitest run --coverage && npx tsx scripts/check-coverage.ts'
