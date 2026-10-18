@@ -244,10 +244,17 @@ function bindControls(root: HTMLElement, joypad: Joypad): void {
     dpad.addEventListener('pointercancel', end);
   }
 
-  // No long-press menus or text selection on the controls
+  // No long-press menus, magnifier, text selection, or zooming on the controls
   root.addEventListener('contextmenu', (event) => {
     event.preventDefault();
   });
+  root.addEventListener(
+    'touchstart',
+    (event) => {
+      event.preventDefault();
+    },
+    { passive: false },
+  );
 }
 
 function bindKeyboard(joypad: Joypad): void {
@@ -271,6 +278,27 @@ function bindKeyboard(joypad: Joypad): void {
   });
 }
 
+/** A second tap within this many milliseconds would zoom the page on iOS */
+const DOUBLE_TAP_MS = 350;
+
+/**
+ * Stop iOS Safari's double-tap-to-zoom: it ignores touch-action for quick repeated
+ * taps (mashing A, or tapping between the buttons), so cancel the second tap's
+ * default action. The game's buttons use pointer events, which still fire; pinch
+ * zoom keeps working.
+ */
+function preventDoubleTapZoom(): void {
+  let lastTap = -Infinity;
+  document.addEventListener(
+    'touchend',
+    (event) => {
+      if (event.timeStamp - lastTap < DOUBLE_TAP_MS) event.preventDefault();
+      lastTap = event.timeStamp;
+    },
+    { passive: false },
+  );
+}
+
 function element<T extends HTMLElement>(selector: string, type: new () => T): T {
   const el = document.querySelector(selector);
   if (!(el instanceof type)) throw new Error(`Missing ${selector}`);
@@ -278,6 +306,7 @@ function element<T extends HTMLElement>(selector: string, type: new () => T): T 
 }
 
 function main(): void {
+  preventDoubleTapZoom();
   const canvas = element('#screen', HTMLCanvasElement);
   const startButton = element('#start', HTMLButtonElement);
   const muteButton = element('#mute', HTMLButtonElement);

@@ -117,6 +117,49 @@ test('fits a phone screen: no sideways scrolling, controls in view', async ({ pa
   }
 });
 
+test('a quick second tap does not zoom the page', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'touch screens');
+  await play(page, isMobile);
+  // Record whether each tap's touchend kept its default action (the zoom gesture)
+  await page.evaluate(() => {
+    const w = window as unknown as { taps: boolean[]; times: number[] };
+    w.taps = [];
+    w.times = [];
+    document.addEventListener('touchend', (event) => {
+      w.taps.push(event.defaultPrevented);
+      w.times.push(event.timeStamp);
+    });
+  });
+  const box = await page.locator('#screen').boundingBox();
+  if (box === null) throw new Error('no screen');
+  const [x, y] = [box.x + box.width / 2, box.y + box.height / 2];
+  await page.touchscreen.tap(x, y);
+  await page.touchscreen.tap(x, y);
+  await page.waitForTimeout(500);
+  await page.touchscreen.tap(x, y);
+  const { taps, times } = await page.evaluate(() => {
+    const w = window as unknown as { taps: boolean[]; times: number[] };
+    return { taps: w.taps, times: w.times };
+  });
+  expect(taps, `touchend times: ${times.join(', ')}`).toEqual([false, true, false]);
+  expect(await page.evaluate(() => window.visualViewport?.scale ?? 1)).toBe(1);
+});
+
+test('mashing a button still presses it every time', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'touch screens');
+  await play(page, isMobile);
+  const a = page.locator('[data-button="a"]');
+  await page.evaluate(() => {
+    const w = window as unknown as { downs: number };
+    w.downs = 0;
+    document.querySelector('[data-button="a"]')?.addEventListener('pointerdown', () => {
+      w.downs++;
+    });
+  });
+  for (let i = 0; i < 4; i++) await a.tap();
+  expect(await page.evaluate(() => (window as unknown as { downs: number }).downs)).toBe(4);
+});
+
 test('remembers the sound setting', async ({ page, isMobile }) => {
   await play(page, isMobile);
   const mute = page.locator('#mute');

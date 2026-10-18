@@ -21,6 +21,8 @@
 html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+  /* No double-tap zoom (play.ts also cancels quick second taps, which iOS zooms on anyway) */
+  touch-action: manipulation;
 }
 
 body {
@@ -81,6 +83,9 @@ h2 {
 /* ---------------------------------------------------------------- the console */
 
 .console {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
   margin: 20px auto;
   padding: 16px;
   max-width: 420px;
