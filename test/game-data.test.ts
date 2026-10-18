@@ -20,14 +20,7 @@ import { PAL, attributeOfCell, buildPaletteSet, paletteOf, paletteOfCell } from 
 import { MAX_CAST, packCast } from '@game/npc';
 import { packAnimation } from '@game/anim';
 import { ENDING_COLORS, GAME_OVER_COLORS, TITLE_COLORS } from '@game/scenes/colors';
-import {
-  BACKDROP,
-  BACKDROP_LEGEND,
-  SCENE_TILE_BASE,
-  SCENE_TILE_CAPACITY,
-  buildSceneArt,
-} from '@game/backdrop';
-import { BACKDROP_GLYPHS } from '@game/glyphs-backdrop';
+import { BACKDROP, SCENE_TILE_BASE, SCENE_TILE_CAPACITY, buildSceneArt } from '@game/backdrop';
 
 describe('font', () => {
   it('maps space to the blank tile 0 and every glyph to a later tile', () => {
@@ -159,24 +152,44 @@ describe('buildSceneArt', () => {
   const blankRow = ' '.repeat(BACKDROP.cols);
   const blank = Array<string>(BACKDROP.rows).fill(blankRow);
 
-  it('gives kit tiles scene slots in order of first use; icons and blanks stay global', () => {
+  it('gives textures scene slots in order of first use, sharing identical tiles', () => {
     const map = [...blank];
-    map[0] = 'o.o' + blankRow.slice(3);
-    map[1] = 'Tt' + blankRow.slice(2);
-    const { backdrop, tileData } = buildSceneArt(map);
+    map[0] = 'p_pmn' + blankRow.slice(5);
+    const { backdrop, tileData, tileOfCell } = buildSceneArt(map);
     expect(backdrop.length).toBe(BACKDROP.rows * BACKDROP.cols);
-    expect([...backdrop.slice(0, 4)]).toEqual([
+    // m and n are the same counter, so they share a tile; blanks use the global tile 0
+    expect([...backdrop.slice(0, 6)]).toEqual([
       SCENE_TILE_BASE,
       SCENE_TILE_BASE + 1,
       SCENE_TILE_BASE,
+      SCENE_TILE_BASE + 2,
+      SCENE_TILE_BASE + 2,
       0,
     ]);
-    expect(backdrop[BACKDROP.cols]).toBe(requireTile(BACKDROP_LEGEND['T'] ?? ''));
-    expect(tileData.length).toBe(2 * 16);
+    expect(tileOfCell.get('_')).toBe(SCENE_TILE_BASE + 1);
+    expect(tileData.length).toBe(3 * 16);
+  });
+
+  it('draws a prop over its rectangle, repeating it along longer runs', () => {
+    const map = [...blank];
+    for (const r of [0, 1, 2]) map[r] = 'YYYY' + blankRow.slice(4);
+    const { backdrop } = buildSceneArt(map);
+    const row = (r: number): number[] => [
+      ...backdrop.slice(r * BACKDROP.cols, r * BACKDROP.cols + 4),
+    ];
+    const [a = 0, b = 0] = row(0);
+    expect(row(0)).toEqual([a, b, a, b]); // two trees side by side
+    expect(new Set([...row(0), ...row(1), ...row(2)]).size).toBeGreaterThan(2);
+    expect(row(1)).not.toEqual(row(0));
+  });
+
+  it('refuses a backdrop with more tiles than the block holds', () => {
+    const map = [...blank];
+    map[0] = 'p_' + blankRow.slice(2);
+    expect(() => buildSceneArt(map, 1)).toThrow(/more than the 1 free/);
   });
 
   it('keeps every scene within its tile block', () => {
-    expect(Object.keys(BACKDROP_GLYPHS).length).toBeLessThanOrEqual(SCENE_TILE_CAPACITY);
     for (const scene of SCENES) {
       expect(buildSceneArt(scene.backdrop).tileData.length / 16).toBeLessThanOrEqual(
         SCENE_TILE_CAPACITY,

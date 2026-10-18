@@ -30,8 +30,7 @@ import {
 import { type Op, ref, u8 } from '../asm/types';
 import { type SceneArt } from './backdrop';
 import { encodeGlyph } from './font';
-import { BACKDROP_GLYPHS } from './glyphs-backdrop';
-import { BACKDROP_LEGEND } from './backdrop';
+import { SCENERY, isProp } from './scenery';
 import { type TileAnimation } from './scenes/animations';
 import { bgTileAddr, vramPut } from './video';
 
@@ -45,7 +44,8 @@ export function packAnimation(animation: TileAnimation | undefined, art: SceneAr
   if (animation === undefined) return Uint8Array.from([0, 0, 0]);
   const { cell, frames, period } = animation;
   const tile = art.tileOfCell.get(cell);
-  const base = BACKDROP_GLYPHS[BACKDROP_LEGEND[cell] ?? ''];
+  const scenery = SCENERY[cell];
+  const base = scenery === undefined || isProp(scenery) ? undefined : scenery;
   if (tile === undefined || base === undefined) {
     throw new Error(`Animated cell "${cell}" isn't a scene tile in this backdrop`);
   }

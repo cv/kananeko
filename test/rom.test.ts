@@ -76,10 +76,12 @@ describe('Given the ROM has been assembled', () => {
 
   // The game is a single 32 KB bank (no mapper). This floor keeps headroom for
   // dialogue and small art changes; outgrowing it means moving to MBC1 banking.
-  // (Lowered from 4 KB when kana chances and generated questions moved in.)
-  it('leaves at least 3 KB free for new content', () => {
+  // (Lowered from 4 KB when kana chances and generated questions moved in, then to
+  // 1.5 KB for the sprite cat, the logo, and multi-tile scenery. Dialogue text is
+  // most of the ROM; the next big addition should come with MBC1 banking.)
+  it('leaves at least 1.5 KB free for new content', () => {
     let end = rom.length;
     while (end > 0 && rom[end - 1] === 0) end--;
-    expect(ROM_SIZE - end).toBeGreaterThanOrEqual(3 * 1024);
+    expect(ROM_SIZE - end).toBeGreaterThanOrEqual(1536);
   });
 });

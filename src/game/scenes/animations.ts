@@ -5,6 +5,7 @@
  */
 
 import { type Glyph } from '../font-data';
+import { SIGN } from '../scenery';
 
 export interface TileAnimation {
   /** Backdrop map character whose tile animates */
@@ -21,14 +22,14 @@ export const STATION_ANIMATION: TileAnimation = {
   period: 64,
   frames: [
     [
-      '++++++++',
-      '+..++--+',
-      '+..++--+',
-      '++++++++',
-      '++++++++',
-      '+--++..+',
-      '+--++..+',
-      '++++++++',
+      '---..---',
+      '--------',
+      '--------',
+      '--------',
+      '---++---',
+      '---++---',
+      '--------',
+      '--------',
     ],
   ],
 };
@@ -40,13 +41,13 @@ export const STREET_ANIMATION: TileAnimation = {
   frames: [
     [
       '........',
-      '........',
-      '........',
-      '..+...+.',
-      '.+.+.+.+',
-      '-+-+-+-+',
+      '....+...',
+      '..+-+..+',
+      '.+-+.+-.',
+      '-+---+--',
       '--------',
       '--------',
+      '++++++++',
     ],
   ],
 };
@@ -89,22 +90,16 @@ export const RESTAURANT_ANIMATION: TileAnimation = {
   ],
 };
 
-/** Conbini: goods on the shelves catch the light */
+/** Shift every row of a tile left by `by` pixels, wrapping around */
+function scrolled(glyph: Glyph, by: number): Glyph {
+  return glyph.map((row) => row.slice(by) + row.slice(0, by)) as Glyph;
+}
+
+/** Conbini: the sign's stripes scroll */
 export const CONBINI_ANIMATION: TileAnimation = {
-  cell: 'E',
-  period: 32,
-  frames: [
-    [
-      '########',
-      '.+-.#+..',
-      '.+-.#+-.',
-      '########',
-      '-..+#.-+',
-      '-+.+#.-+',
-      '########',
-      '+......+',
-    ],
-  ],
+  cell: 'S',
+  period: 16,
+  frames: [1, 2, 3].map((by) => scrolled(SIGN, by)),
 };
 
 /** Park: stars twinkle */
@@ -115,11 +110,11 @@ export const PARK_ANIMATION: TileAnimation = {
     [
       '........',
       '........',
+      '...-....',
       '........',
       '........',
-      '........',
-      '.-......',
-      '........',
+      '......-.',
+      '.....---',
       '......-.',
     ],
   ],

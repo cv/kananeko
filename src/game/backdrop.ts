@@ -1,7 +1,8 @@
 /**
  * Scene backdrops: a 20x8 tile illustration above the dialogue box, written
- * as a character map so scenes can be drawn (and reviewed) as text. Backdrop
- * tiles aren't part of the global font: each scene loads the ones it uses.
+ * as a character map (see scenery.ts for what each character draws) so scenes
+ * can be laid out and reviewed as text. Backdrop tiles aren't part of the global
+ * font: each scene loads the ones it uses.
  */
 
 import {
@@ -21,49 +22,19 @@ import {
 import { ld_rr_nn } from '../asm/ops';
 import { type Op, ref, u8, u16 } from '../asm/types';
 import { copyBlock } from '../asm/macros';
-import { TILE_COUNT, encodeGlyph, requireTile } from './font';
-import { type Glyph, SCENE_ICON_TILES } from './font-data';
-import { BACKDROP_GLYPHS } from './glyphs-backdrop';
+import { at } from '../asm/util';
+import { sliceArt } from './art';
+import { TILE_COUNT, encodeGlyph } from './font';
+import { type Glyph } from './font-data';
+import { type Prop, SCENERY, isProp } from './scenery';
 import { SCREEN_COLS, tilemapAddr } from './tilemap';
 import { bgTileAddr } from './video';
 
 /** Where backdrops sit: rows 1-8, between the HUD and the dialogue box */
 export const BACKDROP = { top: 1, rows: 8, cols: SCREEN_COLS } as const;
 
-/** Map character → font character of the tile it draws */
-export const BACKDROP_LEGEND: Readonly<Record<string, string>> = {
-  ' ': ' ', // paper
-  '.': '\uE040', // sky texture
-  '(': '\uE041', // cloud (left)
-  ')': '\uE042', // cloud (right)
-  o: '\uE043', // sun / moon
-  '^': '\uE044', // rooftop
-  B: '\uE045', // building wall
-  '=': '\uE046', // railway track
-  _: '\uE047', // ground edge
-  '#': '\uE048', // ground
-  g: '\uE049', // grass edge
-  f: '\uE04A', // fence
-  n: '\uE04B', // counter / table
-  L: '\uE04C', // paper lantern
-  E: '\uE04D', // store shelf
-  '|': '\uE04E', // wallpaper
-  F: '\uE04F', // wooden floor
-  k: '\uE054', // tiled floor
-  K: '\uE055', // kitchen wall tiles
-  r: '\uE050', // road
-  N: '\uE051', // noren curtain
-  T: SCENE_ICON_TILES.TRAIN[0],
-  t: SCENE_ICON_TILES.TRAIN[1],
-  H: SCENE_ICON_TILES.HOUSE[0],
-  h: SCENE_ICON_TILES.HOUSE[1],
-  W: SCENE_ICON_TILES.BOWL[0],
-  w: SCENE_ICON_TILES.BOWL[1],
-  S: SCENE_ICON_TILES.SHOP[0],
-  s: SCENE_ICON_TILES.SHOP[1],
-  Y: SCENE_ICON_TILES.TREE[0],
-  y: SCENE_ICON_TILES.TREE[1],
-};
+/** The global blank tile (paper) */
+const BLANK_TILE = 0;
 
 export type Backdrop = readonly string[];
 
@@ -77,59 +48,80 @@ export interface SceneArt {
   readonly backdrop: Uint8Array;
   /** Pixel data for the scene's own tiles, loaded at SCENE_TILE_BASE */
   readonly tileData: Uint8Array;
-  /** BG tile index of each kit tile the scene uses, by backdrop map character */
+  /** BG tile index of each texture (single-tile) map character the scene uses */
   readonly tileOfCell: ReadonlyMap<string, number>;
 }
 
-/**
- * Encode a backdrop map. Kit tiles (glyphs-backdrop.ts) get slots in the scene's
- * tile block in order of first use; everything else (blank, scene icons) is global.
- */
-export function buildSceneArt(map: Backdrop): SceneArt {
-  // Fits by construction while the whole kit fits SCENE_TILE_CAPACITY (checked by tests)
-  const local = new Map<string, Glyph>();
-  const tileOf = (ch: string): number => {
-    const glyph = BACKDROP_GLYPHS[ch];
-    if (glyph === undefined) return requireTile(ch);
-    if (!local.has(ch)) local.set(ch, glyph);
-    return SCENE_TILE_BASE + [...local.keys()].indexOf(ch);
-  };
-  const backdrop = encodeBackdrop(map, tileOf);
-  const tileOfCell = new Map(
-    Object.entries(BACKDROP_LEGEND)
-      .filter(([, ch]) => local.has(ch))
-      .map(([cell, ch]) => [cell, SCENE_TILE_BASE + [...local.keys()].indexOf(ch)] as const),
-  );
-  return {
-    backdrop,
-    tileOfCell,
-    tileData: Uint8Array.from(
-      [...local.values()].flatMap((glyph) => Array.from(encodeGlyph(glyph))),
-    ),
-  };
+/** The 8x8 piece of a prop at (row, col) of the map, counting from the start of its run */
+function propTile(
+  prop: Prop,
+  grid: readonly (readonly string[])[],
+  row: number,
+  col: number,
+): Glyph {
+  const cellAt = (r: number, c: number): string => at(at(grid, r), c);
+  const ch = cellAt(row, col);
+  let firstCol = col;
+  while (firstCol > 0 && cellAt(row, firstCol - 1) === ch) firstCol--;
+  let firstRow = row;
+  while (firstRow > 0 && cellAt(firstRow - 1, col) === ch) firstRow--;
+  const tiles = sliceArt(prop.art);
+  const cols = at(prop.art, 0).length / 8;
+  const rows = prop.art.length / 8;
+  const index = ((row - firstRow) % rows) * cols + ((col - firstCol) % cols);
+  return at(tiles, index);
 }
 
-/** Encode a backdrop map as tile indices, row by row. */
-function encodeBackdrop(map: Backdrop, tileOf: (ch: string) => number): Uint8Array {
+/**
+ * Encode a backdrop map. Its scenery (scenery.ts) gets slots in the scene's tile
+ * block, identical tiles sharing one; blank cells use the global blank tile.
+ */
+export function buildSceneArt(map: Backdrop, capacity = SCENE_TILE_CAPACITY): SceneArt {
   if (map.length !== BACKDROP.rows) {
     throw new RangeError(`Backdrop needs ${String(BACKDROP.rows)} rows, got ${String(map.length)}`);
   }
-  return Uint8Array.from(
-    map.flatMap((row, r) => {
-      const cells = Array.from(row);
-      if (cells.length !== BACKDROP.cols) {
-        throw new RangeError(
-          `Backdrop row ${String(r)} must be ${String(BACKDROP.cols)} wide: "${row}"`,
-        );
-      }
-      return cells.map((cell) => {
-        const ch = BACKDROP_LEGEND[cell];
-        if (ch === undefined)
-          throw new Error(`Unknown backdrop cell "${cell}" in row ${String(r)}`);
-        return tileOf(ch);
-      });
-    }),
-  );
+  const tiles: Glyph[] = [];
+  const slots = new Map<string, number>();
+  const tileOfCell = new Map<string, number>();
+  const place = (glyph: Glyph): number => {
+    const key = glyph.join('/');
+    let slot = slots.get(key);
+    if (slot === undefined) {
+      slot = tiles.length;
+      slots.set(key, slot);
+      tiles.push(glyph);
+    }
+    return SCENE_TILE_BASE + slot;
+  };
+  const grid = map.map((row) => Array.from(row));
+  const backdrop = grid.flatMap((cells, r) => {
+    const row = cells.join('');
+    if (cells.length !== BACKDROP.cols) {
+      throw new RangeError(
+        `Backdrop row ${String(r)} must be ${String(BACKDROP.cols)} wide: "${row}"`,
+      );
+    }
+    return cells.map((cell, c) => {
+      if (cell === ' ') return BLANK_TILE;
+      const scenery = SCENERY[cell];
+      if (scenery === undefined)
+        throw new Error(`Unknown backdrop cell "${cell}" in row ${String(r)}`);
+      if (isProp(scenery)) return place(propTile(scenery, grid, r, c));
+      const index = place(scenery);
+      tileOfCell.set(cell, index);
+      return index;
+    });
+  });
+  if (tiles.length > capacity) {
+    throw new RangeError(
+      `A backdrop needs ${String(tiles.length)} tiles, more than the ${String(capacity)} free`,
+    );
+  }
+  return {
+    backdrop: Uint8Array.from(backdrop),
+    tileOfCell,
+    tileData: Uint8Array.from(tiles.flatMap((glyph) => Array.from(encodeGlyph(glyph)))),
+  };
 }
 
 /** Tilemap row stride minus the visible width */

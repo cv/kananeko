@@ -1,7 +1,7 @@
 /**
  * Color schemes for each screen (GBC), drawn only from the master palette
  * (palette.ts). Backdrop cells pick a ramp by their map character (see
- * BACKDROP_LEGEND); unlisted cells use the first ramp. A scene's mood comes from
+ * scenes/backdrops.ts); unlisted cells use the first ramp. A scene's mood comes from
  * its paper (sky or wall) and hues; the ink is always the same.
  */
 
@@ -20,15 +20,7 @@ export const STATION_COLORS: ColorScheme = {
     train: inked('matcha'),
     track: inked('wood'),
   },
-  cells: {
-    '^': 'building',
-    B: 'building',
-    T: 'train',
-    t: 'train',
-    '=': 'track',
-    _: 'track',
-    '#': 'track',
-  },
+  cells: { '^': 'building', B: 'building', T: 'train', _: 'track', p: 'track' },
 };
 
 export const STREET_COLORS: ColorScheme = {
@@ -40,17 +32,7 @@ export const STREET_COLORS: ColorScheme = {
     house: inked('sakura'),
     ground: inked('wood'),
   },
-  cells: {
-    o: 'sun',
-    Y: 'leaves',
-    y: 'leaves',
-    g: 'leaves',
-    H: 'house',
-    h: 'house',
-    '#': 'ground',
-    r: 'ground',
-    _: 'ground',
-  },
+  cells: { O: 'sun', Y: 'leaves', g: 'leaves', H: 'house', r: 'ground', c: 'ground' },
 };
 
 export const RESTAURANT_COLORS: ColorScheme = {
@@ -64,11 +46,12 @@ export const RESTAURANT_COLORS: ColorScheme = {
     kitchen: inked('stone'),
   },
   cells: {
+    b: 'wood',
     L: 'lantern',
     N: 'noren',
     K: 'kitchen',
     W: 'bowl',
-    w: 'bowl',
+    m: 'wood',
     n: 'wood',
     F: 'wood',
   },
@@ -94,15 +77,7 @@ export const PARK_COLORS: ColorScheme = {
     leaves: inked('matcha'),
     fence: inked('wood'),
   },
-  cells: {
-    '.': 'stars',
-    o: 'stars',
-    Y: 'leaves',
-    y: 'leaves',
-    g: 'leaves',
-    '#': 'leaves',
-    f: 'fence',
-  },
+  cells: { '.': 'stars', O: 'stars', Y: 'leaves', g: 'leaves', '#': 'leaves', f: 'fence' },
 };
 
 export const TITLE_COLORS: ColorScheme = { paper: PAPER, ramps: { cat: inked('ginger') } };
