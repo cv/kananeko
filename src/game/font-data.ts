@@ -1,7 +1,8 @@
 /**
  * 8x8 pixel art glyph definitions for all game characters.
  *
- * Each glyph is 8 rows of 8 pixels: '#' = on, '.' = off.
+ * Each glyph is 8 rows of 8 pixels using the palette's four shades:
+ *   '.' = paper (0), '-' = light (1), '+' = mid (2), '#' = ink (3)
  * Separated from font.ts to keep the builder logic clean.
  *
  * Glyph data is split across files by script:

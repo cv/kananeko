@@ -1,5 +1,5 @@
 /**
- * 8x8 monochrome font for the Game Boy.
+ * 8x8 font and art tiles for the Game Boy (four shades).
  * Glyph pixel art is defined in font-data.ts.
  * This module handles tile encoding, character mapping, and data building.
  */
@@ -9,19 +9,24 @@ import { ALL_GLYPHS, type Glyph } from './font-data';
 
 type TileTuple<T extends readonly string[]> = { [K in keyof T]: TileIndex };
 
-function glyphToTile(glyph: Glyph): Uint8Array {
+/** Glyph pixel characters → palette color index (0 = paper ... 3 = ink) */
+export const SHADES: Readonly<Record<string, number>> = { '.': 0, '-': 1, '+': 2, '#': 3 };
+
+/** Encode an 8x8 glyph as a 2bpp Game Boy tile (16 bytes: low plane, high plane per row). */
+export function encodeGlyph(glyph: Glyph): Uint8Array {
   const tile = new Uint8Array(16);
-  for (let row = 0 as 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7; row < 8; row++) {
-    let byte = 0;
-    const line = glyph[row];
-    for (let col = 0; col < 8; col++) {
-      if (line[col] === '#') {
-        byte |= 0x80 >> col;
-      }
-    }
-    tile[row * 2] = byte;
-    tile[row * 2 + 1] = byte;
-  }
+  glyph.forEach((line, row) => {
+    let low = 0;
+    let high = 0;
+    Array.from(line).forEach((pixel, col) => {
+      const shade = SHADES[pixel];
+      if (shade === undefined) throw new Error(`Invalid glyph pixel "${pixel}" in "${line}"`);
+      if (shade & 1) low |= 0x80 >> col;
+      if (shade & 2) high |= 0x80 >> col;
+    });
+    tile[row * 2] = low;
+    tile[row * 2 + 1] = high;
+  });
   return tile;
 }
 
@@ -68,7 +73,7 @@ export function buildTileData(): Uint8Array {
       if (glyph === undefined) {
         throw new Error(`Missing glyph for character: ${ch}`);
       }
-      return glyphToTile(glyph);
+      return encodeGlyph(glyph);
     }),
   ];
   const data = new Uint8Array(tiles.length * 16);

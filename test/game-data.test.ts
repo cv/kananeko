@@ -1,7 +1,14 @@
 /** Font, kana question, and scene-data builders. */
 
 import { describe, expect, it } from 'vitest';
-import { CHAR_MAP, TILE_COUNT, buildTileData, requireTile, textToTiles } from '@game/font';
+import {
+  CHAR_MAP,
+  TILE_COUNT,
+  buildTileData,
+  encodeGlyph,
+  requireTile,
+  textToTiles,
+} from '@game/font';
 import { MAX_KANA_WORD_LENGTH, buildKanaData, defineKanaQuestion } from '@game/kana';
 import { packScene, SCENES } from '@game/scene';
 import { centerStartCol, tilemapAddr, tilePos } from '@game/tilemap';
@@ -24,6 +31,29 @@ describe('font', () => {
     for (let tile = 1; tile <= TILE_COUNT; tile++) {
       expect(data.slice(tile * 16, (tile + 1) * 16).some((b) => b !== 0)).toBe(true);
     }
+  });
+
+  it('encodes the four shades into the low and high bit planes', () => {
+    const tile = encodeGlyph([
+      '.-+#....',
+      '########',
+      '........',
+      '........',
+      '........',
+      '........',
+      '........',
+      '++++++++',
+    ]);
+    // '.'=0, '-'=1 (low), '+'=2 (high), '#'=3 (both)
+    expect([tile[0], tile[1]]).toEqual([0b01010000, 0b00110000]);
+    expect([tile[2], tile[3]]).toEqual([0xff, 0xff]);
+    expect([tile[14], tile[15]]).toEqual([0x00, 0xff]);
+  });
+
+  it('rejects unknown pixel characters', () => {
+    expect(() => encodeGlyph(['x.......', '', '', '', '', '', '', ''])).toThrow(
+      /Invalid glyph pixel/,
+    );
   });
 
   it('rejects characters that are not in the font', () => {
@@ -67,6 +97,21 @@ describe('scene packing', () => {
     const scene = SCENES[0];
     expect(packScene(scene).nameRow).toEqual(textToTiles(scene.name));
   });
+});
+
+describe('scene palettes', () => {
+  const luma = (c: number): number =>
+    0.299 * (c & 0x1f) + 0.587 * ((c >> 5) & 0x1f) + 0.114 * ((c >> 10) & 0x1f);
+
+  it.each(SCENES.map((s) => [s.name, s.palette] as const))(
+    '%s runs from paper to ink, so glyph shades read as intended',
+    (_name, palette) => {
+      const lumas = palette.map(luma);
+      lumas.slice(1).forEach((l, i) => {
+        expect(l).toBeLessThan(lumas[i] ?? 0);
+      });
+    },
+  );
 });
 
 describe('layout helpers', () => {
