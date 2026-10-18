@@ -33,6 +33,7 @@ import {
   xor_r,
 } from '../asm/ops';
 import { type Op, type U16, ref, u8, u16 } from '../asm/types';
+import { buildCopyRows, drawBackdrop } from './backdrop';
 import { buildDialogueEngine } from './dialogue';
 import { buildTileData, requireTiles, textToTiles } from './font';
 import { CAT_TILES } from './font-data';
@@ -115,6 +116,10 @@ export function sceneDialogueLabel(sceneIndex: number): string {
 
 export function sceneKanaLabel(sceneIndex: number): string {
   return `scene${String(sceneIndex)}_kana`;
+}
+
+export function sceneBackdropLabel(sceneIndex: number): string {
+  return `scene${String(sceneIndex)}_backdrop`;
 }
 
 /**
@@ -323,8 +328,8 @@ export function buildProgram(): Op[] {
     // Scene name (row 1), icon (row 4), and palette
     ...sceneSwitch('scene_name', (_, packed) => writeCenteredRow(1, packed.nameRow), packedScenes),
     ...sceneSwitch(
-      'scene_icon',
-      (scene) => writeCenteredRow(4, requireTiles(scene.icon)),
+      'scene_backdrop',
+      (_s, _p, i) => drawBackdrop(sceneBackdropLabel(i)),
       packedScenes,
     ),
     ...sceneSwitch('scene_palette', (scene) => setBgPalette(scene.palette), packedScenes),
@@ -399,6 +404,7 @@ export function buildProgram(): Op[] {
     ...buildDrawHudOps(),
     ...buildScoreRoutines(),
     ...buildScoreDigits(),
+    ...buildCopyRows(),
     ...buildVramPut(),
 
     // ==== Data ====
@@ -411,6 +417,8 @@ export function buildProgram(): Op[] {
       db(scene.dialogueData),
       label(sceneKanaLabel(i)),
       db(scene.kanaData),
+      label(sceneBackdropLabel(i)),
+      db(scene.backdropData),
     ]),
   ];
 }

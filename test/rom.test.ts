@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { ROM_SIZE, globalChecksum, headerChecksum } from '@asm/assembler';
 import { buildTileData } from '@game/font';
-import { sceneDialogueLabel, sceneKanaLabel } from '@game/main';
+import { sceneBackdropLabel, sceneDialogueLabel, sceneKanaLabel } from '@game/main';
 import { SCENES, buildSceneData } from '@game/scene';
 import { rom, symbols } from './helpers/game-runner';
 
@@ -59,6 +59,9 @@ describe('Given the ROM has been assembled', () => {
         packed.dialogueData,
       );
       expect(bytesAt(sceneKanaLabel(i), packed.kanaData.length)).toEqual(packed.kanaData);
+      expect(bytesAt(sceneBackdropLabel(i), packed.backdropData.length)).toEqual(
+        packed.backdropData,
+      );
     });
     expect(SCENES).toHaveLength(5);
   });

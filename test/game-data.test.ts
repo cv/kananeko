@@ -13,6 +13,7 @@ import { MAX_KANA_WORD_LENGTH, buildKanaData, defineKanaQuestion } from '@game/k
 import { packScene, SCENES } from '@game/scene';
 import { centerStartCol, tilemapAddr, tilePos } from '@game/tilemap';
 import { rgb } from '@game/video';
+import { BACKDROP, BACKDROP_LEGEND, encodeBackdrop } from '@game/backdrop';
 
 describe('font', () => {
   it('maps space to the blank tile 0 and every glyph to a later tile', () => {
@@ -96,6 +97,26 @@ describe('scene packing', () => {
   it('stores the scene name without padding (it is centered when drawn)', () => {
     const scene = SCENES[0];
     expect(packScene(scene).nameRow).toEqual(textToTiles(scene.name));
+  });
+});
+
+describe('encodeBackdrop', () => {
+  const blankRow = ' '.repeat(BACKDROP.cols);
+  const blank = Array<string>(BACKDROP.rows).fill(blankRow);
+
+  it('maps each cell through the legend', () => {
+    const map = [...blank];
+    map[0] = 'o' + blankRow.slice(1);
+    const data = encodeBackdrop(map);
+    expect(data.length).toBe(BACKDROP.rows * BACKDROP.cols);
+    expect(data[0]).toBe(requireTile(BACKDROP_LEGEND['o'] ?? ''));
+    expect(data[1]).toBe(0);
+  });
+
+  it('rejects maps of the wrong size or with unknown cells', () => {
+    expect(() => encodeBackdrop(blank.slice(1))).toThrow(/rows/);
+    expect(() => encodeBackdrop([blankRow + ' ', ...blank.slice(1)])).toThrow(/wide/);
+    expect(() => encodeBackdrop(['?' + blankRow.slice(1), ...blank.slice(1)])).toThrow(/Unknown/);
   });
 });
 

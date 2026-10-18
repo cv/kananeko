@@ -3,7 +3,8 @@
 import { describe, expect, it } from 'vitest';
 import { SCENES } from '@game/scene';
 import { checkpoint, runnerAt } from '../helpers/checkpoints';
-import { SCREEN_W, inkBounds, readText, waitForPicture } from '../helpers/screen';
+import { BACKDROP } from '@game/backdrop';
+import { SCREEN_W, inkBounds, inkCount, readText, waitForPicture } from '../helpers/screen';
 
 const SCENE_NAME_ROW = 1;
 const NPC_TEXT = { row: 12, col: 2 };
@@ -20,6 +21,18 @@ describe('Given a scene has loaded', () => {
       const center = ((bounds?.left ?? 0) + (bounds?.right ?? 0) + 1) / 2;
       // Tile-aligned centering of an odd-length name can be off by half a tile
       expect(Math.abs(center - SCREEN_W / 2)).toBeLessThanOrEqual(4);
+    },
+  );
+
+  it.each(SCENES.map((scene, i) => [scene.name, i] as const))(
+    'draws the backdrop of %s above the dialogue box',
+    (_name, i) => {
+      const runner = waitForPicture(runnerAt(checkpoint.sceneStart(i)).frames(1));
+      const drawnRows = Array.from({ length: BACKDROP.rows }, (_, r) => BACKDROP.top + r).filter(
+        (row) => inkCount(runner, row) > 0,
+      );
+      // Every backdrop leaves at most one row empty (e.g. open sky)
+      expect(drawnRows.length).toBeGreaterThanOrEqual(BACKDROP.rows - 1);
     },
   );
 

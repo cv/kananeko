@@ -16,6 +16,14 @@ import { STREET_DIALOGUE } from './scenes/street';
 import { RESTAURANT_DIALOGUE } from './scenes/restaurant';
 import { CONBINI_DIALOGUE } from './scenes/conbini';
 import { PARK_DIALOGUE } from './scenes/park';
+import { type Backdrop, encodeBackdrop } from './backdrop';
+import {
+  CONBINI_BACKDROP,
+  PARK_BACKDROP,
+  RESTAURANT_BACKDROP,
+  STATION_BACKDROP,
+  STREET_BACKDROP,
+} from './scenes/backdrops';
 
 // ---------------------------------------------------------------------------
 // Scene data types
@@ -29,6 +37,8 @@ export interface Scene {
   readonly dialogue: readonly DialogueNode[];
   readonly kanaQuestions: KanaRound;
   readonly palette: Palette;
+  /** Illustration above the dialogue box (see backdrop.ts) */
+  readonly backdrop: Backdrop;
 }
 
 export type SceneList = Quint<Scene>;
@@ -47,6 +57,7 @@ export const SCENES = defineScenes([
   {
     name: 'えき',
     icon: SCENE_ICON_TILES.TRAIN,
+    backdrop: STATION_BACKDROP,
     palette: [
       rgb(0xe8, 0xe8, 0xe0),
       rgb(0xb0, 0xb0, 0xa0),
@@ -65,6 +76,7 @@ export const SCENES = defineScenes([
   {
     name: 'みち',
     icon: SCENE_ICON_TILES.HOUSE,
+    backdrop: STREET_BACKDROP,
     palette: [
       rgb(0xf0, 0xf0, 0xc0),
       rgb(0xc0, 0xd0, 0x80),
@@ -83,6 +95,7 @@ export const SCENES = defineScenes([
   {
     name: 'レストラン',
     icon: SCENE_ICON_TILES.BOWL,
+    backdrop: RESTAURANT_BACKDROP,
     palette: [
       rgb(0xf0, 0xe0, 0xd0),
       rgb(0xd0, 0xa0, 0x80),
@@ -101,6 +114,7 @@ export const SCENES = defineScenes([
   {
     name: 'コンビニ',
     icon: SCENE_ICON_TILES.SHOP,
+    backdrop: CONBINI_BACKDROP,
     palette: [
       rgb(0xf0, 0xf0, 0xf0),
       rgb(0xa0, 0xc0, 0xe0),
@@ -119,6 +133,7 @@ export const SCENES = defineScenes([
   {
     name: 'こうえん',
     icon: SCENE_ICON_TILES.TREE,
+    backdrop: PARK_BACKDROP,
     palette: [
       rgb(0xd0, 0xc0, 0xe0),
       rgb(0x80, 0x70, 0xb0),
@@ -145,6 +160,7 @@ export interface PackedScene {
   readonly nameRow: readonly number[];
   readonly dialogueData: Uint8Array;
   readonly kanaData: Uint8Array;
+  readonly backdropData: Uint8Array;
 }
 
 export function packScene(scene: Scene): PackedScene {
@@ -152,6 +168,7 @@ export function packScene(scene: Scene): PackedScene {
     nameRow: textToTiles(scene.name),
     dialogueData: buildDialogueTree(scene.dialogue),
     kanaData: buildKanaData(scene.kanaQuestions),
+    backdropData: encodeBackdrop(scene.backdrop),
   };
 }
 
