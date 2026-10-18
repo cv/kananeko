@@ -5,9 +5,9 @@ import { SCENES } from '@game/scene';
 import { checkpoint, runnerAt } from '../helpers/checkpoints';
 import { GameRunner } from '../helpers/game-runner';
 import { BACKDROP } from '@game/backdrop';
+import { DIALOGUE_LAYOUT } from '@game/dialogue';
 import { DialogueState } from '@game/state';
 import {
-  SCREEN_W,
   inkBounds,
   inkCount,
   darkestLuma,
@@ -16,10 +16,14 @@ import {
   waitForPicture,
 } from '../helpers/screen';
 
-const SCENE_NAME_ROW = 1;
-const NPC_TEXT = { row: 12, col: 2 };
-const CHOICES = { row: 14, col: 3 };
+const NPC_TEXT = DIALOGUE_LAYOUT.text;
+const CHOICE_ROWS = DIALOGUE_LAYOUT.choiceRows;
 const TEXT_WIDTH = 17;
+const choiceRow = (i: number): number => {
+  const row = CHOICE_ROWS[i];
+  if (row === undefined) throw new Error(`No choice row ${String(i)}`);
+  return row;
+};
 
 describe('Given the screen changes', () => {
   it('fades the first scene in from white after START', () => {
@@ -40,8 +44,7 @@ describe('Given the screen changes', () => {
 });
 
 describe('Given the player is choosing an answer', () => {
-  const CHOICE_ROW = 14;
-  const TEXT_LEFT = 24; // choice text starts at column 3
+  const TEXT_LEFT = DIALOGUE_LAYOUT.choiceCol * 8;
   /** Leftmost cursor pixel between the box border and the choice text, if any */
   const cursorLeft = (runner: GameRunner, row: number): number | undefined =>
     inkBounds(runner, row, { fromX: 8, toX: TEXT_LEFT })?.left;
@@ -50,24 +53,24 @@ describe('Given the player is choosing an answer', () => {
 
   it('points the cursor sprite at the highlighted row', () => {
     const runner = choosing();
-    expect(cursorLeft(runner, CHOICE_ROW)).toBeDefined();
-    expect(cursorLeft(runner, CHOICE_ROW + 1)).toBeUndefined();
+    expect(cursorLeft(runner, choiceRow(0))).toBeDefined();
+    expect(cursorLeft(runner, choiceRow(1))).toBeUndefined();
     // Shadow OAM → DMA on the next frame → shown a frame or two later
     runner.pressDown().frames(4);
-    expect(cursorLeft(runner, CHOICE_ROW)).toBeUndefined();
-    expect(cursorLeft(runner, CHOICE_ROW + 1)).toBeDefined();
+    expect(cursorLeft(runner, choiceRow(0))).toBeUndefined();
+    expect(cursorLeft(runner, choiceRow(1))).toBeDefined();
   });
 
   it('bounces the cursor while waiting', () => {
     const runner = choosing();
     const positions = new Set<number | undefined>();
-    for (let f = 0; f < 20; f++) positions.add(cursorLeft(runner.frames(1), CHOICE_ROW));
+    for (let f = 0; f < 20; f++) positions.add(cursorLeft(runner.frames(1), choiceRow(0)));
     expect([...positions].filter((p) => p !== undefined)).toHaveLength(2);
   });
 
   it('hides the cursor once a choice is confirmed', () => {
     const runner = choosing().pressA().frames(3);
-    for (const row of [CHOICE_ROW, CHOICE_ROW + 1, CHOICE_ROW + 2]) {
+    for (const row of CHOICE_ROWS) {
       expect(cursorLeft(runner, row)).toBeUndefined();
     }
   });
@@ -94,14 +97,13 @@ describe('Given the player is talking to someone', () => {
 
 describe('Given a scene has loaded', () => {
   it.each(SCENES.map((scene, i) => [scene.name, i] as const))(
-    'centers the scene name %s',
-    (_name, i) => {
-      const runner = waitForPicture(runnerAt(checkpoint.sceneStart(i)).frames(1));
-      const bounds = inkBounds(runner, SCENE_NAME_ROW);
-      expect(bounds).toBeDefined();
-      const center = ((bounds?.left ?? 0) + (bounds?.right ?? 0) + 1) / 2;
-      // Tile-aligned centering of an odd-length name can be off by half a tile
-      expect(Math.abs(center - SCREEN_W / 2)).toBeLessThanOrEqual(4);
+    'labels the dialogue box with the scene name %s',
+    (name, i) => {
+      // A few frames: the test emulator can show the fade's last palette step mid-frame
+      const runner = waitForPicture(runnerAt(checkpoint.sceneStart(i)).frames(4));
+      const length = Array.from(name).length;
+      const col = DIALOGUE_LAYOUT.nameCol(length);
+      expect(readText(runner, DIALOGUE_LAYOUT.boxTop, col, length + 2)).toBe(` ${name} `);
     },
   );
 
@@ -130,9 +132,9 @@ describe('Given a scene has loaded', () => {
       );
       runner.dlgChoiceOrder.forEach((choice, row) => {
         const expected = opening?.choices[choice]?.text ?? '';
-        expect(readText(runner, CHOICES.row + row, CHOICES.col, TEXT_WIDTH - 1).trimEnd()).toBe(
-          expected,
-        );
+        expect(
+          readText(runner, choiceRow(row), DIALOGUE_LAYOUT.choiceCol, TEXT_WIDTH - 1).trimEnd(),
+        ).toBe(expected);
       });
     },
   );

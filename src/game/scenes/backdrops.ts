@@ -3,7 +3,7 @@
  *
  *   ' ' paper   . sky    ( ) cloud   o sun/moon   ^ rooftop   B building
  *   = rails     _ ground edge   # ground   g grass   f fence   r road
- *   | wallpaper L lantern   N noren   n counter   E shelf   F floor
+ *   | wallpaper L lantern   N noren   n counter   E shelf   F wood floor   k tile floor
  *   Tt train    Hh house    Ww bowl   Ss shop   Yy tree
  */
 
@@ -18,7 +18,6 @@ export const STATION_BACKDROP: Backdrop = [
   ' TtTtTt      TtTt   ',
   '====================',
   '____________________',
-  '####################',
 ];
 
 export const STREET_BACKDROP: Backdrop = [
@@ -30,7 +29,6 @@ export const STREET_BACKDROP: Backdrop = [
   '####################',
   'rrrrrrrrrrrrrrrrrrrr',
   '____________________',
-  '####################',
 ];
 
 export const RESTAURANT_BACKDROP: Backdrop = [
@@ -42,7 +40,6 @@ export const RESTAURANT_BACKDROP: Backdrop = [
   '  WwWw  WwWw  WwWw  ',
   'nnnnnnnnnnnnnnnnnnnn',
   'FFFFFFFFFFFFFFFFFFFF',
-  'FFFFFFFFFFFFFFFFFFFF',
 ];
 
 export const CONBINI_BACKDROP: Backdrop = [
@@ -52,9 +49,8 @@ export const CONBINI_BACKDROP: Backdrop = [
   'EEEEE||EEEEE||EEEEE|',
   'EEEEE||EEEEE||EEEEE|',
   '||||||||||||||||||||',
-  'FFFFFFFFFFFFFFFFFFFF',
-  'FFFFFFFFFFFFFFFFFFFF',
-  'FFFFFFFFFFFFFFFFFFFF',
+  'kkkkkkkkkkkkkkkkkkkk',
+  'kkkkkkkkkkkkkkkkkkkk',
 ];
 
 export const PARK_BACKDROP: Backdrop = [
@@ -64,7 +60,6 @@ export const PARK_BACKDROP: Backdrop = [
   'Yy  Yy    Yy  Yy  Yy',
   'ffffffffffffffffffff',
   'gggggggggggggggggggg',
-  '####################',
   '####################',
   '####################',
 ];

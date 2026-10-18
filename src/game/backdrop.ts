@@ -23,8 +23,8 @@ import { requireTile } from './font';
 import { SCENE_ICON_TILES } from './font-data';
 import { SCREEN_COLS, tilemapAddr } from './tilemap';
 
-/** Where backdrops sit: rows 2-10, between the scene name and the dialogue box */
-export const BACKDROP = { top: 2, rows: 9, cols: SCREEN_COLS } as const;
+/** Where backdrops sit: rows 1-8, between the HUD and the dialogue box */
+export const BACKDROP = { top: 1, rows: 8, cols: SCREEN_COLS } as const;
 
 /** Map character → font character of the tile it draws */
 export const BACKDROP_LEGEND: Readonly<Record<string, string>> = {
@@ -45,6 +45,7 @@ export const BACKDROP_LEGEND: Readonly<Record<string, string>> = {
   E: '\uE04D', // store shelf
   '|': '\uE04E', // wallpaper
   F: '\uE04F', // wooden floor
+  k: '\uE054', // tiled floor
   r: '\uE050', // road
   N: '\uE051', // noren curtain
   T: SCENE_ICON_TILES.TRAIN[0],

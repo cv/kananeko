@@ -35,7 +35,7 @@ import {
 import { type Op, type U16, ref, u8, u16 } from '../asm/types';
 import { buildCopyRows, drawBackdrop } from './backdrop';
 import { buildDmaRoutineData, buildSpriteInit, runDma } from './sprites';
-import { buildDialogueEngine } from './dialogue';
+import { DIALOGUE_LAYOUT, buildDialogueEngine } from './dialogue';
 import { buildTileData, requireTile, requireTiles, textToTiles } from './font';
 import { CAT_TILES } from './font-data';
 import { buildReadJoypad } from './joypad';
@@ -419,8 +419,7 @@ export function buildProgram(): Op[] {
     ...screenOff('scene_vblank'),
     ...clearTilemap('scene_clear'),
 
-    // Scene name (row 1), icon (row 4), and palette
-    ...sceneSwitch('scene_name', (_, packed) => writeCenteredRow(1, packed.nameRow), packedScenes),
+    // Backdrop above the dialogue box
     ...sceneSwitch(
       'scene_backdrop',
       (_s, _p, i) => drawBackdrop(sceneBackdropLabel(i)),
@@ -428,6 +427,18 @@ export function buildProgram(): Op[] {
     ),
     call(ref('kana_draw_hud')), // hearts + score on row 0
     call(ref('dlg_draw_box')),
+    // Location name as a label in the box's top border: ┌─── えき ─┐
+    ...sceneSwitch(
+      'scene_name',
+      (_, packed) => [
+        ld_rr_nn(
+          'hl',
+          u16(tilemapAddr(DIALOGUE_LAYOUT.boxTop, DIALOGUE_LAYOUT.nameCol(packed.nameRow.length))),
+        ),
+        ...[0, ...packed.nameRow, 0].flatMap((tile) => [ld_r_n('a', u8(tile)), ldi_hl_a()]),
+      ],
+      packedScenes,
+    ),
     ...sceneSwitch(
       'scene_fade',
       (_s, _p, i) => [ld_rr_nn('hl', ref(sceneFadeLabel(i)))],

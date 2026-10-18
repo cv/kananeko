@@ -76,23 +76,35 @@ export type { DialogueNode, DialogueTree } from './dialogue-data';
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const BOX_TOP_ROW = 11;
-const BOX_ROWS = 7; // rows 11-17
-const TEXT_ROW_1 = 12;
-const CHOICE_START_ROW = 14;
+const BOX_TOP_ROW = 9;
+const BOX_ROWS = 9; // rows 9-17
+const TEXT_ROW_1 = 10;
+const CHOICE_START_ROW = 12;
+/** Choices sit on every other row so they don't run together */
+const CHOICE_ROW_STEP = 2;
 const REVEAL_DELAY = 3; // frames between each character reveal
 
 const TEXT_START = tilePos(TEXT_ROW_1, 2);
 const CHOICE_TEXT_POSITIONS: Triple<TilePosition> = [
   tilePos(CHOICE_START_ROW, 3),
-  tilePos(CHOICE_START_ROW + 1, 3),
-  tilePos(CHOICE_START_ROW + 2, 3),
+  tilePos(CHOICE_START_ROW + CHOICE_ROW_STEP, 3),
+  tilePos(CHOICE_START_ROW + 2 * CHOICE_ROW_STEP, 3),
 ];
 const CHOICE_CURSOR_COL = 2;
 
 /** Widest text that fits in the box: NPC text starts at col 2, choices at col 3, border at col 19. */
 export const MAX_NPC_TEXT_WIDTH = SCREEN_COLS - 1 - TEXT_START.col;
 export const MAX_CHOICE_TEXT_WIDTH = SCREEN_COLS - 1 - CHOICE_TEXT_POSITIONS[0].col;
+
+/** Textbox geometry, for the scene loader, tests, and tools */
+export const DIALOGUE_LAYOUT = {
+  boxTop: BOX_TOP_ROW,
+  text: TEXT_START,
+  choiceRows: CHOICE_TEXT_POSITIONS.map((p) => p.row),
+  choiceCol: CHOICE_TEXT_POSITIONS[0].col,
+  /** Column where a location name label (name plus a space either side) starts, right-aligned in the top border */
+  nameCol: (nameLength: number): number => SCREEN_COLS - 2 - (nameLength + 2),
+} as const;
 
 // Tile indices for border characters
 const BORDER_TL = requireTile('┌');
@@ -538,7 +550,8 @@ export function buildDialogueEngine(): Op[] {
     ld_a_nn(MEM.DLG_CURSOR),
     add_r('a'),
     add_r('a'),
-    add_r('a'), // A = cursor * 8 (one row per choice)
+    add_r('a'),
+    add_r('a'), // A = cursor * 16 (choices are two tile rows apart)
     add_n(u8(CURSOR_Y)),
     ld_nn_a(oamField(SPRITE_SLOT.cursor, 'y')),
     ...storeByte(oamField(SPRITE_SLOT.cursor, 'x'), CURSOR_X),

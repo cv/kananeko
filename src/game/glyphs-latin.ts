@@ -386,14 +386,15 @@ export const DIGITS_PUNCT: Record<string, Glyph> = {
     '..##....',
     '........',
   ],
+  // Only used in "..." — vertically centered like the Japanese ellipsis (…)
   '.': [
     '........',
     '........',
     '........',
-    '........',
-    '........',
     '..##....',
     '..##....',
+    '........',
+    '........',
     '........',
   ],
   ',': [
