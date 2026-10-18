@@ -39,6 +39,40 @@ describe('Given the screen changes', () => {
   });
 });
 
+describe('Given the player is choosing an answer', () => {
+  const CHOICE_ROW = 14;
+  const TEXT_LEFT = 24; // choice text starts at column 3
+  /** Leftmost cursor pixel between the box border and the choice text, if any */
+  const cursorLeft = (runner: GameRunner, row: number): number | undefined =>
+    inkBounds(runner, row, { fromX: 8, toX: TEXT_LEFT })?.left;
+  const choosing = (): GameRunner =>
+    waitForPicture(runnerAt(checkpoint.sceneStart(0)).waitForDialogueChoices().frames(2));
+
+  it('points the cursor sprite at the highlighted row', () => {
+    const runner = choosing();
+    expect(cursorLeft(runner, CHOICE_ROW)).toBeDefined();
+    expect(cursorLeft(runner, CHOICE_ROW + 1)).toBeUndefined();
+    // Shadow OAM → DMA on the next frame → shown a frame or two later
+    runner.pressDown().frames(4);
+    expect(cursorLeft(runner, CHOICE_ROW)).toBeUndefined();
+    expect(cursorLeft(runner, CHOICE_ROW + 1)).toBeDefined();
+  });
+
+  it('bounces the cursor while waiting', () => {
+    const runner = choosing();
+    const positions = new Set<number | undefined>();
+    for (let f = 0; f < 20; f++) positions.add(cursorLeft(runner.frames(1), CHOICE_ROW));
+    expect([...positions].filter((p) => p !== undefined)).toHaveLength(2);
+  });
+
+  it('hides the cursor once a choice is confirmed', () => {
+    const runner = choosing().pressA().frames(3);
+    for (const row of [CHOICE_ROW, CHOICE_ROW + 1, CHOICE_ROW + 2]) {
+      expect(cursorLeft(runner, row)).toBeUndefined();
+    }
+  });
+});
+
 describe('Given the player is talking to someone', () => {
   it('never flashes a blank screen between dialogue nodes', () => {
     const runner = waitForPicture(runnerAt(checkpoint.sceneStart(0)));

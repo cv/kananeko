@@ -29,7 +29,7 @@ import { type Quad } from './fixed';
 import { centerStartCol, tilemapAddr, tileRow } from './tilemap';
 
 /** LCDC value used whenever the game turns the screen on. */
-export const SCREEN_ON_FLAGS = LCDC.LCD_ON | LCDC.TILE_DATA_8000 | LCDC.BG_ON;
+export const SCREEN_ON_FLAGS = LCDC.LCD_ON | LCDC.TILE_DATA_8000 | LCDC.BG_ON | LCDC.OBJ_ON;
 
 /** Wait for VBlank and turn the LCD off. `name` labels the wait loop. */
 export function screenOff(name: string): Op[] {
@@ -190,6 +190,7 @@ export function buildFadeRoutines(): Op[] {
     label('fade_wait_frame'),
     halt(),
     nop(),
+    call(u16(0xff80)), // OAM DMA (see sprites.ts) so sprites update during fades
     dec_r('c'),
     jr_cc('nz', ref('fade_wait_frame')),
     ret(),

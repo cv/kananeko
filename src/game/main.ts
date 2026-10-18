@@ -34,6 +34,7 @@ import {
 } from '../asm/ops';
 import { type Op, type U16, ref, u8, u16 } from '../asm/types';
 import { buildCopyRows, drawBackdrop } from './backdrop';
+import { buildDmaRoutineData, buildSpriteInit, runDma } from './sprites';
 import { buildDialogueEngine } from './dialogue';
 import { buildTileData, requireTile, requireTiles, textToTiles } from './font';
 import { CAT_TILES } from './font-data';
@@ -177,6 +178,7 @@ function engineLoop(name: string, update: string, stateAddr: U16): Op[] {
   return [
     label(name),
     ...waitFrame(),
+    ...runDma(),
     call(ref('hud_update')), // refresh HUD early in VBlank window
     call(ref('joy_read')),
     call(ref(update)),
@@ -319,6 +321,8 @@ export function buildProgram(): Op[] {
     ...screenOff('init_vblank'),
     ...copyPages('init_copy', MEM.VRAM_TILES, ref('tileData'), Math.ceil(tileData.length / 256)),
 
+    ...buildSpriteInit(),
+
     // Enable the VBlank interrupt so HALT wakes once per frame (fades and game loops).
     // The handler at $0040 is a RETI placed by the assembler.
     ...storeByte(MEM.IE, 0x01), // bit 0 = VBlank
@@ -450,6 +454,7 @@ export function buildProgram(): Op[] {
     ...buildFadeRoutines(),
 
     // ==== Data ====
+    ...buildDmaRoutineData(),
     label('tileData'),
     db(tileData),
 

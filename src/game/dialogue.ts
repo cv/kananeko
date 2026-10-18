@@ -64,6 +64,7 @@ import {
 } from './kana-hud';
 import { DialogueState, END_OF_CONVERSATION, MAX_LIVES } from './state';
 import { SCREEN_COLS, type TilePosition, tilePos, tilemapAddr } from './tilemap';
+import { OAM_X_OFFSET, OAM_Y_OFFSET, SPRITE_SLOT, oamField } from './sprites';
 import { vramPut } from './video';
 
 // Re-export data types and encoder from dialogue-data.ts
@@ -86,11 +87,7 @@ const CHOICE_TEXT_POSITIONS: Triple<TilePosition> = [
   tilePos(CHOICE_START_ROW + 1, 3),
   tilePos(CHOICE_START_ROW + 2, 3),
 ];
-const CHOICE_CURSOR_POSITIONS: Triple<TilePosition> = [
-  tilePos(CHOICE_START_ROW, 2),
-  tilePos(CHOICE_START_ROW + 1, 2),
-  tilePos(CHOICE_START_ROW + 2, 2),
-];
+const CHOICE_CURSOR_COL = 2;
 
 /** Widest text that fits in the box: NPC text starts at col 2, choices at col 3, border at col 19. */
 export const MAX_NPC_TEXT_WIDTH = SCREEN_COLS - 1 - TEXT_START.col;
@@ -104,6 +101,11 @@ const BORDER_BR = requireTile('┘');
 const BORDER_H = requireTile('─');
 const BORDER_V = requireTile('│');
 const CURSOR_TILE = requireTile('▶');
+/** Cursor sprite position for the first choice row (OAM coordinates) */
+const CURSOR_Y = CHOICE_START_ROW * 8 + OAM_Y_OFFSET;
+const CURSOR_X = CHOICE_CURSOR_COL * 8 + OAM_X_OFFSET;
+/** Bit of DLG_BOUNCE that nudges the cursor (toggles every 8 frames) */
+const CURSOR_BOUNCE_FRAMES = 8;
 
 const DLG_ORDER = [MEM.DLG_ORDER0, MEM.DLG_ORDER1, MEM.DLG_ORDER2] as const;
 
@@ -121,14 +123,6 @@ const TWO_CHOICE_SWAPPED = [1, 0] as const;
 // ---------------------------------------------------------------------------
 // Assembly helpers
 // ---------------------------------------------------------------------------
-
-/** HL = positions[A] for A in 0..2 */
-function buildLoadChoicePosition(positions: Triple<TilePosition>, name: string): Op[] {
-  return switchCases(
-    positions.map((position) => [ld_rr_nn('hl', u16(tilemapAddr(position)))]),
-    { name },
-  );
-}
 
 /** HL = text position of the display row whose DLG_ORDER entry equals B */
 function buildLoadChoicePositionForLogicalChoice(name: string): Op[] {
@@ -388,13 +382,9 @@ export function buildDialogueEngine(): Op[] {
     dec_r('c'), // remaining--
     jr_cc('nz', ref('dlg_draw_choice_loop')),
 
-    // Draw cursor at first choice
-    ld_rr_nn('hl', u16(tilemapAddr(CHOICE_CURSOR_POSITIONS[0]))),
-    ld_r_n('a', u8(CURSOR_TILE)),
-    ...vramPut(),
-
-    // Init cursor position
-    ...zeroBytes(MEM.DLG_CURSOR),
+    // Cursor sprite on the first row
+    ...zeroBytes(MEM.DLG_CURSOR, MEM.DLG_BOUNCE),
+    call(ref('dlg_draw_cursor')),
 
     ret(),
 
@@ -414,6 +404,17 @@ export function buildDialogueEngine(): Op[] {
     // dlg_do_choose — Navigate choices with UP/DOWN, confirm with A
     // =================================================================
     label('dlg_do_choose'),
+    // Bounce the cursor one pixel right every CURSOR_BOUNCE_FRAMES frames
+    ld_a_nn(MEM.DLG_BOUNCE),
+    inc_r('a'),
+    ld_nn_a(MEM.DLG_BOUNCE),
+    and_n(u8(CURSOR_BOUNCE_FRAMES)),
+    ld_r_n('a', u8(CURSOR_X)),
+    jr_cc('z', ref('dlg_bounce_set')),
+    inc_r('a'),
+    label('dlg_bounce_set'),
+    ld_nn_a(oamField(SPRITE_SLOT.cursor, 'x')),
+
     ld_a_nn(MEM.JOYPAD_NEW),
 
     // Check A button
@@ -435,8 +436,6 @@ export function buildDialogueEngine(): Op[] {
 
     // --- Move cursor down ---
     label('dlg_cursor_down'),
-    // Erase old cursor
-    call(ref('dlg_erase_cursor')),
     // Increment cursor, wrap around
     ld_a_nn(MEM.DLG_CURSOR),
     inc_r('a'),
@@ -451,7 +450,6 @@ export function buildDialogueEngine(): Op[] {
 
     // --- Move cursor up ---
     label('dlg_cursor_up'),
-    call(ref('dlg_erase_cursor')),
     ld_a_nn(MEM.DLG_CURSOR),
     cp_n(u8(0)),
     jr_cc('nz', ref('dlg_cursor_up_dec')),
@@ -471,6 +469,7 @@ export function buildDialogueEngine(): Op[] {
 
     // --- Confirm choice ---
     label('dlg_confirm_choice'),
+    ...zeroBytes(oamField(SPRITE_SLOT.cursor, 'y')), // hide the cursor
     ld_a_nn(MEM.DLG_CURSOR),
     ld_nn_a(MEM.DLG_RESULT),
 
@@ -519,23 +518,18 @@ export function buildDialogueEngine(): Op[] {
     ret(),
 
     // =================================================================
-    // dlg_erase_cursor — Clear the cursor tile at the current position
-    // =================================================================
-    label('dlg_erase_cursor'),
-    ld_a_nn(MEM.DLG_CURSOR),
-    ...buildLoadChoicePosition(CHOICE_CURSOR_POSITIONS, 'dlg_erase_pos'),
-    xor_r('a'),
-    ...vramPut(), // blank tile
-    ret(),
-
-    // =================================================================
-    // dlg_draw_cursor — Draw cursor at the current position
+    // dlg_draw_cursor — Move the cursor sprite to the highlighted row
     // =================================================================
     label('dlg_draw_cursor'),
     ld_a_nn(MEM.DLG_CURSOR),
-    ...buildLoadChoicePosition(CHOICE_CURSOR_POSITIONS, 'dlg_draw_pos'),
-    ld_r_n('a', u8(CURSOR_TILE)),
-    ...vramPut(),
+    add_r('a'),
+    add_r('a'),
+    add_r('a'), // A = cursor * 8 (one row per choice)
+    add_n(u8(CURSOR_Y)),
+    ld_nn_a(oamField(SPRITE_SLOT.cursor, 'y')),
+    ...storeByte(oamField(SPRITE_SLOT.cursor, 'x'), CURSOR_X),
+    ...storeByte(oamField(SPRITE_SLOT.cursor, 'tile'), CURSOR_TILE),
+    ...zeroBytes(oamField(SPRITE_SLOT.cursor, 'attr')),
     ret(),
 
     // =================================================================

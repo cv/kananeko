@@ -33,6 +33,8 @@ export const HW = {
   // GBC color palettes
   BCPS: ioReg(0x68), // BG Color Palette Spec (index + auto-increment bit 7)
   BCPD: ioReg(0x69), // BG Color Palette Data (write color bytes)
+  OCPS: ioReg(0x6a), // OBJ Color Palette Spec
+  OCPD: ioReg(0x6b), // OBJ Color Palette Data
 
   // GBC VRAM bank
   VBK: ioReg(0x4f), // VRAM Bank Select (0 or 1)
@@ -85,6 +87,7 @@ export const MEM = {
   DLG_ORDER0: u16(0xc02f), // Display row 0 → logical choice index
   DLG_ORDER1: u16(0xc030), // Display row 1 → logical choice index
   DLG_ORDER2: u16(0xc031), // Display row 2 → logical choice index
+  DLG_BOUNCE: u16(0xc032), // Frame counter driving the choice cursor's bounce
 
   // WRAM — kana mini-game
   KANA_STATE: u16(0xc040), // 0=idle, 2=awaiting, 3=correct feedback, 4=wrong feedback

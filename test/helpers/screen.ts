@@ -45,7 +45,11 @@ export interface InkBounds {
  * Horizontal extent of "ink" (pixels darker than the row's lightest color) on a tile row,
  * or undefined if the row is blank.
  */
-export function inkBounds(runner: GameRunner, tileRow: number): InkBounds | undefined {
+export function inkBounds(
+  runner: GameRunner,
+  tileRow: number,
+  { fromX = 0, toX = SCREEN_W }: { fromX?: number; toX?: number } = {},
+): InkBounds | undefined {
   const screen = runner.getScreen();
   const ys = Array.from({ length: TILE }, (_, i) => tileRow * TILE + i);
   let paper = 0;
@@ -55,7 +59,7 @@ export function inkBounds(runner: GameRunner, tileRow: number): InkBounds | unde
   let left = SCREEN_W;
   let right = -1;
   for (const y of ys) {
-    for (let x = 0; x < SCREEN_W; x++) {
+    for (let x = fromX; x < toX; x++) {
       if (luma(screen, x, y) < paper - 1) {
         left = Math.min(left, x);
         right = Math.max(right, x);
