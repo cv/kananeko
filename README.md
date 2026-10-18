@@ -24,6 +24,12 @@ The whole thing is hand-assembled from TypeScript. No engine, no SDK — just ra
 4. Keep your lives — gain your score
 5. Advance to the next location
 
+## 🖼️ Screenshots
+
+![Contact sheet of every screen](docs/screenshots/contact-sheet.png)
+
+See [the gallery](docs/screenshots/README.md); regenerate it with `npm run screenshots`.
+
 ## 🔧 Setup
 
 Needs **Node.js 25+** — older versions (e.g. 18) won't work with the current toolchain.

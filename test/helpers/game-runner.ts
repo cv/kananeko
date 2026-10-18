@@ -327,14 +327,18 @@ export class GameRunner {
     return this.frames(GameRunner.INPUT_DEBOUNCE);
   }
 
-  /** Press a d-pad direction for the current kana question and wait out the feedback */
-  private answerKana(pickDirection: (correct: number) => number): this {
+  /** Press the d-pad direction of a right or wrong answer for one frame, without waiting */
+  pressKanaAnswer(correct: boolean): this {
     this.waitForKanaInput();
-    const direction = pickDirection(this.kanaCorrectPos);
+    const direction = correct ? this.kanaCorrectPos : (this.kanaCorrectPos + 1) & 3;
     const key = DIR_KEYS[direction];
     if (key === undefined) throw new Error(`Invalid kana direction: ${String(direction)}`);
-    this.gb.pressKey(key);
-    this.gb.doFrame();
+    return this.pressKey(key);
+  }
+
+  /** Answer the current kana question and wait out the feedback */
+  private answerKana(correct: boolean): this {
+    this.pressKanaAnswer(correct);
     return this.waitUntil(() => this.kanaState !== KanaState.AWAITING, 'kana answer registration')
       .waitUntil(
         () => this.kanaState === KanaState.AWAITING || this.kanaState === KanaState.IDLE,
@@ -345,12 +349,12 @@ export class GameRunner {
 
   /** Answer the current kana question correctly (reads the randomized position from WRAM) */
   answerKanaCorrectly(): this {
-    return this.answerKana((correct) => correct);
+    return this.answerKana(true);
   }
 
   /** Answer the current kana question with a wrong direction */
   answerKanaWrong(): this {
-    return this.answerKana((correct) => (correct + 1) & 3);
+    return this.answerKana(false);
   }
 
   /** Complete all kana questions for a scene (correct on first try) */
