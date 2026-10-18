@@ -65,7 +65,6 @@ export const DELTA_PLUS_10 = 2;
 export const DELTA_MINUS_5 = 3;
 export const DELTA_MINUS_100 = 4;
 
-/** Dispatch order for the delta flash; the last entry is the fallback */
 /**
  * Jump to hud_redraw if what the HUD shows (`shownAddr`) differs from the current
  * value (register B or a memory address). Clobbers A and C.
@@ -75,6 +74,7 @@ function redrawIfChanged(shownAddr: U16, current: U16 | 'b'): Op[] {
   return [...load, ld_a_nn(shownAddr), cp_r('c'), jp_cc('nz', ref('hud_redraw'))];
 }
 
+/** Dispatch order for the delta flash; the last entry is the fallback */
 const DELTA_TYPES = [DELTA_PLUS_100, DELTA_PLUS_10, DELTA_MINUS_5, DELTA_MINUS_100] as const;
 
 export type DeltaType =
@@ -118,6 +118,66 @@ export function buildAddScore(delta: ScoreDelta): Op[] {
 /** Subtract from the score, stopping at zero (clobbers A, B). */
 export function buildSubScore(delta: ScoreDelta): Op[] {
   return [ld_r_n('a', u8(delta)), call(ref('score_sub'))];
+}
+
+/** Decimal places converted by score_digits (the ones digit is what remains) */
+const DIGIT_PLACES = [1000, 100, 10] as const;
+const SCORE_DIGIT_COUNT = DIGIT_PLACES.length + 1;
+
+function scoreDigitAddr(i: number): U16 {
+  return u16(MEM.SCORE_DIGITS + i);
+}
+
+/**
+ * Subroutine score_digits: convert the score into four digit tiles at
+ * MEM.SCORE_DIGITS by repeated 16-bit subtraction. Clobbers A, C, DE, L.
+ */
+export function buildScoreDigits(): Op[] {
+  return [
+    label('score_digits'),
+    ld_a_nn(MEM.KANA_SCORE_HI),
+    ld_r_r('d', 'a'),
+    ld_a_nn(MEM.KANA_SCORE_LO),
+    ld_r_r('e', 'a'),
+    ...DIGIT_PLACES.flatMap((place, i) => {
+      const loop = `score_digit${String(place)}`;
+      const done = `${loop}_done`;
+      return [
+        ld_r_n('c', u8(0)),
+        label(loop),
+        // DE -= place, keeping the old value if that would go negative
+        ld_r_r('a', 'e'),
+        sub_n(u8(place & 0xff)),
+        ld_r_r('l', 'a'),
+        ld_r_r('a', 'd'),
+        sbc_n(u8(place >> 8)),
+        jr_cc('c', ref(done)),
+        ld_r_r('d', 'a'),
+        ld_r_r('e', 'l'),
+        inc_r('c'),
+        jr(ref(loop)),
+        label(done),
+        ld_r_r('a', 'c'),
+        add_n(u8(d0)),
+        ld_nn_a(scoreDigitAddr(i)),
+      ];
+    }),
+    ld_r_r('a', 'e'),
+    add_n(u8(d0)),
+    ld_nn_a(scoreDigitAddr(DIGIT_PLACES.length)),
+    ret(),
+  ];
+}
+
+/** Draw the four tiles computed by score_digits at (row, col); safe with the LCD on. */
+export function buildDrawScoreDigits(row: number, col: number): Op[] {
+  return [
+    ld_rr_nn('hl', u16(tilemapAddr(row, col))),
+    ...Array.from({ length: SCORE_DIGIT_COUNT }, (_, i) => [
+      ld_a_nn(scoreDigitAddr(i)),
+      ...vramPut(),
+    ]).flat(),
+  ];
 }
 
 /** Subroutines score_add / score_sub: A = amount; the score stays within 0..MAX_SCORE. */
@@ -284,81 +344,8 @@ export function buildDrawHudOps(): Op[] {
     ...Array.from({ length: MAX_LIVES }, (_, i) => buildHeart(i + 1)).flat(),
 
     // --- Score at cols 8-11 (centered) ---
-    ld_a_nn(MEM.KANA_SCORE_HI),
-    ld_r_r('d', 'a'),
-    ld_a_nn(MEM.KANA_SCORE_LO),
-    ld_r_r('e', 'a'),
-
-    // Thousands
-    ld_r_n('c', u8(0)),
-    label('kana_thousands'),
-    ld_r_r('a', 'd'),
-    cp_n(u8(4)),
-    jr_cc('nc', ref('kana_th_sub')),
-    cp_n(u8(3)),
-    jr_cc('c', ref('kana_thousands_done')),
-    ld_r_r('a', 'e'),
-    cp_n(u8(0xe8)),
-    jr_cc('c', ref('kana_thousands_done')),
-    label('kana_th_sub'),
-    ld_r_r('a', 'e'),
-    sub_n(u8(0xe8)),
-    ld_r_r('e', 'a'),
-    ld_r_r('a', 'd'),
-    sbc_n(u8(3)),
-    ld_r_r('d', 'a'),
-    inc_r('c'),
-    jr(ref('kana_thousands')),
-    label('kana_thousands_done'),
-    ld_r_r('a', 'c'),
-    add_n(u8(d0)),
-    ...buildDrawTileAt(0, SCORE_COL, 'from_a'),
-
-    // Hundreds
-    ld_r_n('c', u8(0)),
-    label('kana_hundreds'),
-    ld_r_r('a', 'd'),
-    cp_n(u8(1)),
-    jr_cc('nc', ref('kana_h_sub')),
-    ld_r_r('a', 'e'),
-    cp_n(u8(100)),
-    jr_cc('c', ref('kana_hundreds_done')),
-    label('kana_h_sub'),
-    ld_r_r('a', 'e'),
-    sub_n(u8(100)),
-    ld_r_r('e', 'a'),
-    ld_r_r('a', 'd'),
-    sbc_n(u8(0)),
-    ld_r_r('d', 'a'),
-    inc_r('c'),
-    jr(ref('kana_hundreds')),
-    label('kana_hundreds_done'),
-    ld_r_r('a', 'c'),
-    add_n(u8(d0)),
-    ...buildDrawTileAt(0, SCORE_COL + 1, 'from_a'),
-
-    // Tens
-    ld_r_r('b', 'e'),
-    ld_r_n('c', u8(0)),
-    label('kana_tens'),
-    ld_r_r('a', 'b'),
-    cp_n(u8(10)),
-    jr_cc('c', ref('kana_tens_done')),
-    sub_n(u8(10)),
-    ld_r_r('b', 'a'),
-    inc_r('c'),
-    jr(ref('kana_tens')),
-    label('kana_tens_done'),
-    ld_r_r('a', 'c'),
-    add_n(u8(d0)),
-    ...buildDrawTileAt(0, SCORE_COL + 2, 'from_a'),
-
-    // Ones
-    ld_r_r('a', 'b'),
-    add_n(u8(d0)),
-    ...buildDrawTileAt(0, SCORE_COL + 3, 'from_a'),
-
-    label('kana_score_done'),
+    call(ref('score_digits')),
+    ...buildDrawScoreDigits(0, SCORE_COL),
 
     // --- Delta flash at cols 15-18 (timer ticks in hud_update) ---
     ld_a_nn(MEM.DELTA_TIMER),

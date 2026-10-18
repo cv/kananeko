@@ -3,7 +3,16 @@
 import { describe, expect, it } from 'vitest';
 import { MEM } from '@asm/hardware';
 import { storeByte } from '@asm/macros';
-import { MAX_SCORE, buildAddScore, buildScoreRoutines, buildSubScore } from '@game/kana-hud';
+import { call } from '@asm/ops';
+import { ref } from '@asm/types';
+import { textToTiles } from '@game/font';
+import {
+  MAX_SCORE,
+  buildAddScore,
+  buildScoreDigits,
+  buildScoreRoutines,
+  buildSubScore,
+} from '@game/kana-hud';
 import { runProgram } from './helpers/run-program';
 
 function scoreAfter(start: number, ops: ReturnType<typeof buildAddScore>): number {
@@ -17,6 +26,25 @@ function scoreAfter(start: number, ops: ReturnType<typeof buildAddScore>): numbe
   );
   return (mem[MEM.KANA_SCORE_LO] ?? 0) | ((mem[MEM.KANA_SCORE_HI] ?? 0) << 8);
 }
+
+describe('score_digits', () => {
+  it.each([0, 7, 10, 99, 100, 255, 256, 1000, 1009, 4860, 9990, MAX_SCORE])(
+    'converts %i into four digit tiles',
+    (score) => {
+      const mem = runProgram(
+        [
+          ...storeByte(MEM.KANA_SCORE_LO, score & 0xff),
+          ...storeByte(MEM.KANA_SCORE_HI, score >> 8),
+          call(ref('score_digits')),
+        ],
+        buildScoreDigits(),
+      );
+      expect(Array.from(mem.slice(MEM.SCORE_DIGITS, MEM.SCORE_DIGITS + 4))).toEqual(
+        textToTiles(String(score).padStart(4, '0')),
+      );
+    },
+  );
+});
 
 describe('score arithmetic', () => {
   it.each([

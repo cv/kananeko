@@ -37,7 +37,7 @@ import { buildTileData, requireTiles, textToTiles } from './font';
 import { CAT_TILES } from './font-data';
 import { buildReadJoypad } from './joypad';
 import { buildKanaEngine } from './kana';
-import { buildDrawHudOps, buildScoreRoutines } from './kana-hud';
+import { buildDrawHudOps, buildScoreDigits, buildScoreRoutines } from './kana-hud';
 import { type PackedScene, type Scene, SCENES, buildSceneData } from './scene';
 import { END_OF_CONVERSATION, MAX_LIVES } from './state';
 import {
@@ -336,6 +336,7 @@ export function buildProgram(): Op[] {
     ...buildKanaEngine(),
     ...buildDrawHudOps(),
     ...buildScoreRoutines(),
+    ...buildScoreDigits(),
     ...buildVramPut(),
 
     // ==== Data ====

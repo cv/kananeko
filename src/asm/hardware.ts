@@ -113,6 +113,7 @@ export const MEM = {
   HUD_SHOWN_SCORE_LO: u16(0xc059),
   HUD_SHOWN_SCORE_HI: u16(0xc05a),
   HUD_SHOWN_DELTA: u16(0xc05b), // delta type on screen (0 = cleared)
+  SCORE_DIGITS: u16(0xc05c), // 4 digit tiles of the score, most significant first ($C05C-$C05F)
 
   // WRAM — scene system
   SCENE_ID: u16(0xc050), // Current scene index (0-4, 0xFF = title)
