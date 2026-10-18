@@ -43,6 +43,34 @@ describe('Given the screen changes', () => {
   });
 });
 
+describe('Given a Game Boy Color', () => {
+  const rgbAt = (runner: GameRunner, x: number, y: number): [number, number, number] => {
+    const s = runner.getScreen();
+    const i = (y * 160 + x) * 4;
+    return [s[i] ?? 0, s[i + 1] ?? 0, s[i + 2] ?? 0];
+  };
+  /** Most saturated pixel's dominant channel within a tile (0 = R, 1 = G, 2 = B) */
+  const dominantChannel = (runner: GameRunner, row: number, col: number): number => {
+    let best = { spread: -1, channel: 0 };
+    for (let y = row * 8; y < row * 8 + 8; y++) {
+      for (let x = col * 8; x < col * 8 + 8; x++) {
+        const c = rgbAt(runner, x, y);
+        const spread = Math.max(...c) - Math.min(...c);
+        if (spread > best.spread) best = { spread, channel: c.indexOf(Math.max(...c)) };
+      }
+    }
+    return best.channel;
+  };
+
+  it('draws the HUD hearts red and the street trees green', () => {
+    const runner = waitForPicture(runnerAt(checkpoint.sceneStart(1)).frames(6));
+    expect(dominantChannel(runner, 0, 1)).toBe(0); // heart
+    const treeRow = BACKDROP.top + 3; // ' Yy  Hh  Yy  Hh  Yy '
+    expect(dominantChannel(runner, treeRow, 1)).toBe(1); // tree
+    expect(dominantChannel(runner, treeRow, 5)).toBe(0); // house roof
+  });
+});
+
 describe('Given the player is choosing an answer', () => {
   const TEXT_LEFT = DIALOGUE_LAYOUT.choiceCol * 8;
   /** Leftmost cursor pixel between the box border and the choice text, if any */

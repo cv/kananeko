@@ -49,15 +49,20 @@ import {
 import { centerStartCol, tilemapAddr } from './tilemap';
 import { type PackedScene, type Scene, SCENES, buildSceneData } from './scene';
 import { END_OF_CONVERSATION, MAX_LIVES } from './state';
+import { type ColorScheme, buildPaletteSet, paletteOf } from './color';
+import { ENDING_COLORS, GAME_OVER_COLORS, TITLE_COLORS } from './scenes/colors';
+import { BACKDROP } from './backdrop';
 import {
-  type Palette,
-  buildVramPut,
-  clearTilemap,
-  rgb,
+  buildAttributeRuns,
+  buildClearScreen,
+  buildFadeData,
   buildFadeRoutines,
-  buildFadeTable,
+  buildVramPut,
+  cgbAttributes,
+  clearScreen,
   fadeIn,
   fadeOut,
+  fillAttributes,
   screenOff,
   writeCenteredRow,
 } from './video';
@@ -74,12 +79,6 @@ export const ROM_HEADER: ROMHeader = {
 
 const TITLE = 'カナネコ';
 const SUBTITLE = 'はじめよう!';
-const TITLE_PALETTE: Palette = [
-  rgb(0xff, 0xf3, 0xdb),
-  rgb(0xff, 0xc8, 0x8a),
-  rgb(0xc6, 0x7a, 0x3d),
-  rgb(0x4a, 0x28, 0x18),
-];
 
 // Cat portrait tile rows (4x3 grid)
 const CAT_ROWS = [
@@ -99,19 +98,7 @@ const BLINK_BIT = 0x20;
 // Ending screen content
 const ENDING_TITLE = 'おめでとう!';
 const ENDING_SCORE_LABEL = 'とくてん ';
-const ENDING_PALETTE: Palette = [
-  rgb(0xff, 0xf6, 0xd5),
-  rgb(0xf2, 0xc1, 0x4e),
-  rgb(0xb0, 0x6c, 0x1d),
-  rgb(0x3b, 0x24, 0x10),
-];
 const ENDING_ROWS = { cat: 2, title: 6, stamps: 8, score: 10 } as const;
-const GAME_OVER_PALETTE: Palette = [
-  rgb(0xe0, 0xe0, 0xe8),
-  rgb(0xa0, 0xa8, 0xc0),
-  rgb(0x58, 0x60, 0x80),
-  rgb(0x18, 0x18, 0x28),
-];
 const SCORE_DIGITS = 4;
 
 // ---------------------------------------------------------------------------
@@ -134,6 +121,10 @@ const TITLE_FADE = 'title_fade';
 
 function resultFadeLabel(screen: { readonly name: string }): string {
   return `${screen.name}_fade`;
+}
+
+export function sceneColorsLabel(sceneIndex: number): string {
+  return `scene${String(sceneIndex)}_colors`;
 }
 
 export function sceneTilesLabel(sceneIndex: number): string {
@@ -197,7 +188,7 @@ interface ResultScreen {
   readonly name: string;
   readonly cat: readonly (readonly number[])[];
   readonly title: string;
-  readonly palette: Palette;
+  readonly colors: ColorScheme;
   /** Whether the (happy) portrait blinks */
   readonly blink: boolean;
 }
@@ -206,7 +197,7 @@ const ENDING: ResultScreen = {
   name: 'game_complete',
   cat: CAT_ROWS,
   title: ENDING_TITLE,
-  palette: ENDING_PALETTE,
+  colors: ENDING_COLORS,
   blink: true,
 };
 
@@ -214,9 +205,17 @@ const GAME_OVER: ResultScreen = {
   name: 'game_over',
   cat: CAT_SAD_ROWS,
   title: 'GAME OVER',
-  palette: GAME_OVER_PALETTE,
+  colors: GAME_OVER_COLORS,
   blink: false, // the sad portrait keeps its own eyes
 };
+
+/** On GBC, give the portrait (rows 2-4, centered) the scheme's 'cat' palette */
+function catPortraitColors(name: string, colors: ColorScheme): Op[] {
+  return cgbAttributes(
+    name,
+    fillAttributes(ENDING_ROWS.cat, centerStartCol(4), 3, 4, paletteOf(colors, 'cat')),
+  );
+}
 
 /** Width of the stamp row: each scene icon is 2 tiles, one blank tile apart */
 const STAMP_ROW_WIDTH = SCENES.length * 3 - 1;
@@ -246,7 +245,7 @@ function buildResultScreen(screen: ResultScreen): Op[] {
     label(name),
     ...fadeOut(),
     ...screenOff(`${name}_vblank`),
-    ...clearTilemap(`${name}_clear`),
+    ...clearScreen(),
     ...zeroBytes(MEM.TITLE_TIMER), // prompt starts visible
 
     call(ref('kana_draw_hud')),
@@ -258,6 +257,7 @@ function buildResultScreen(screen: ResultScreen): Op[] {
     call(ref('score_digits')),
     ...buildDrawScoreDigits(ENDING_ROWS.score, scoreCol + labelTiles.length),
     call(ref('draw_start_box')),
+    ...catPortraitColors(`${name}_cat`, screen.colors),
     ...fadeIn(resultFadeLabel(screen)),
 
     label(`${name}_loop`),
@@ -357,6 +357,13 @@ export function buildProgram(): Op[] {
   return [
     // ==== Init ====
     di(),
+    // A = $11 at boot on a Game Boy Color (LD doesn't touch the flags CP set)
+    cp_n(u8(0x11)),
+    ld_r_n('a', u8(0)),
+    jr_cc('nz', ref('init_not_cgb')),
+    inc_r('a'),
+    label('init_not_cgb'),
+    ld_nn_a(MEM.IS_CGB),
     ld_rr_nn('sp', u16(0xfffe)),
 
     // Clear WRAM state
@@ -384,7 +391,7 @@ export function buildProgram(): Op[] {
 
     // ==== Title Screen (entered with the LCD off) ====
     label('title_screen'),
-    ...clearTilemap('title_clear'),
+    ...clearScreen(),
 
     // Reset title animation state so the prompt always starts visible.
     ...zeroBytes(MEM.TITLE_TIMER),
@@ -395,6 +402,7 @@ export function buildProgram(): Op[] {
     ...writeCenteredRow(7, textToTiles(TITLE)),
     ...writeCenteredRow(10, textToTiles(SUBTITLE)),
     call(ref('draw_start_box')),
+    ...catPortraitColors('title_cat', TITLE_COLORS),
 
     ...fadeIn(TITLE_FADE),
 
@@ -428,7 +436,7 @@ export function buildProgram(): Op[] {
     label('scene_load'),
     ...fadeOut(),
     ...screenOff('scene_vblank'),
-    ...clearTilemap('scene_clear'),
+    ...clearScreen(),
 
     // Backdrop above the dialogue box
     ...sceneSwitch(
@@ -440,6 +448,11 @@ export function buildProgram(): Op[] {
           packed.sceneTileData.length,
         ),
         ...drawBackdrop(sceneBackdropLabel(i)),
+        ...cgbAttributes(`scene${String(i)}_colors`, [
+          ld_rr_nn('hl', u16(tilemapAddr(BACKDROP.top, 0))),
+          ld_rr_nn('de', ref(sceneColorsLabel(i))),
+          call(ref('attr_runs')),
+        ]),
       ],
       packedScenes,
     ),
@@ -526,9 +539,12 @@ export function buildProgram(): Op[] {
     ...buildCopyRows(),
     ...buildVramPut(),
     ...buildFadeRoutines(),
+    ...buildClearScreen(),
+    ...buildAttributeRuns(),
 
     // ==== Data ====
     ...buildSpriteData(),
+    ...buildFadeData(),
     label('tileData'),
     db(tileData.slice(0, 2048)),
     label('tileDataHigh'),
@@ -546,13 +562,18 @@ export function buildProgram(): Op[] {
       db(scene.sceneTileData),
     ]),
 
-    // Fade tables for every palette
+    // GBC palette sets (also drive the fades) and backdrop palette maps
     label(TITLE_FADE),
-    db(buildFadeTable(TITLE_PALETTE)),
-    ...SCENES.flatMap((scene, i) => [label(sceneFadeLabel(i)), db(buildFadeTable(scene.palette))]),
+    db(buildPaletteSet(TITLE_COLORS)),
+    ...packedScenes.flatMap((packed, i) => [
+      label(sceneFadeLabel(i)),
+      db(packed.paletteSet),
+      label(sceneColorsLabel(i)),
+      db(packed.backdropAttributes),
+    ]),
     ...[ENDING, GAME_OVER].flatMap((screen) => [
       label(resultFadeLabel(screen)),
-      db(buildFadeTable(screen.palette)),
+      db(buildPaletteSet(screen.colors)),
     ]),
   ];
 }

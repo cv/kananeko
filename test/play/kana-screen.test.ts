@@ -45,8 +45,9 @@ describe.each(SCENES.map((scene, i) => [scene.name, i] as const))(
   'Given the kana round of %s',
   (_name, sceneIdx) => {
     const question = firstQuestion(sceneIdx);
+    // A few frames: the test emulator can show the fade's last palette step mid-frame
     const atRound = (): GameRunner =>
-      waitForPicture(runnerAt(checkpoint.kanaStart(sceneIdx)).frames(1));
+      waitForPicture(runnerAt(checkpoint.kanaStart(sceneIdx)).frames(4));
 
     it('asks the question with the word blanked and four options on the d-pad', () => {
       const runner = atRound();
@@ -62,7 +63,7 @@ describe.each(SCENES.map((scene, i) => [scene.name, i] as const))(
 
 describe('Given the player answers the first station question', () => {
   const question = firstQuestion(0);
-  const atRound = (): GameRunner => waitForPicture(runnerAt(checkpoint.kanaStart(0)).frames(1));
+  const atRound = (): GameRunner => waitForPicture(runnerAt(checkpoint.kanaStart(0)).frames(4));
 
   it('celebrates a correct answer and fills in the word', () => {
     const runner = atRound().pressKanaAnswer(true).frames(FEEDBACK_SHOWN);

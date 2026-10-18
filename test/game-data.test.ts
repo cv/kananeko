@@ -14,7 +14,9 @@ import { MAX_KANA_WORD_LENGTH, buildKanaData, defineKanaQuestion } from '@game/k
 import { type DialogueNode, buildDialogueTree } from '@game/dialogue';
 import { packScene, SCENES } from '@game/scene';
 import { centerStartCol, tilemapAddr, tilePos } from '@game/tilemap';
-import { FADE_STEPS, bgTileAddr, buildFadeTable, rgb } from '@game/video';
+import { bgTileAddr, encodeAttributeRuns, rgb } from '@game/video';
+import { HEARTS, PAL, buildPaletteSet, paletteOf, paletteOfCell } from '@game/color';
+import { ENDING_COLORS, GAME_OVER_COLORS, TITLE_COLORS } from '@game/scenes/colors';
 import {
   BACKDROP,
   BACKDROP_LEGEND,
@@ -182,43 +184,72 @@ describe('buildSceneArt', () => {
   });
 });
 
-describe('buildFadeTable', () => {
-  const palette = SCENES[0].palette;
-  const table = buildFadeTable(palette);
-  const step = (k: number): number[] => Array.from(table.slice(k * 9, k * 9 + 9));
-  const colors = (k: number): number[] =>
-    [0, 1, 2, 3].map((i) => (step(k)[1 + i * 2] ?? 0) | ((step(k)[2 + i * 2] ?? 0) << 8));
+describe('buildPaletteSet', () => {
+  const scheme = SCENES[1].colors;
+  const set = buildPaletteSet(scheme);
+  const color = (palette: number, index: number): number =>
+    (set[1 + palette * 8 + index * 2] ?? 0) | ((set[2 + palette * 8 + index * 2] ?? 0) << 8);
 
-  it('starts at white and ends at the palette itself', () => {
-    expect(table.length).toBe(FADE_STEPS * 9);
-    expect(step(0)[0]).toBe(0x00); // DMG: every shade white
-    expect(colors(0)).toEqual([0x7fff, 0x7fff, 0x7fff, 0x7fff]);
-    expect(step(FADE_STEPS - 1)[0]).toBe(0xe4);
-    expect(colors(FADE_STEPS - 1)).toEqual([...palette]);
+  it('puts ui first and hearts second, every palette on the shared paper', () => {
+    const count = set[0] ?? 0;
+    expect(set.length).toBe(1 + count * 8);
+    expect(color(PAL.ui, 3)).toBe(scheme.ramps.ui[2]);
+    expect(color(PAL.hearts, 2)).toBe(HEARTS[1]);
+    for (let p = 0; p < count; p++) expect(color(p, 0)).toBe(scheme.paper);
   });
 
-  it('darkens every color at each step', () => {
-    for (let k = 1; k < FADE_STEPS; k++) {
-      colors(k).forEach((c, i) => {
-        expect(c & 0x1f).toBeLessThanOrEqual((colors(k - 1)[i] ?? 0) & 0x1f);
-      });
-    }
+  it('maps backdrop cells to their ramp, defaulting to ui', () => {
+    expect(paletteOfCell(scheme, 'Y')).toBe(paletteOf(scheme, 'leaves'));
+    expect(paletteOfCell(scheme, ' ')).toBe(PAL.ui);
+    expect(() => paletteOf(scheme, 'nope')).toThrow(/No ramp/);
+  });
+
+  it('rejects more than 8 palettes', () => {
+    const ramps = Object.fromEntries(
+      Array.from({ length: 8 }, (_, i) => [`r${String(i)}`, HEARTS] as const),
+    );
+    expect(() => buildPaletteSet({ paper: 0, ramps: { ui: HEARTS, ...ramps } })).toThrow(/At most/);
   });
 });
 
-describe('scene palettes', () => {
+describe('encodeAttributeRuns', () => {
+  it('run-length encodes palettes and ends with a zero count', () => {
+    expect([...encodeAttributeRuns([0, 0, 0, 2, 2, 5])]).toEqual([3, 0, 2, 2, 1, 5, 0]);
+    expect([...encodeAttributeRuns(Array<number>(300).fill(1))]).toEqual([255, 1, 45, 1, 0]);
+  });
+});
+
+describe('scene colors', () => {
   const luma = (c: number): number =>
     0.299 * (c & 0x1f) + 0.587 * ((c >> 5) & 0x1f) + 0.114 * ((c >> 10) & 0x1f);
 
-  it.each(SCENES.map((s) => [s.name, s.palette] as const))(
-    '%s runs from paper to ink, so glyph shades read as intended',
-    (_name, palette) => {
-      const lumas = palette.map(luma);
+  const schemes = [...SCENES.map((s) => s.colors), TITLE_COLORS, ENDING_COLORS, GAME_OVER_COLORS];
+
+  it.each(schemes.map((scheme, i) => [i, scheme] as const))(
+    'scheme %i: the ui ramp runs from paper to ink, so text reads clearly',
+    (_i, scheme) => {
+      const lumas = [scheme.paper, ...scheme.ramps.ui].map(luma);
       lumas.slice(1).forEach((l, i) => {
         expect(l).toBeLessThan(lumas[i] ?? 0);
       });
     },
   );
+
+  it('gives every art ramp an ink darker than its paper (accents like stars may glow)', () => {
+    for (const scheme of schemes) {
+      for (const ramp of Object.values(scheme.ramps)) {
+        expect(luma(ramp[2])).toBeLessThan(luma(scheme.paper));
+      }
+    }
+  });
+
+  it('only maps backdrop cells to ramps that exist', () => {
+    for (const scene of SCENES) {
+      for (const ramp of Object.values(scene.colors.cells ?? {})) {
+        expect(Object.keys(scene.colors.ramps)).toContain(ramp);
+      }
+    }
+  });
 });
 
 describe('layout helpers', () => {

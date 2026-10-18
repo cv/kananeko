@@ -73,14 +73,7 @@ import {
 } from './kana-hud';
 import { KanaState } from './state';
 import { type TilePosition, tilePos, tilemapAddr } from './tilemap';
-import {
-  clearTilemap,
-  fadeInCurrent,
-  fadeOut,
-  screenOff,
-  vramPut,
-  writeCenteredRow,
-} from './video';
+import { clearScreen, fadeInCurrent, fadeOut, screenOff, vramPut, writeCenteredRow } from './video';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -367,7 +360,7 @@ export function buildKanaEngine(): Op[] {
 
     ...fadeOut(),
     ...screenOff('kana_vblank'),
-    ...clearTilemap('kana_clear'),
+    ...clearScreen(),
     call(ref('kana_draw_hud')),
 
     ...loadPointer('de', MEM.KANA_DATA_LO, MEM.KANA_DATA_HI),

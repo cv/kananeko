@@ -127,8 +127,9 @@ export const MEM = {
   TITLE_TIMER: u16(0xc053), // Title-screen animation timer (1 tick per frame)
   KANA_BLANK_LO: u16(0xc054), // VRAM address of the blanked kana in the word (lo)
   KANA_BLANK_HI: u16(0xc055), // VRAM address of the blanked kana in the word (hi)
-  FADE_TABLE_LO: u16(0xc056), // Fade table of the palette on screen (lo)
-  FADE_TABLE_HI: u16(0xc057), // Fade table of the palette on screen (hi)
+  FADE_TABLE_LO: u16(0xc056), // Palette set on screen (lo)
+  FADE_TABLE_HI: u16(0xc057), // Palette set on screen (hi)
+  IS_CGB: u16(0xc060), // 1 on a Game Boy Color (A = $11 at boot), else 0
 } as const satisfies Record<string, U16>;
 
 // Joypad bit flags (active-high after our read routine)

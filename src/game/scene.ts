@@ -10,13 +10,21 @@ import { type KanaQuestion, buildKanaData, defineKanaQuestion } from './kana';
 import { textToTiles } from './font';
 import { SCENE_ICON_TILES } from './font-data';
 import { type Pair, type Quint } from './fixed';
-import { type Palette, rgb } from './video';
+import { type ColorScheme, buildPaletteSet, paletteOfCell } from './color';
+import { encodeAttributeRuns } from './video';
 import { STATION_DIALOGUE } from './scenes/station';
 import { STREET_DIALOGUE } from './scenes/street';
 import { RESTAURANT_DIALOGUE } from './scenes/restaurant';
 import { CONBINI_DIALOGUE } from './scenes/conbini';
 import { PARK_DIALOGUE } from './scenes/park';
 import { type Backdrop, buildSceneArt } from './backdrop';
+import {
+  CONBINI_COLORS,
+  PARK_COLORS,
+  RESTAURANT_COLORS,
+  STATION_COLORS,
+  STREET_COLORS,
+} from './scenes/colors';
 import {
   CONBINI_BACKDROP,
   PARK_BACKDROP,
@@ -36,7 +44,8 @@ export interface Scene {
   readonly icon: Pair<string>;
   readonly dialogue: readonly DialogueNode[];
   readonly kanaQuestions: KanaRound;
-  readonly palette: Palette;
+  /** GBC colors: palettes and which backdrop cells use which */
+  readonly colors: ColorScheme;
   /** Illustration above the dialogue box (see backdrop.ts) */
   readonly backdrop: Backdrop;
 }
@@ -58,12 +67,7 @@ export const SCENES = defineScenes([
     name: 'えき',
     icon: SCENE_ICON_TILES.TRAIN,
     backdrop: STATION_BACKDROP,
-    palette: [
-      rgb(0xe8, 0xe8, 0xe0),
-      rgb(0xb0, 0xb0, 0xa0),
-      rgb(0x60, 0x60, 0x58),
-      rgb(0x18, 0x18, 0x18),
-    ],
+    colors: STATION_COLORS,
     dialogue: STATION_DIALOGUE,
     kanaQuestions: [
       q(['こ', 'ん', 'に', 'ち', 'は'], 0, 'か', 'く', 'き'),
@@ -77,12 +81,7 @@ export const SCENES = defineScenes([
     name: 'みち',
     icon: SCENE_ICON_TILES.HOUSE,
     backdrop: STREET_BACKDROP,
-    palette: [
-      rgb(0xf0, 0xf0, 0xc0),
-      rgb(0xc0, 0xd0, 0x80),
-      rgb(0x60, 0x80, 0x30),
-      rgb(0x18, 0x30, 0x10),
-    ],
+    colors: STREET_COLORS,
     dialogue: STREET_DIALOGUE,
     kanaQuestions: [
       q(['レ', 'ス', 'ト', 'ラ', 'ン'], 4, 'ナ', 'ニ', 'ヌ'),
@@ -96,12 +95,7 @@ export const SCENES = defineScenes([
     name: 'レストラン',
     icon: SCENE_ICON_TILES.BOWL,
     backdrop: RESTAURANT_BACKDROP,
-    palette: [
-      rgb(0xf0, 0xe0, 0xd0),
-      rgb(0xd0, 0xa0, 0x80),
-      rgb(0x80, 0x50, 0x30),
-      rgb(0x30, 0x18, 0x10),
-    ],
+    colors: RESTAURANT_COLORS,
     dialogue: RESTAURANT_DIALOGUE,
     kanaQuestions: [
       q(['ラ', 'ー', 'メ', 'ン'], 0, 'リ', 'ル', 'レ'),
@@ -115,12 +109,7 @@ export const SCENES = defineScenes([
     name: 'コンビニ',
     icon: SCENE_ICON_TILES.SHOP,
     backdrop: CONBINI_BACKDROP,
-    palette: [
-      rgb(0xf0, 0xf0, 0xf0),
-      rgb(0xa0, 0xc0, 0xe0),
-      rgb(0x40, 0x60, 0xa0),
-      rgb(0x10, 0x10, 0x30),
-    ],
+    colors: CONBINI_COLORS,
     dialogue: CONBINI_DIALOGUE,
     kanaQuestions: [
       q(['く', 'だ', 'さ', 'い'], 0, 'き', 'け', 'か'),
@@ -134,12 +123,7 @@ export const SCENES = defineScenes([
     name: 'こうえん',
     icon: SCENE_ICON_TILES.TREE,
     backdrop: PARK_BACKDROP,
-    palette: [
-      rgb(0xd0, 0xc0, 0xe0),
-      rgb(0x80, 0x70, 0xb0),
-      rgb(0x40, 0x30, 0x60),
-      rgb(0x10, 0x10, 0x28),
-    ],
+    colors: PARK_COLORS,
     dialogue: PARK_DIALOGUE,
     kanaQuestions: [
       q(['さ', 'よ', 'う', 'な', 'ら'], 3, 'に', 'ぬ', 'ね'),
@@ -163,6 +147,10 @@ export interface PackedScene {
   readonly backdropData: Uint8Array;
   /** Pixel data of the scene's own BG tiles (see SCENE_TILE_BASE) */
   readonly sceneTileData: Uint8Array;
+  /** GBC palette set (see buildPaletteSet) */
+  readonly paletteSet: Uint8Array;
+  /** Run-length encoded backdrop palettes (see encodeAttributeRuns) */
+  readonly backdropAttributes: Uint8Array;
 }
 
 export function packScene(scene: Scene): PackedScene {
@@ -173,6 +161,12 @@ export function packScene(scene: Scene): PackedScene {
     kanaData: buildKanaData(scene.kanaQuestions),
     backdropData: art.backdrop,
     sceneTileData: art.tileData,
+    paletteSet: buildPaletteSet(scene.colors),
+    backdropAttributes: encodeAttributeRuns(
+      scene.backdrop.flatMap((row) =>
+        Array.from(row).map((cell) => paletteOfCell(scene.colors, cell)),
+      ),
+    ),
   };
 }
 
