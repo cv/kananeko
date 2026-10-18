@@ -9,7 +9,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { MEM } from '../src/asm/hardware';
-import { SCENES } from '../src/game/scene';
+import { SCENES, sceneRounds } from '../src/game/scene';
 import { checkpoint, runnerAt } from '../test/helpers/checkpoints';
 import { GameRunner } from '../test/helpers/game-runner';
 import { blit, createImage, encodePng, type Image, scale } from './png';
@@ -72,7 +72,33 @@ const SHOTS: Shot[] = [
   {
     file: 'kana-correct',
     caption: 'Kana: correct answer feedback',
-    capture: () => runnerAt(checkpoint.kanaStart(0)).pressKanaAnswer(true).frames(10),
+    capture: () => runnerAt(checkpoint.kanaStart(0)).resetStreak().pressKanaAnswer(true).frames(10),
+  },
+  {
+    file: 'kana-streak',
+    caption: 'Kana: three first tries in a row pay a bonus',
+    capture: () =>
+      runnerAt(checkpoint.kanaStart(0))
+        .resetStreak()
+        .answerKanaCorrectly()
+        .answerKanaCorrectly()
+        .pressKanaAnswer(true)
+        .frames(10),
+  },
+  {
+    file: 'kana-katakana',
+    caption: 'Kana: the review ends with a word to write in katakana',
+    capture: (): GameRunner => {
+      const runner = runnerAt(checkpoint.kanaStart(0));
+      const review = sceneRounds(SCENES[0]).at(-1)?.questions ?? [];
+      review.slice(0, -1).forEach(() => runner.answerKanaCorrectly());
+      return runner.waitForKanaInput().frames(SETTLE_FRAMES);
+    },
+  },
+  {
+    file: 'speed-round',
+    caption: 'Speed round: one more from each scene, against the clock',
+    capture: () => runnerAt(checkpoint.speedRound).frames(SETTLE_FRAMES + 60),
   },
   {
     file: 'kana-wrong',

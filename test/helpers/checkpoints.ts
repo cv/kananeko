@@ -11,7 +11,7 @@
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { SCENES } from '@game/scene';
+import { SCENES, SPEED_ROUND } from '@game/scene';
 import { DialogueState } from '@game/state';
 import { FADE_STEPS, FADE_STEP_FRAMES } from '@game/video';
 
@@ -19,13 +19,16 @@ import { FADE_STEPS, FADE_STEP_FRAMES } from '@game/video';
 export const SETTLE_FRAMES = 2 * FADE_STEPS * FADE_STEP_FRAMES + 10;
 import { GameRunner, type GameRunnerSnapshot, rom } from './game-runner';
 
-export type Checkpoint = `scene${string}:start` | `scene${string}:kana` | 'game:complete';
+export type Checkpoint =
+  `scene${string}:start` | `scene${string}:kana` | 'game:speed' | 'game:complete';
 
 export const checkpoint = {
   /** Scene `i` has just loaded and its opening dialogue is revealing */
   sceneStart: (i: number): Checkpoint => `scene${String(i)}:start`,
   /** Scene `i`'s dialogue was finished on the good path; the first kana question awaits input */
   kanaStart: (i: number): Checkpoint => `scene${String(i)}:kana`,
+  /** All scenes completed; the speed round's first question awaits input */
+  speedRound: 'game:speed' as const,
   /** All scenes completed; the ending screen is showing */
   gameComplete: 'game:complete' as const,
 };
@@ -47,6 +50,8 @@ export function recordCheckpoints(): Checkpoints {
     out[checkpoint.kanaStart(i)] = runner.snapshot();
     runner.completeKanaQuestions(i);
   });
+  out[checkpoint.speedRound] = runner.waitForKanaInput().snapshot();
+  SPEED_ROUND.forEach(() => runner.answerKanaCorrectly());
   out[checkpoint.gameComplete] = runner.frames(SETTLE_FRAMES).snapshot();
   return out;
 }

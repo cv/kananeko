@@ -52,6 +52,7 @@ import {
   ldh_a_n,
   ldi_hl_a,
   ret,
+  add_n,
   or_r,
   ret_cc,
   srl,
@@ -172,6 +173,7 @@ export const KANA_MESSAGES = {
   reveal: 'ざんねん...',
   streak: 'れんぞく!',
   katakana: 'カタカナで?',
+  hurry: 'はやく!',
 } as const;
 const MESSAGE_WIDTH = Math.max(...Object.values(KANA_MESSAGES).map((m) => Array.from(m).length));
 
@@ -180,6 +182,12 @@ const FEEDBACK_FRAMES = 40;
 const SCORE_FIRST_TRY = 100;
 const SCORE_SECOND_TRY = 10;
 const SCORE_DEATH_PENALTY = 100;
+/** Seconds to answer each speed-round question */
+export const SPEED_SECONDS = 5;
+const FRAMES_PER_SECOND = 60;
+/** Where the speed round's countdown digit sits: just right of the prompt */
+export const CLOCK_POSITION = tilePos(PROMPT_ROW, 14);
+
 /** Every STREAK_LENGTH-th first-try answer in a row earns STREAK_BONUS more */
 export const STREAK_LENGTH = 3;
 export const STREAK_BONUS = 50;
@@ -399,6 +407,12 @@ export function buildKanaEngine(): Op[] {
     jr_cc('z', ref('kana_prompt_drawn')),
     ...writeCenteredRow(PROMPT_ROW, messageTiles(KANA_MESSAGES.katakana)),
     label('kana_prompt_drawn'),
+    // ...and the speed round hurries you along
+    ld_a_nn(MEM.KANA_MODE),
+    cp_n(u8(KanaMode.SPEED)),
+    jr_cc('nz', ref('kana_prompt_final')),
+    ...writeCenteredRow(PROMPT_ROW, messageTiles(KANA_MESSAGES.hurry)),
+    label('kana_prompt_final'),
 
     // HL = start of the word, centered in the box: inner + (width - length) / 2
     ld_r_n('a', u8(WORD_BOX.innerWidth)),
@@ -450,6 +464,20 @@ export function buildKanaEngine(): Op[] {
     ...zeroBytes(MEM.KANA_ATTEMPTS),
     ...storeByte(MEM.KANA_STATE, KanaState.AWAITING),
     ...storeByte(MEM.KANA_FEEDBACK_TIMER, FEEDBACK_FRAMES),
+    // Speed round: start the clock
+    ld_a_nn(MEM.KANA_MODE),
+    cp_n(u8(KanaMode.SPEED)),
+    ret_cc('nz'),
+    ...storeByte(MEM.KANA_CLOCK_FRAMES, FRAMES_PER_SECOND),
+    ...storeByte(MEM.KANA_CLOCK_SECS, SPEED_SECONDS),
+    jp(ref('kana_draw_clock')),
+
+    // kana_draw_clock — show the seconds left (LCD on)
+    label('kana_draw_clock'),
+    ld_rr_nn('hl', u16(tilemapAddr(CLOCK_POSITION))),
+    ld_a_nn(MEM.KANA_CLOCK_SECS),
+    add_n(u8(requireTile('0'))),
+    ...vramPut(),
     ret(),
 
     // =================================================================
@@ -471,6 +499,23 @@ export function buildKanaEngine(): Op[] {
     // kana_await_input — Check d-pad, compare with correct position.
     // =================================================================
     label('kana_await_input'),
+    // Speed round: tick the clock; running out counts as a miss
+    ld_a_nn(MEM.KANA_MODE),
+    cp_n(u8(KanaMode.SPEED)),
+    jr_cc('nz', ref('kana_clock_done')),
+    ld_a_nn(MEM.KANA_CLOCK_FRAMES),
+    dec_r('a'),
+    ld_nn_a(MEM.KANA_CLOCK_FRAMES),
+    jr_cc('nz', ref('kana_clock_done')),
+    ...storeByte(MEM.KANA_CLOCK_FRAMES, FRAMES_PER_SECOND),
+    ld_a_nn(MEM.KANA_CLOCK_SECS),
+    dec_r('a'),
+    ld_nn_a(MEM.KANA_CLOCK_SECS),
+    call(ref('kana_draw_clock')),
+    ld_a_nn(MEM.KANA_CLOCK_SECS),
+    or_r('a'),
+    jp_cc('z', ref('kana_wrong')),
+    label('kana_clock_done'),
     ...readDirection('kana_got_answer'),
     ld_nn_a(MEM.KANA_ANSWER),
 

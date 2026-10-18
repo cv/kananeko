@@ -59,7 +59,7 @@ import { DIALOGUE_LAYOUT, buildDialogueEngine } from './dialogue';
 import { buildTileData, requireTile, requireTiles, textToTiles } from './font';
 import { CAT_TILES } from './font-data';
 import { buildReadJoypad } from './joypad';
-import { buildKanaEngine } from './kana';
+import { buildKanaData, buildKanaEngine } from './kana';
 import {
   buildDrawHudOps,
   buildDrawScoreDigits,
@@ -68,7 +68,7 @@ import {
   SCORE_DIGIT_COUNT,
 } from './kana-hud';
 import { centerStartCol, tilemapAddr } from './tilemap';
-import { type PackedScene, type Scene, SCENES, buildSceneData } from './scene';
+import { type PackedScene, type Scene, SCENES, SPEED_ROUND, buildSceneData } from './scene';
 import { BAD_PICK, END_OF_CONVERSATION, KanaMode, MAX_LIVES } from './state';
 import { REDEEM_KEY } from './rounds';
 import { type ColorScheme, buildPaletteSet, paletteOf } from './color';
@@ -129,6 +129,8 @@ const ENDING_ROWS = { cat: 2, title: 6, stamps: 8, score: 10 } as const;
 export function sceneDialogueLabel(sceneIndex: number): string {
   return `scene${String(sceneIndex)}_dlg`;
 }
+
+const SPEED_ROUND_LABEL = 'speed_round';
 
 export function sceneChancesLabel(sceneIndex: number): string {
   return `scene${String(sceneIndex)}_chances`;
@@ -626,6 +628,11 @@ export function buildProgram(): Op[] {
     cp_n(u8(SCENES.length)),
     jp_cc('c', ref('scene_load')), // more scenes to go
 
+    // ==== Bonus: the speed round ====
+    ...storeByte(MEM.KANA_MODE, KanaMode.SPEED),
+    ld_rr_nn('de', ref(SPEED_ROUND_LABEL)),
+    call(ref('play_round')),
+
     // ==== Game complete — ending screen, then back to the title ====
     ...buildResultScreen(ENDING),
 
@@ -705,6 +712,9 @@ export function buildProgram(): Op[] {
     db(tileData.slice(0, 2048)),
     label('tileDataHigh'),
     db(tileData.slice(2048)),
+
+    label(SPEED_ROUND_LABEL),
+    db(buildKanaData(SPEED_ROUND)),
 
     // Per-scene dialogue and kana data
     ...packedScenes.flatMap((scene, i) => [

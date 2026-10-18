@@ -28,6 +28,8 @@ export const KanaMode = {
   SAY_IT: 1,
   /** One try: right after a bad answer, a correct kana wins the life back */
   REDEEM: 2,
+  /** One try against the clock: the bonus round before the ending */
+  SPEED: 3,
 } as const;
 
 /** Bit of MEM.DLG_PICK set when the last choice was a bad answer */

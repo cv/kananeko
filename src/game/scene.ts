@@ -7,6 +7,7 @@
 
 import { type DialogueNode, buildDialogueTree } from './dialogue';
 import { type KanaQuestion, defineKanaQuestion } from './kana';
+import { generateQuestions } from './quiz';
 import {
   type KanaCheckpoint,
   type QuizPlan,
@@ -229,6 +230,24 @@ export function sceneQuiz(scene: Scene): QuizPlan {
 export function sceneRounds(scene: Scene): readonly KanaCheckpoint[] {
   return sceneQuiz(scene).rounds;
 }
+
+/**
+ * The bonus round before the ending: one more phrase from each scene, none of
+ * them asked anywhere else in the game.
+ */
+export function planSpeedRound(scenes: readonly Scene[]): KanaQuestion[] {
+  const asked = scenes
+    .map(sceneQuiz)
+    .flatMap((quiz) => [...quiz.rounds, ...quiz.chances])
+    .flatMap((round) => round.questions);
+  const history = {
+    phrases: new Set(asked.map((q) => q.word)),
+    kana: new Set<string>(), // only this round's own blanks, so they differ
+  };
+  return scenes.flatMap((scene) => generateQuestions(scene.dialogue, 1, history));
+}
+
+export const SPEED_ROUND = planSpeedRound(SCENES);
 
 export function buildSceneData(): PackedScene[] {
   return SCENES.map(packScene);
