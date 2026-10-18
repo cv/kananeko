@@ -9,6 +9,7 @@ import Gameboy from 'serverboy';
 import { MEM } from '@asm/hardware';
 import { buildRom } from '@game/main';
 import { SCENES } from '@game/scene';
+import { DialogueState, END_OF_CONVERSATION, KanaState } from '@game/state';
 
 // Build the ROM once per worker — shared across all tests
 const { rom, symbols } = buildRom();
@@ -251,21 +252,22 @@ export class GameRunner {
     throw new Error(`Timed out waiting for: ${description}`);
   }
 
-  /** Wait until dialogue reaches choosing (3) or wait-for-input (2) state */
+  /** Wait until dialogue has finished printing and waits for input or a choice */
   waitForDialogueChoices(): this {
-    return this.waitUntil(() => this.dlgState >= 2, 'dialogue choosing/wait state').frames(
-      GameRunner.INPUT_DEBOUNCE,
-    );
+    return this.waitUntil(
+      () => this.dlgState === DialogueState.WAITING || this.dlgState === DialogueState.CHOOSING,
+      'dialogue choosing/wait state',
+    ).frames(GameRunner.INPUT_DEBOUNCE);
   }
 
-  /** Wait until kana game reaches awaiting-input (2) state */
+  /** Wait until the kana round awaits a d-pad answer */
   waitForKanaInput(): this {
-    return this.waitUntil(() => this.kanaState === 2, 'kana awaiting input');
+    return this.waitUntil(() => this.kanaState === KanaState.AWAITING, 'kana awaiting input');
   }
 
-  /** Wait until dialogue is idle (0) and node signals end (0xFF) */
-  waitForDialogueEnd(): this {
-    return this.waitUntil(() => this.dlgState === 0 && this.dlgNodeId === 0xff, 'dialogue end');
+  /** Whether the current conversation has ended */
+  get dialogueEnded(): boolean {
+    return this.dlgState === DialogueState.IDLE && this.dlgNodeId === END_OF_CONVERSATION;
   }
 
   // ---------------------------------------------------------------------------
@@ -282,7 +284,7 @@ export class GameRunner {
   /** Press START to begin the game from the title screen */
   start(): this {
     this.pressStart();
-    return this.waitUntil(() => this.dlgState > 0, 'scene 0 opening dialogue').frames(
+    return this.waitUntil(() => this.dlgState !== DialogueState.IDLE, 'opening dialogue').frames(
       GameRunner.INPUT_DEBOUNCE,
     );
   }
@@ -320,36 +322,35 @@ export class GameRunner {
   completeDialogueTree(): this {
     for (let safety = 0; safety < 100; safety++) {
       this.advanceDialogue();
-      if (this.dlgNodeId === 0xff && this.dlgState === 0) break;
+      if (this.dialogueEnded) break;
     }
     return this.frames(GameRunner.INPUT_DEBOUNCE);
   }
 
-  /** Answer the current kana question correctly (reads randomized position from WRAM) */
-  answerKanaCorrectly(): this {
+  /** Press a d-pad direction for the current kana question and wait out the feedback */
+  private answerKana(pickDirection: (correct: number) => number): this {
     this.waitForKanaInput();
-    const correctPos = this.kanaCorrectPos;
-    const key = DIR_KEYS[correctPos];
-    if (key === undefined) throw new Error(`Invalid correct pos: ${String(correctPos)}`);
+    const direction = pickDirection(this.kanaCorrectPos);
+    const key = DIR_KEYS[direction];
+    if (key === undefined) throw new Error(`Invalid kana direction: ${String(direction)}`);
     this.gb.pressKey(key);
     this.gb.doFrame();
-    return this.waitUntil(() => this.kanaState !== 2, 'kana correct answer registration')
-      .waitUntil(() => this.kanaState === 2 || this.kanaState === 0, 'kana correct feedback')
+    return this.waitUntil(() => this.kanaState !== KanaState.AWAITING, 'kana answer registration')
+      .waitUntil(
+        () => this.kanaState === KanaState.AWAITING || this.kanaState === KanaState.IDLE,
+        'kana feedback',
+      )
       .frames(GameRunner.INPUT_DEBOUNCE);
   }
 
-  /** Answer the current kana question WRONG */
+  /** Answer the current kana question correctly (reads the randomized position from WRAM) */
+  answerKanaCorrectly(): this {
+    return this.answerKana((correct) => correct);
+  }
+
+  /** Answer the current kana question with a wrong direction */
   answerKanaWrong(): this {
-    this.waitForKanaInput();
-    const correctPos = this.kanaCorrectPos;
-    const wrongPos = (correctPos + 1) & 3;
-    const key = DIR_KEYS[wrongPos];
-    if (key === undefined) throw new Error(`Invalid wrong pos: ${String(wrongPos)}`);
-    this.gb.pressKey(key);
-    this.gb.doFrame();
-    return this.waitUntil(() => this.kanaState !== 2, 'kana wrong answer registration')
-      .waitUntil(() => this.kanaState === 2 || this.kanaState === 0, 'kana wrong feedback')
-      .frames(GameRunner.INPUT_DEBOUNCE);
+    return this.answerKana((correct) => (correct + 1) & 3);
   }
 
   /** Complete all kana questions for a scene (correct on first try) */
@@ -359,10 +360,5 @@ export class GameRunner {
       this.answerKanaCorrectly();
     }
     return this.frames(10);
-  }
-
-  /** Play through an entire scene: dialogue tree + kana questions */
-  completeScene(sceneIndex: number): this {
-    return this.completeDialogueTree().completeKanaQuestions(sceneIndex);
   }
 }

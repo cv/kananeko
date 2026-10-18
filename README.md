@@ -35,24 +35,36 @@ npm run build
 
 Out comes `build/kananeko.gb` — load it in any Game Boy emulator and go.
 
-A symbol file (`build/kananeko.sym`) is also produced for debugging.
+A symbol file (`build/kananeko.sym`, BGB/no$gmb format) is also produced for debugging.
 
 ## 🧪 Tests
 
 ```bash
 npm test                   # run all tests
 npm run test:coverage      # with coverage
-npm run lint               # lint
+npm run check              # typecheck + lint + format check + tests (what CI runs)
 ```
 
-Tests cover ROM structure, dialogue flow, kana gameplay, per-scene progression, and full start-to-finish playthroughs — all driven by [serverboy](https://github.com/nickthecoder/serverboy), a headless Game Boy emulator.
+- `test/asm/` — opcode encodings, assembler validation, and macros (run in the emulator)
+- `test/content.test.ts` — static checks over every scene: dialogue graph, text widths, kana questions, ROM encoding round-trips
+- `test/play/` and `test/scenes/` — the real ROM driven by joypad input in [serverboy](https://gitlab.com/piglet-plays/serverboy.js), a headless Game Boy emulator
+
+Emulator tests start from checkpoints (the start of each scene and kana round) recorded from one continuous playthrough. Checkpoints are cached in `node_modules/.cache/kananeko/`, keyed by the ROM and the test driver source, so only the first run after a change pays for the playthrough.
+
+Each scene's test file lists the dialogue paths worth exercising as detours from the good path:
+
+```ts
+describeScene(0, [
+  { name: 'tired clerk', detours: { 1: 2 } }, // at node 1, pick choice 2
+]);
+```
 
 ## 📁 Project layout
 
 ```
 src/
-  asm/           assembler, opcodes, hardware defs
-  game/          gameplay logic, fonts, dialogue, HUD
+  asm/           assembler, opcodes, macros, hardware defs
+  game/          engines (dialogue, kana, HUD), fonts, screen helpers
     scenes/      station, street, restaurant, conbini, park
   build.ts       ROM entry point
 test/            unit, integration, and emulator-driven tests
