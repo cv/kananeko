@@ -5,20 +5,13 @@
  * game scenarios instead of raw frame counts and hex addresses.
  */
 
-// @ts-expect-error — serverboy has no type declarations
 import Gameboy from 'serverboy';
-import { assemble } from '@asm/assembler';
-import { buildProgram } from '@game/main';
 import { MEM } from '@asm/hardware';
+import { buildRom } from '@game/main';
 import { SCENES } from '@game/scene';
-// KanaDir removed — answers are now randomized, tests read correct position from WRAM
 
-// Build the ROM once — shared across all tests
-const { rom, symbols } = assemble(buildProgram(), {
-  title: 'KANANEKO',
-  cgbFlag: 0x80,
-  destinationCode: 0x00,
-});
+// Build the ROM once per worker — shared across all tests
+const { rom, symbols } = buildRom();
 
 export { rom, symbols };
 
@@ -66,10 +59,10 @@ function patchRomForServerboy(sourceRom: Uint8Array): Buffer {
 
 // Direction index → serverboy key mapping (0=UP, 1=DOWN, 2=LEFT, 3=RIGHT)
 const DIR_KEYS: number[] = [
-  Gameboy.KEYMAP.UP as number,
-  Gameboy.KEYMAP.DOWN as number,
-  Gameboy.KEYMAP.LEFT as number,
-  Gameboy.KEYMAP.RIGHT as number,
+  Gameboy.KEYMAP.UP,
+  Gameboy.KEYMAP.DOWN,
+  Gameboy.KEYMAP.LEFT,
+  Gameboy.KEYMAP.RIGHT,
 ];
 
 /**
@@ -100,7 +93,7 @@ export class GameRunner {
     if (privateKey === undefined) {
       throw new Error('Could not locate serverboy internals');
     }
-    const internals = (gb as Record<string, EmulatorInternals | undefined>)[privateKey];
+    const internals = (gb as unknown as Record<string, EmulatorInternals | undefined>)[privateKey];
     if (internals === undefined) {
       throw new Error('Could not access serverboy internals');
     }
@@ -142,31 +135,33 @@ export class GameRunner {
   }
 
   pressA(): this {
-    return this.pressKey(Gameboy.KEYMAP.A as number);
+    return this.pressKey(Gameboy.KEYMAP.A);
   }
   pressStart(): this {
-    return this.pressKey(Gameboy.KEYMAP.START as number);
+    return this.pressKey(Gameboy.KEYMAP.START);
   }
   pressUp(): this {
-    return this.pressKey(Gameboy.KEYMAP.UP as number);
+    return this.pressKey(Gameboy.KEYMAP.UP);
   }
   pressDown(): this {
-    return this.pressKey(Gameboy.KEYMAP.DOWN as number);
+    return this.pressKey(Gameboy.KEYMAP.DOWN);
   }
 
   /** Read a WRAM byte by its MEM constant */
   readMem(addr: number): number {
-    return this.gb.getMemory()[addr] as number;
+    const value = this.gb.getMemory()[addr];
+    if (value === undefined) throw new RangeError(`Address out of range: ${String(addr)}`);
+    return value;
   }
 
   /** Get the full screen buffer */
   getScreen(): number[] {
-    return this.gb.getScreen() as number[];
+    return this.gb.getScreen();
   }
 
   /** Get the full memory array */
-  getMemory(): number[] {
-    return this.gb.getMemory() as number[];
+  getMemory(): Uint8Array {
+    return this.gb.getMemory();
   }
 
   // ---------------------------------------------------------------------------

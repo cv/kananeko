@@ -99,6 +99,10 @@ export const MEM = {
   KANA_SHUFFLE1: u16(0xc049), // shuffle buffer[1]
   KANA_SHUFFLE2: u16(0xc04a), // shuffle buffer[2]
   KANA_SHUFFLE3: u16(0xc04b), // shuffle buffer[3]
+  // The kana round never runs alongside dialogue, so it borrows these dialogue bytes:
+  KANA_DATA_LO: u16(0xc025), // = DLG_STR_LO: pointer to the next question in ROM (lo)
+  KANA_DATA_HI: u16(0xc026), // = DLG_STR_HI: pointer to the next question in ROM (hi)
+  KANA_FEEDBACK_TIMER: u16(0xc022), // = DLG_DELAY: frames left in the feedback pause
 
   // WRAM — HUD delta flash
   DELTA_TYPE: u16(0xc04c), // 0=none, 1=+100, 2=+10, 3=-5, 4=-100

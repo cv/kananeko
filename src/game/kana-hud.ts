@@ -36,9 +36,12 @@ import {
   ret,
 } from '../asm/ops';
 import { MEM } from '../asm/hardware';
+import { switchCases } from '../asm/macros';
+import { at } from '../asm/util';
 import { requireTile, requireTiles } from './font';
 import { CAT_TILES } from './font-data';
 import { type Quad } from './fixed';
+import { MAX_LIVES } from './state';
 import { tilemapAddr, type TilePosition } from './tilemap';
 
 // ---------------------------------------------------------------------------
@@ -57,6 +60,9 @@ export const DELTA_PLUS_100 = 1;
 export const DELTA_PLUS_10 = 2;
 export const DELTA_MINUS_5 = 3;
 export const DELTA_MINUS_100 = 4;
+
+/** Dispatch order for the delta flash; the last entry is the fallback */
+const DELTA_TYPES = [DELTA_PLUS_100, DELTA_PLUS_10, DELTA_MINUS_5, DELTA_MINUS_100] as const;
 
 export type DeltaType =
   typeof DELTA_PLUS_100 | typeof DELTA_PLUS_10 | typeof DELTA_MINUS_5 | typeof DELTA_MINUS_100;
@@ -125,21 +131,20 @@ export function buildSetDelta(deltaType: DeltaType): Op[] {
 // Heart drawing
 // ---------------------------------------------------------------------------
 
-let heartLabelCounter = 0;
-
-/** Generate assembly to draw a heart (full/empty) based on lives threshold */
-function buildHeartAtCol(col: number, minLives: number): Op[] {
-  const id = String(heartLabelCounter++);
+/** Draw the heart for life `n` (1-based): full if KANA_LIVES >= n, else empty */
+function buildHeart(n: number): Op[] {
+  const empty = `hud_heart${String(n)}_empty`;
+  const draw = `hud_heart${String(n)}_draw`;
   return [
     ld_a_nn(MEM.KANA_LIVES),
-    cp_n(u8(minLives)),
-    jr_cc('c', ref(`kana_h${id}_empty`)),
+    cp_n(u8(n)),
+    jr_cc('c', ref(empty)),
     ld_r_n('a', u8(HEART_FULL)),
-    jr(ref(`kana_h${id}_draw`)),
-    label(`kana_h${id}_empty`),
+    jr(ref(draw)),
+    label(empty),
     ld_r_n('a', u8(HEART_EMPTY)),
-    label(`kana_h${id}_draw`),
-    ...buildDrawTileAt(0, col, 'from_a'),
+    label(draw),
+    ...buildDrawTileAt(0, HEART_COL + n - 1, 'from_a'),
   ];
 }
 
@@ -192,9 +197,7 @@ export function buildDrawHudOps(): Op[] {
     label('kana_draw_hud'),
 
     // --- Hearts at cols 1-3 ---
-    ...buildHeartAtCol(HEART_COL, 1),
-    ...buildHeartAtCol(HEART_COL + 1, 2),
-    ...buildHeartAtCol(HEART_COL + 2, 3),
+    ...Array.from({ length: MAX_LIVES }, (_, i) => buildHeart(i + 1)).flat(),
 
     // --- Score at cols 8-11 (centered) ---
     // If negative, show 0000
@@ -290,30 +293,12 @@ export function buildDrawHudOps(): Op[] {
     dec_r('a'),
     ld_nn_a(MEM.DELTA_TIMER),
 
-    // Dispatch on delta type
+    // Dispatch on delta type (the last case is the default)
     ld_a_nn(MEM.DELTA_TYPE),
-
-    cp_n(u8(DELTA_PLUS_100)),
-    jr_cc('nz', ref('delta_not_p100')),
-    ...buildDrawTilesAt(0, DELTA_COL, DELTA_TILE_RUNS[DELTA_PLUS_100]),
-    ret(),
-
-    label('delta_not_p100'),
-    cp_n(u8(DELTA_PLUS_10)),
-    jr_cc('nz', ref('delta_not_p10')),
-    ...buildDrawTilesAt(0, DELTA_COL, DELTA_TILE_RUNS[DELTA_PLUS_10]),
-    ret(),
-
-    label('delta_not_p10'),
-    cp_n(u8(DELTA_MINUS_5)),
-    jr_cc('nz', ref('delta_not_m5')),
-    ...buildDrawTilesAt(0, DELTA_COL, DELTA_TILE_RUNS[DELTA_MINUS_5]),
-    ret(),
-
-    label('delta_not_m5'),
-    // Must be DELTA_MINUS_100
-    ...buildDrawTilesAt(0, DELTA_COL, DELTA_TILE_RUNS[DELTA_MINUS_100]),
-    ret(),
+    ...switchCases(
+      DELTA_TYPES.map((type) => [...buildDrawTilesAt(0, DELTA_COL, DELTA_TILE_RUNS[type]), ret()]),
+      { name: 'delta_type', compare: (i) => [cp_n(u8(at(DELTA_TYPES, i)))], exit: 'none' },
+    ),
 
     // Clear delta area (timer expired or type=0)
     label('delta_clear'),

@@ -7,6 +7,7 @@
 
 import { type TupleIndex } from './fixed';
 import { textToTiles } from './font';
+import { END_OF_CONVERSATION } from './state';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -86,8 +87,8 @@ export function defineDialogueTree<const T extends readonly DialogueNode[]>(
  * Sentinel bytes — deliberately outside the TileIndex range (0x00-0xFD)
  * so they can never collide with valid tile data.
  */
-const END_MARKER = 0xff; // end of conversation (node.next = null)
-const TEXT_END = 0xfe; // end of text string (tile 0 = space, so 0x00 is valid content)
+/** End of a text string (tile 0 = space, so 0x00 is valid content) */
+export const TEXT_END = 0xfe;
 
 /**
  * Pack a dialogue tree into ROM data with an offset table for random access.
@@ -116,7 +117,7 @@ export function buildDialogueTree(tree: DialogueTree): Uint8Array {
 
     // Next-node lookup table (one byte per choice, right after count)
     for (const choice of node.choices) {
-      chunk.push(choice.next ?? END_MARKER);
+      chunk.push(choice.next ?? END_OF_CONVERSATION);
     }
 
     // Good-answer flags (first choice = good, rest = bad)

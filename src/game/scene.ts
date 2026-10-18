@@ -9,8 +9,9 @@ import { type DialogueNode, buildDialogueTree } from './dialogue';
 import { type KanaQuestion, buildKanaData, defineKanaQuestion } from './kana';
 import { textToTiles } from './font';
 import { SCENE_ICON_TILES } from './font-data';
-import { type Pair, type Quad, type Quint } from './fixed';
+import { type Pair, type Quint } from './fixed';
 import { centerStartCol } from './tilemap';
+import { type Palette, rgb } from './video';
 import { STATION_DIALOGUE } from './scenes/station';
 import { STREET_DIALOGUE } from './scenes/street';
 import { RESTAURANT_DIALOGUE } from './scenes/restaurant';
@@ -21,12 +22,6 @@ import { PARK_DIALOGUE } from './scenes/park';
 // Scene data types
 // ---------------------------------------------------------------------------
 
-/** GBC RGB555 color: (r5) | (g5 << 5) | (b5 << 10). Pass 8-bit RGB, auto-truncated. */
-export function rgb(r: number, g: number, b: number): number {
-  return ((r >> 3) & 0x1f) | (((g >> 3) & 0x1f) << 5) | (((b >> 3) & 0x1f) << 10);
-}
-
-export type Palette = Quad<number>;
 export type KanaRound = Quint<KanaQuestion>;
 
 export interface Scene {
@@ -146,25 +141,23 @@ export const SCENES = defineScenes([
 // Build packed scene data for ROM
 // ---------------------------------------------------------------------------
 
-export interface PackedSceneData {
-  scenes: Array<{
-    nameRow: number[];
-    dialogueData: Uint8Array;
-    kanaData: Uint8Array;
-  }>;
+export interface PackedScene {
+  /** Scene name tiles, left-padded with blanks so the name is centered */
+  readonly nameRow: readonly number[];
+  readonly dialogueData: Uint8Array;
+  readonly kanaData: Uint8Array;
 }
 
-export function buildSceneData(): PackedSceneData {
+export function packScene(scene: Scene): PackedScene {
+  const nameTiles = textToTiles(scene.name);
+  const pad = centerStartCol(nameTiles.length);
   return {
-    scenes: SCENES.map((scene) => {
-      const nameTiles = textToTiles(scene.name);
-      const pad = centerStartCol(nameTiles.length);
-      const nameRow = [...Array<number>(pad).fill(0), ...nameTiles];
-
-      const dialogueData = buildDialogueTree(scene.dialogue);
-      const kanaData = buildKanaData(scene.kanaQuestions);
-
-      return { nameRow, dialogueData, kanaData };
-    }),
+    nameRow: [...Array<number>(pad).fill(0), ...nameTiles],
+    dialogueData: buildDialogueTree(scene.dialogue),
+    kanaData: buildKanaData(scene.kanaQuestions),
   };
+}
+
+export function buildSceneData(): PackedScene[] {
+  return SCENES.map(packScene);
 }

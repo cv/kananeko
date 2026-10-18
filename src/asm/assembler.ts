@@ -1,25 +1,31 @@
 import { type Op } from './types';
+import { at, hex } from './util';
 
-const ROM_SIZE = 32 * 1024; // 32KB
+export const ROM_SIZE = 32 * 1024; // 32KB, single bank, no mapper
 
-/** Checked array/Uint8Array read — throws on out-of-bounds instead of returning undefined */
-function at(arr: ArrayLike<number>, i: number): number {
-  const v = arr[i];
-  if (v === undefined) {
-    throw new RangeError(`Out of bounds read at index ${String(i)}`);
-  }
-  return v;
-}
+/** Program code starts right after the cartridge header. */
+export const PROGRAM_START = 0x0150;
+
+const VBLANK_VECTOR = 0x0040;
+const HEADER_START = 0x0100;
+const TITLE_ADDR = 0x0134;
+const TITLE_MAX_LENGTH = 11;
+
+/** ROM regions the assembler writes itself; program bytes must not overlap them. */
+const RESERVED_REGIONS: readonly { start: number; end: number; name: string }[] = [
+  { start: VBLANK_VECTOR, end: VBLANK_VECTOR + 1, name: 'VBlank vector' },
+  { start: HEADER_START, end: PROGRAM_START, name: 'cartridge header' },
+];
 
 // Nintendo logo — required at $0104-$0133 for the boot ROM to accept the cartridge
-const NINTENDO_LOGO = new Uint8Array([
+export const NINTENDO_LOGO = new Uint8Array([
   0xce, 0xed, 0x66, 0x66, 0xcc, 0x0d, 0x00, 0x0b, 0x03, 0x73, 0x00, 0x83, 0x00, 0x0c, 0x00, 0x0d,
   0x00, 0x08, 0x11, 0x1f, 0x88, 0x89, 0x00, 0x0e, 0xdc, 0xcc, 0x6e, 0xe6, 0xdd, 0xdd, 0xd9, 0x99,
   0xbb, 0xbb, 0x67, 0x63, 0x6e, 0x0e, 0xec, 0xcc, 0xdd, 0xdc, 0x99, 0x9f, 0xbb, 0xb9, 0x33, 0x3e,
 ]);
 
 export interface ROMHeader {
-  title: string; // Up to 11 characters
+  title: string; // Up to 11 ASCII characters
   cgbFlag?: number; // $00 = DMG, $80 = CGB+DMG, $C0 = CGB only
   cartridgeType?: number; // $00 = ROM only
   romSize?: number; // $00 = 32KB
@@ -32,76 +38,62 @@ export interface AssembleResult {
   symbols: Map<string, number>;
 }
 
-/**
- * Two-pass assembler: resolves labels and emits a valid Game Boy ROM.
- *
- * The program should NOT include the entry point or header — the assembler
- * writes those automatically. Program code begins at $0150.
- */
-export function assemble(program: Op[], header: ROMHeader): AssembleResult {
-  const rom = new Uint8Array(ROM_SIZE);
-  const symbols = new Map<string, number>();
+type Emitting = Extract<Op, { kind: 'inst' | 'data' }>;
 
-  // -----------------------------------------------------------------------
-  // Write header ($0100 – $014F)
-  // -----------------------------------------------------------------------
+interface Positioned {
+  op: Emitting;
+  address: number;
+}
 
-  // VBlank interrupt handler at $0040 — just RETI so HALT wakes up.
-  // The GB boot ROM enables VBlank in IE ($FFFF) before jumping to $0100,
-  // so we don't need to set IE ourselves — just provide the handler.
-  rom[0x0040] = 0xd9; // RETI
+function addr(n: number): string {
+  return `$${hex(n, 4)}`;
+}
+
+function writeHeader(rom: Uint8Array, header: ROMHeader): void {
+  if (header.title.length > TITLE_MAX_LENGTH || !/^[\x20-\x7e]*$/.test(header.title)) {
+    throw new Error(
+      `ROM title must be at most ${String(TITLE_MAX_LENGTH)} printable ASCII characters: "${header.title}"`,
+    );
+  }
+
+  // VBlank interrupt handler — just RETI so HALT wakes up.
+  rom[VBLANK_VECTOR] = 0xd9; // RETI
 
   // Entry point: NOP + JP $0150
-  rom[0x0100] = 0x00; // NOP
-  rom[0x0101] = 0xc3; // JP
-  rom[0x0102] = 0x50; // lo($0150)
-  rom[0x0103] = 0x01; // hi($0150)
+  rom.set([0x00, 0xc3, PROGRAM_START & 0xff, PROGRAM_START >> 8], HEADER_START);
 
-  // Nintendo logo
   rom.set(NINTENDO_LOGO, 0x0104);
+  rom.set(new TextEncoder().encode(header.title), TITLE_ADDR);
 
-  // Title (up to 11 bytes, padded with zeroes)
-  const titleBytes = new TextEncoder().encode(header.title.slice(0, 11));
-  rom.set(titleBytes, 0x0134);
-
-  // CGB flag
   rom[0x0143] = header.cgbFlag ?? 0x00;
-
-  // Cartridge type
   rom[0x0147] = header.cartridgeType ?? 0x00;
-
-  // ROM size
   rom[0x0148] = header.romSize ?? 0x00;
-
-  // RAM size
   rom[0x0149] = header.ramSize ?? 0x00;
-
-  // Destination code
   rom[0x014a] = header.destinationCode ?? 0x01;
+  rom[0x014b] = 0x33; // Old licensee code: $33 = use new licensee code
+}
 
-  // Old licensee code ($33 = use new licensee code)
-  rom[0x014b] = 0x33;
-
-  // -----------------------------------------------------------------------
-  // Pass 1: assign addresses and record labels
-  // -----------------------------------------------------------------------
-
-  // Flat list of positioned operations for pass 2
-  const positioned: { op: Op; address: number }[] = [];
-  let pc = 0x0150; // program starts after header
+/** Pass 1: assign addresses, record labels, and reject overlapping or out-of-range output. */
+function layout(program: readonly Op[]): {
+  positioned: Positioned[];
+  symbols: Map<string, number>;
+} {
+  const symbols = new Map<string, number>();
+  const positioned: Positioned[] = [];
+  let pc = PROGRAM_START;
 
   for (const op of program) {
     switch (op.kind) {
       case 'label':
+        if (symbols.has(op.name)) {
+          throw new Error(`Duplicate label: "${op.name}"`);
+        }
         symbols.set(op.name, pc);
         break;
       case 'org':
         pc = op.address;
         break;
       case 'inst':
-        positioned.push({ op, address: pc });
-        pc += op.bytes.length;
-        break;
       case 'data':
         positioned.push({ op, address: pc });
         pc += op.bytes.length;
@@ -109,69 +101,112 @@ export function assemble(program: Op[], header: ROMHeader): AssembleResult {
     }
   }
 
-  // -----------------------------------------------------------------------
-  // Pass 2: resolve references and write bytes
-  // -----------------------------------------------------------------------
+  const ranges = positioned
+    .filter(({ op }) => op.bytes.length > 0)
+    .map(({ op, address }) => ({ start: address, end: address + op.bytes.length }))
+    .sort((a, b) => a.start - b.start);
 
+  for (const [i, range] of ranges.entries()) {
+    if (range.end > ROM_SIZE) {
+      throw new Error(
+        `Program does not fit in ROM: bytes at ${addr(range.start)} extend to ${addr(range.end)} (limit ${addr(ROM_SIZE)})`,
+      );
+    }
+    for (const reserved of RESERVED_REGIONS) {
+      if (range.start < reserved.end && reserved.start < range.end) {
+        throw new Error(`Program bytes at ${addr(range.start)} overlap the ${reserved.name}`);
+      }
+    }
+    const next = ranges[i + 1];
+    if (next !== undefined && next.start < range.end) {
+      throw new Error(`Program bytes overlap at ${addr(next.start)}`);
+    }
+  }
+
+  return { positioned, symbols };
+}
+
+/** Pass 2: copy bytes and patch label references. */
+function emit(
+  rom: Uint8Array,
+  positioned: readonly Positioned[],
+  symbols: Map<string, number>,
+): void {
   for (const { op, address } of positioned) {
-    if (op.kind === 'data') {
-      rom.set(op.bytes, address);
-      continue;
-    }
+    rom.set(op.bytes, address);
+    if (op.kind !== 'inst' || op.refs === undefined) continue;
 
-    if (op.kind !== 'inst') continue;
+    for (const r of op.refs) {
+      const target = symbols.get(r.label);
+      if (target === undefined) {
+        throw new Error(`Undefined label: "${r.label}" (referenced at ${addr(address)})`);
+      }
 
-    // Copy raw bytes
-    for (let i = 0; i < op.bytes.length; i++) {
-      rom[address + i] = at(op.bytes, i);
-    }
-
-    // Resolve label references
-    if (op.refs) {
-      for (const r of op.refs) {
-        const target = symbols.get(r.label);
-        if (target === undefined) {
-          throw new Error(`Undefined label: "${r.label}" (referenced at $${address.toString(16)})`);
+      if (r.type === 'rel8') {
+        // Relative offset from the END of this instruction
+        const offset = target - (address + op.bytes.length);
+        if (offset < -128 || offset > 127) {
+          throw new Error(
+            `JR target "${r.label}" out of range: offset ${String(offset)} at ${addr(address)}`,
+          );
         }
-
-        if (r.type === 'rel8') {
-          // Relative offset from the END of this instruction
-          const instrEnd = address + op.bytes.length;
-          const offset = target - instrEnd;
-          if (offset < -128 || offset > 127) {
-            throw new Error(
-              `JR target "${r.label}" out of range: offset ${String(offset)} at $${address.toString(16)}`,
-            );
-          }
-          rom[address + r.offset] = offset & 0xff;
-        } else {
-          // imm16: little-endian absolute address
-          rom[address + r.offset] = target & 0xff;
-          rom[address + r.offset + 1] = (target >> 8) & 0xff;
-        }
+        rom[address + r.offset] = offset & 0xff;
+      } else {
+        // imm16: little-endian absolute address
+        rom[address + r.offset] = target & 0xff;
+        rom[address + r.offset + 1] = (target >> 8) & 0xff;
       }
     }
   }
+}
 
-  // -----------------------------------------------------------------------
-  // Checksums
-  // -----------------------------------------------------------------------
-
-  // Header checksum ($014D): complement of sum of $0134-$014C
-  let headerSum = 0;
-  for (let i = 0x0134; i <= 0x014c; i++) {
-    headerSum = (headerSum - at(rom, i) - 1) & 0xff;
+/** Header checksum ($014D): complement of sum of $0134-$014C */
+export function headerChecksum(rom: Uint8Array): number {
+  let sum = 0;
+  for (let i = TITLE_ADDR; i <= 0x014c; i++) {
+    sum = (sum - at(rom, i) - 1) & 0xff;
   }
-  rom[0x014d] = headerSum;
+  return sum;
+}
 
-  // Global checksum ($014E-$014F): sum of all bytes except the checksum itself
-  let globalSum = 0;
-  for (let i = 0; i < ROM_SIZE; i++) {
+/** Global checksum ($014E-$014F): 16-bit sum of all bytes except the checksum itself */
+export function globalChecksum(rom: Uint8Array): number {
+  let sum = 0;
+  for (let i = 0; i < rom.length; i++) {
     if (i === 0x014e || i === 0x014f) continue;
-    globalSum = (globalSum + at(rom, i)) & 0xffff;
+    sum = (sum + at(rom, i)) & 0xffff;
   }
-  rom[0x014e] = (globalSum >> 8) & 0xff;
-  rom[0x014f] = globalSum & 0xff;
+  return sum;
+}
+
+/**
+ * Two-pass assembler: resolves labels and emits a valid Game Boy ROM.
+ *
+ * The program should NOT include the entry point or header — the assembler
+ * writes those automatically. Program code begins at $0150.
+ */
+export function assemble(program: readonly Op[], header: ROMHeader): AssembleResult {
+  const rom = new Uint8Array(ROM_SIZE);
+  writeHeader(rom, header);
+
+  const { positioned, symbols } = layout(program);
+  emit(rom, positioned, symbols);
+
+  rom[0x014d] = headerChecksum(rom);
+  const global = globalChecksum(rom);
+  rom[0x014e] = (global >> 8) & 0xff;
+  rom[0x014f] = global & 0xff;
 
   return { rom, symbols };
+}
+
+/**
+ * Render symbols in the BGB/no$gmb `.sym` format (`bank:addr name`), sorted by address.
+ * Without a mapper, $0000-$3FFF is bank 0 and $4000-$7FFF is bank 1.
+ */
+export function formatSymbolFile(symbols: ReadonlyMap<string, number>): string {
+  return [...symbols.entries()]
+    .sort((a, b) => a[1] - b[1])
+    .map(([name, address]) => `${hex(address < 0x4000 ? 0 : 1, 2)}:${hex(address, 4)} ${name}\n`)
+    .join('');
 }

@@ -15,6 +15,7 @@ import {
   type U16,
   type IoRegOffset,
 } from './types';
+import { hi, lo } from './util';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -24,11 +25,17 @@ function inst(bytes: number[], refs?: OpRef[]): Op {
   return refs !== undefined ? { kind: 'inst', bytes, refs } : { kind: 'inst', bytes };
 }
 
-function lo(n: number): number {
-  return n & 0xff;
+/** Opcode followed by a 16-bit little-endian immediate or a label to resolve */
+function instImm16(opcode: number, value: U16 | LabelRef): Op {
+  if (isRef(value)) {
+    return inst([opcode, 0x00, 0x00], [{ offset: 1, label: value.name, type: 'imm16' }]);
+  }
+  return inst([opcode, lo(value), hi(value)]);
 }
-function hi(n: number): number {
-  return (n >> 8) & 0xff;
+
+/** Opcode followed by a signed 8-bit offset to a label */
+function instRel8(opcode: number, target: LabelRef): Op {
+  return inst([opcode, 0x00], [{ offset: 1, label: target.name, type: 'rel8' }]);
 }
 
 /** Insert a named label into the program */
@@ -112,13 +119,7 @@ export function ldd_hl_a(): Op {
 
 /** LD r16, nn — immediate or label */
 export function ld_rr_nn(dst: R16Name, value: U16 | LabelRef): Op {
-  if (isRef(value)) {
-    return inst(
-      [0x01 + R16[dst] * 16, 0x00, 0x00],
-      [{ offset: 1, label: value.name, type: 'imm16' }],
-    );
-  }
-  return inst([0x01 + R16[dst] * 16, lo(value), hi(value)]);
+  return instImm16(0x01 + R16[dst] * 16, value);
 }
 
 /** LD SP, HL */
@@ -142,12 +143,12 @@ export function ldh_a_n(n: IoRegOffset): Op {
 
 /** LD (nn), A */
 export function ld_nn_a(addr: U16): Op {
-  return inst([0xea, lo(addr), hi(addr)]);
+  return instImm16(0xea, addr);
 }
 
 /** LD A, (nn) */
 export function ld_a_nn(addr: U16): Op {
-  return inst([0xfa, lo(addr), hi(addr)]);
+  return instImm16(0xfa, addr);
 }
 
 // ---------------------------------------------------------------------------
@@ -231,29 +232,22 @@ export function dec_rr(rr: R16Name): Op {
 
 /** JR offset (unconditional relative jump to label) */
 export function jr(target: LabelRef): Op {
-  return inst([0x18, 0x00], [{ offset: 1, label: target.name, type: 'rel8' }]);
+  return instRel8(0x18, target);
 }
 
 /** JR cc, offset (conditional relative jump to label) */
 export function jr_cc(cc: CCName, target: LabelRef): Op {
-  return inst([0x20 + CC[cc] * 8, 0x00], [{ offset: 1, label: target.name, type: 'rel8' }]);
+  return instRel8(0x20 + CC[cc] * 8, target);
 }
 
 /** JP nn (unconditional absolute jump) */
 export function jp(target: U16 | LabelRef): Op {
-  if (isRef(target)) {
-    return inst([0xc3, 0x00, 0x00], [{ offset: 1, label: target.name, type: 'imm16' }]);
-  }
-  return inst([0xc3, lo(target), hi(target)]);
+  return instImm16(0xc3, target);
 }
 
 /** JP cc, nn */
 export function jp_cc(cc: CCName, target: U16 | LabelRef): Op {
-  const base = 0xc2 + CC[cc] * 8;
-  if (isRef(target)) {
-    return inst([base, 0x00, 0x00], [{ offset: 1, label: target.name, type: 'imm16' }]);
-  }
-  return inst([base, lo(target), hi(target)]);
+  return instImm16(0xc2 + CC[cc] * 8, target);
 }
 
 // ---------------------------------------------------------------------------
@@ -262,10 +256,7 @@ export function jp_cc(cc: CCName, target: U16 | LabelRef): Op {
 
 /** CALL nn */
 export function call(target: U16 | LabelRef): Op {
-  if (isRef(target)) {
-    return inst([0xcd, 0x00, 0x00], [{ offset: 1, label: target.name, type: 'imm16' }]);
-  }
-  return inst([0xcd, lo(target), hi(target)]);
+  return instImm16(0xcd, target);
 }
 
 /** RET */

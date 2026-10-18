@@ -22,6 +22,7 @@ repos:
         language: system
         pass_filenames: false
         always_run: true
+        stages: [pre-commit]
 
       - id: validate-commit-message
         name: validate commit message format

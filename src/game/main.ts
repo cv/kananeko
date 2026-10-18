@@ -4,62 +4,59 @@
  * Flow: Title screen → Scene 0..4 (dialogue → kana) → End/loop
  */
 
-import { type Op, ref, u8, u16 } from '../asm/types';
+import { type AssembleResult, type ROMHeader, assemble } from '../asm/assembler';
+import { HW, JOY, MEM } from '../asm/hardware';
+import { copyPages, storeByte, switchCases, waitFrame, zeroBytes } from '../asm/macros';
 import {
-  label,
+  and_n,
+  call,
+  cp_n,
   db,
   di,
   ei,
-  nop,
-  halt,
-  ld_rr_nn,
-  ld_r_n,
-  ldi_hl_a,
-  xor_r,
-  cp_n,
-  ldh_a_n,
-  ldh_n_a,
-  jr,
-  jr_cc,
+  inc_r,
   jp,
   jp_cc,
-  dec_r,
-  inc_rr,
-  ld_a_de,
+  jr,
+  jr_cc,
+  label,
   ld_a_nn,
   ld_nn_a,
-  and_n,
+  ld_r_n,
+  ld_rr_nn,
+  ldh_n_a,
   or_r,
-  inc_r,
-  call,
+  xor_r,
 } from '../asm/ops';
-import { HW, JOY, LCDC, MEM } from '../asm/hardware';
-import { buildTileData, textToTiles, requireTiles } from './font';
+import { type Op, type U16, ref, u8, u16 } from '../asm/types';
+import { buildDialogueEngine } from './dialogue';
+import { buildTileData, requireTiles, textToTiles } from './font';
 import { CAT_TILES } from './font-data';
 import { buildReadJoypad } from './joypad';
-import { buildDialogueEngine } from './dialogue';
 import { buildKanaEngine } from './kana';
-import { buildSceneData, rgb, SCENES, type Palette } from './scene';
-import { centerStartCol, tilemapAddr, tileRow } from './tilemap';
+import { buildDrawHudOps } from './kana-hud';
+import { type PackedScene, type Scene, SCENES, buildSceneData } from './scene';
+import { END_OF_CONVERSATION, MAX_LIVES } from './state';
+import {
+  type Palette,
+  clearTilemap,
+  rgb,
+  screenOff,
+  screenOn,
+  setBgPalette,
+  writeCenteredRow,
+} from './video';
+
+export const ROM_HEADER: ROMHeader = {
+  title: 'KANANEKO',
+  cgbFlag: 0x80, // CGB+DMG compatible
+  destinationCode: 0x00, // Japan
+};
 
 // ---------------------------------------------------------------------------
-// Data
+// Title screen content
 // ---------------------------------------------------------------------------
 
-const tileData = buildTileData();
-const tileDataSize = tileData.length;
-const sceneData = buildSceneData();
-
-/** Safe array access — throws instead of returning undefined */
-function at<T>(arr: readonly T[], i: number): T {
-  const v = arr[i];
-  if (v === undefined) {
-    throw new RangeError(`Index ${String(i)} out of bounds`);
-  }
-  return v;
-}
-
-// Title screen text & palette
 const TITLE = 'カナネコ';
 const SUBTITLE = 'はじめよう!';
 const TITLE_PALETTE: Palette = [
@@ -70,103 +67,90 @@ const TITLE_PALETTE: Palette = [
 ];
 
 // Cat portrait tile rows (4x3 grid)
-const CAT_ROW0 = requireTiles(CAT_TILES.ROW0);
-const CAT_ROW1 = requireTiles(CAT_TILES.ROW1);
-const CAT_ROW2 = requireTiles(CAT_TILES.ROW2);
+const CAT_ROWS = [
+  requireTiles(CAT_TILES.ROW0),
+  requireTiles(CAT_TILES.ROW1),
+  requireTiles(CAT_TILES.ROW2),
+] as const;
 const START_BOX_TOP = textToTiles('┌─────────────┐');
 const START_BOX_ON = textToTiles('│ PRESS START │');
 const START_BOX_OFF = textToTiles('│             │');
 const START_BOX_BOTTOM = textToTiles('└─────────────┘');
+const START_PROMPT_ROW = 13;
+/** TITLE_TIMER bit that toggles the START prompt (every 32 frames) */
+const BLINK_BIT = 0x20;
+
+const DMG_PALETTE = 0xe4; // shades 3,2,1,0
 
 // ---------------------------------------------------------------------------
-// Helper: write a row of tiles at a tilemap address
+// Program helpers
 // ---------------------------------------------------------------------------
+
+export function sceneDialogueLabel(sceneIndex: number): string {
+  return `scene${String(sceneIndex)}_dlg`;
+}
+
+export function sceneKanaLabel(sceneIndex: number): string {
+  return `scene${String(sceneIndex)}_kana`;
+}
 
 /**
- * Write a 4-color GBC palette to BG palette 0 via BCPS/BCPD.
- * On DMG this is harmless (registers are ignored).
+ * Run per-scene ops based on SCENE_ID. `name` must be unique per call site.
  */
-function buildSetPalette(palette: Palette): Op[] {
-  const ops: Op[] = [
-    // Set BCPS to palette 0, color 0, auto-increment
-    ld_r_n('a', u8(0x80)),
-    ldh_n_a(HW.BCPS),
-  ];
-  // Write 4 colors × 2 bytes each
-  for (const color of palette) {
-    ops.push(ld_r_n('a', u8(color & 0xff)));
-    ops.push(ldh_n_a(HW.BCPD));
-    ops.push(ld_r_n('a', u8((color >> 8) & 0xff)));
-    ops.push(ldh_n_a(HW.BCPD));
-  }
-  return ops;
+function sceneSwitch(
+  name: string,
+  getOps: (scene: Scene, packed: PackedScene, index: number) => Op[],
+  packedScenes: readonly PackedScene[],
+): Op[] {
+  const cases = packedScenes.map((packed, i) => {
+    const scene = SCENES[i];
+    if (scene === undefined) throw new RangeError(`No scene at index ${String(i)}`);
+    return getOps(scene, packed, i);
+  });
+  return [ld_a_nn(MEM.SCENE_ID), ...switchCases(cases, { name, branch: 'jp', exit: 'jp' })];
 }
 
-function buildWriteRow(row: number, tiles: readonly number[]): Op[] {
-  const ops: Op[] = [];
-  const col = centerStartCol(tiles.length);
-  ops.push(ld_rr_nn('hl', u16(tilemapAddr(tileRow(row), col))));
-  for (const tile of tiles) {
-    ops.push(ld_r_n('a', u8(tile)));
-    ops.push(ldi_hl_a());
-  }
-  return ops;
-}
-
-// ---------------------------------------------------------------------------
-// Helper: clear tilemap
-// ---------------------------------------------------------------------------
-
-let clearTilemapCounter = 0;
-
-function buildClearTilemap(): Op[] {
-  const id = String(clearTilemapCounter++);
-  const lbl = `clear_map_${id}`;
+/** Reset score, delta flash, and lives (plus any extra bytes to zero) for a new run. */
+function resetRunState(...alsoZero: U16[]): Op[] {
   return [
-    ld_rr_nn('hl', MEM.VRAM_MAP0),
-    xor_r('a'),
-    ld_r_n('b', u8(4)),
-    ld_r_n('c', u8(0)),
-    label(lbl),
-    ldi_hl_a(),
-    dec_r('c'),
-    jr_cc('nz', ref(lbl)),
-    dec_r('b'),
-    jr_cc('nz', ref(lbl)),
+    ...zeroBytes(
+      ...alsoZero,
+      MEM.KANA_SCORE_LO,
+      MEM.KANA_SCORE_HI,
+      MEM.DELTA_TYPE,
+      MEM.DELTA_TIMER,
+    ),
+    ...storeByte(MEM.KANA_LIVES, MAX_LIVES),
   ];
 }
 
-// ---------------------------------------------------------------------------
-// Helper: scene dispatch table
-// ---------------------------------------------------------------------------
-
-let dispatchCounter = 0;
-
 /**
- * Build a scene-id-based dispatch: reads SCENE_ID, then for each scene
- * executes the ops returned by `getOps(sceneIndex)`. Avoids repeating
- * the compare-and-jump pattern 5 times per use site.
+ * Per-frame engine loop: wait a frame, refresh HUD and input, run `update`,
+ * and repeat while the engine's state byte is non-zero.
  */
-function buildSceneDispatch(getOps: (i: number) => Op[]): Op[] {
-  const id = String(dispatchCounter++);
-  const doneLabel = `dispatch_done_${id}`;
-  const ops: Op[] = [ld_a_nn(MEM.SCENE_ID)];
+function engineLoop(name: string, update: string, stateAddr: U16): Op[] {
+  return [
+    label(name),
+    ...waitFrame(),
+    call(ref('hud_update')), // refresh HUD early in VBlank window
+    call(ref('joy_read')),
+    call(ref(update)),
+    ld_a_nn(stateAddr),
+    cp_n(u8(0)),
+    jr_cc('nz', ref(name)),
+  ];
+}
 
-  for (let i = 0; i < SCENES.length; i++) {
-    const branchLabel = `dispatch_${id}_s${String(i + 1)}`;
-    if (i < SCENES.length - 1) {
-      ops.push(cp_n(u8(i)));
-      ops.push(jp_cc('nz', ref(branchLabel)));
-    }
-    ops.push(...getOps(i));
-    if (i < SCENES.length - 1) {
-      ops.push(jp(ref(doneLabel)));
-      ops.push(label(branchLabel));
-    }
-  }
-
-  ops.push(label(doneLabel));
-  return ops;
+/** Block until START is newly pressed. */
+function waitForStart(name: string): Op[] {
+  return [
+    label(name),
+    ...waitFrame(),
+    call(ref('joy_read')),
+    ld_a_nn(MEM.JOYPAD_NEW),
+    and_n(u8(JOY.START)),
+    jr_cc('z', ref(name)),
+  ];
 }
 
 // ---------------------------------------------------------------------------
@@ -174,10 +158,8 @@ function buildSceneDispatch(getOps: (i: number) => Op[]): Op[] {
 // ---------------------------------------------------------------------------
 
 export function buildProgram(): Op[] {
-  const sceneLabels = SCENES.map((_, i) => ({
-    dlg: `scene${String(i)}_dlg`,
-    kana: `scene${String(i)}_kana`,
-  }));
+  const tileData = buildTileData();
+  const packedScenes = buildSceneData();
 
   return [
     // ==== Init ====
@@ -185,116 +167,64 @@ export function buildProgram(): Op[] {
     ld_rr_nn('sp', u16(0xfffe)),
 
     // Clear WRAM state
-    xor_r('a'),
-    ld_nn_a(MEM.JOYPAD_CUR),
-    ld_nn_a(MEM.JOYPAD_PREV),
-    ld_nn_a(MEM.JOYPAD_NEW),
-    ld_nn_a(MEM.DLG_STATE),
-    ld_r_n('a', u8(0xff)),
-    ld_nn_a(MEM.DLG_NODE_ID),
-    xor_r('a'),
-    ld_nn_a(MEM.KANA_STATE),
-    ld_nn_a(MEM.SCENE_ID),
-    ld_nn_a(MEM.SCENE_FLAGS),
-    ld_nn_a(MEM.GAME_MODE),
-    ld_nn_a(MEM.TITLE_TIMER),
-    ld_nn_a(MEM.KANA_SCORE_LO),
-    ld_nn_a(MEM.KANA_SCORE_HI),
-    ld_nn_a(MEM.DELTA_TYPE),
-    ld_nn_a(MEM.DELTA_TIMER),
-    ld_r_n('a', u8(3)),
-    ld_nn_a(MEM.KANA_LIVES),
+    ...zeroBytes(MEM.JOYPAD_CUR, MEM.JOYPAD_PREV, MEM.JOYPAD_NEW, MEM.DLG_STATE),
+    ...storeByte(MEM.DLG_NODE_ID, END_OF_CONVERSATION),
+    ...resetRunState(MEM.KANA_STATE, MEM.SCENE_ID, MEM.SCENE_FLAGS, MEM.GAME_MODE, MEM.TITLE_TIMER),
 
-    // Wait for VBlank
-    label('init_vblank'),
-    ldh_a_n(HW.LY),
-    cp_n(u8(144)),
-    jr_cc('nz', ref('init_vblank')),
+    // Copy all tile data to VRAM with the LCD off
+    ...screenOff('init_vblank'),
+    ...copyPages('init_copy', MEM.VRAM_TILES, ref('tileData'), Math.ceil(tileData.length / 256)),
 
-    // Turn off LCD
-    xor_r('a'),
-    ldh_n_a(HW.LCDC),
-
-    // Copy all tile data to VRAM
-    ld_rr_nn('hl', MEM.VRAM_TILES),
-    ld_rr_nn('de', ref('tileData')),
-    ld_r_n('b', u8(Math.ceil(tileDataSize / 256))),
-    ld_r_n('c', u8(0)),
-    label('init_copy'),
-    ld_a_de(),
-    ldi_hl_a(),
-    inc_rr('de'),
-    dec_r('c'),
-    jr_cc('nz', ref('init_copy')),
-    dec_r('b'),
-    jr_cc('nz', ref('init_copy')),
-
-    // Set DMG palette (for original GB compatibility)
-    ld_r_n('a', u8(0xe4)),
+    // Set DMG palette (for original GB compatibility) and GBC palette (ignored on DMG)
+    ld_r_n('a', u8(DMG_PALETTE)),
     ldh_n_a(HW.BGP),
-    // Set GBC palette (ignored on DMG)
-    ...buildSetPalette(TITLE_PALETTE),
+    ...setBgPalette(TITLE_PALETTE),
 
-    // ==== Title Screen ====
+    // ==== Title Screen (entered with the LCD off) ====
     label('title_screen'),
-
-    // Clear tilemap (LCD already off or we turn it off)
-    ...buildClearTilemap(),
+    ...clearTilemap('title_clear'),
 
     // Reset title animation state so the prompt always starts visible.
-    xor_r('a'),
-    ld_nn_a(MEM.TITLE_TIMER),
+    ...zeroBytes(MEM.TITLE_TIMER),
 
-    // Draw score HUD on row 0
+    // Score HUD on row 0, cat portrait, title card, and prompt frame
     call(ref('kana_draw_hud')),
+    ...CAT_ROWS.flatMap((tiles, i) => writeCenteredRow(2 + i, tiles)),
+    ...writeCenteredRow(7, textToTiles(TITLE)),
+    ...writeCenteredRow(10, textToTiles(SUBTITLE)),
+    ...writeCenteredRow(START_PROMPT_ROW - 1, START_BOX_TOP),
+    ...writeCenteredRow(START_PROMPT_ROW, START_BOX_ON),
+    ...writeCenteredRow(START_PROMPT_ROW + 1, START_BOX_BOTTOM),
 
-    // Draw cat portrait (4x3 tiles, centered)
-    ...buildWriteRow(2, CAT_ROW0),
-    ...buildWriteRow(3, CAT_ROW1),
-    ...buildWriteRow(4, CAT_ROW2),
-
-    // Draw title card + prompt frame
-    ...buildWriteRow(7, textToTiles(TITLE)),
-    ...buildWriteRow(10, textToTiles(SUBTITLE)),
-    ...buildWriteRow(12, START_BOX_TOP),
-    ...buildWriteRow(13, START_BOX_ON),
-    ...buildWriteRow(14, START_BOX_BOTTOM),
-
-    // Turn on LCD
-    ld_r_n('a', u8(LCDC.LCD_ON | LCDC.TILE_DATA_8000 | LCDC.BG_ON)),
-    ldh_n_a(HW.LCDC),
+    ...screenOn(),
 
     // Enable VBlank interrupt — required for HALT on real hardware.
     // Handler at $0040 (RETI) is placed by the assembler.
-    ld_r_n('a', u8(0x01)), // bit 0 = VBlank
-    ld_nn_a(MEM.IE),
+    ...storeByte(MEM.IE, 0x01), // bit 0 = VBlank
     ei(),
 
     // Wait for all buttons to be released (debounce boot ROM START press)
     label('title_debounce'),
-    halt(),
-    nop(),
+    ...waitFrame(),
     call(ref('joy_read')),
     ld_a_nn(MEM.JOYPAD_CUR),
     cp_n(u8(0)),
     jr_cc('nz', ref('title_debounce')),
 
-    // Wait for START
+    // Wait for START, blinking the prompt
     label('title_loop'),
-    halt(),
-    nop(),
+    ...waitFrame(),
     call(ref('joy_read')),
 
-    // Blink the START prompt at a gentler pace.
     ld_a_nn(MEM.TITLE_TIMER),
     inc_r('a'),
     ld_nn_a(MEM.TITLE_TIMER),
-    and_n(u8(0x20)),
+    and_n(u8(BLINK_BIT)),
     jr_cc('z', ref('title_prompt_on')),
-    ...buildWriteRow(13, START_BOX_OFF),
+    ...writeCenteredRow(START_PROMPT_ROW, START_BOX_OFF),
     jr(ref('title_prompt_done')),
     label('title_prompt_on'),
-    ...buildWriteRow(13, START_BOX_ON),
+    ...writeCenteredRow(START_PROMPT_ROW, START_BOX_ON),
     label('title_prompt_done'),
 
     ld_a_nn(MEM.JOYPAD_NEW),
@@ -306,174 +236,104 @@ export function buildProgram(): Op[] {
     ldh_n_a(HW.DIV), // reset entropy timing so gameplay remains deterministic after title idling
     ld_nn_a(MEM.SCENE_ID),
 
-    // ==== Scene dispatch ====
+    // ==== Scene load ====
     label('scene_load'),
+    ...screenOff('scene_vblank'),
+    ...clearTilemap('scene_clear'),
 
-    // Turn LCD off for redraw
-    label('scene_vblank'),
-    ldh_a_n(HW.LY),
-    cp_n(u8(144)),
-    jr_cc('nz', ref('scene_vblank')),
-    xor_r('a'),
-    ldh_n_a(HW.LCDC),
+    // Scene name (row 1), icon (row 4), and palette
+    ...sceneSwitch('scene_name', (_, packed) => writeCenteredRow(1, packed.nameRow), packedScenes),
+    ...sceneSwitch(
+      'scene_icon',
+      (scene) => writeCenteredRow(4, requireTiles(scene.icon)),
+      packedScenes,
+    ),
+    ...sceneSwitch('scene_palette', (scene) => setBgPalette(scene.palette), packedScenes),
 
-    // Clear tilemap
-    ...buildClearTilemap(),
+    call(ref('kana_draw_hud')), // hearts + score on row 0
+    ...screenOn(),
 
-    // Draw scene name at row 1 (dispatched by scene_id)
-    ...buildSceneDispatch((i) => buildWriteRow(1, at(sceneData.scenes, i).nameRow)),
-
-    // Draw scene icon at row 4, centered (dispatched by scene_id)
-    ...buildSceneDispatch((i) => {
-      const scene = at(SCENES, i);
-      return buildWriteRow(4, requireTiles(scene.icon));
-    }),
-
-    // Set scene palette (dispatched by scene_id)
-    ...buildSceneDispatch((i) => buildSetPalette(at(SCENES, i).palette)),
-
-    // Draw score HUD on row 0 (hearts + 4-digit score)
-    call(ref('kana_draw_hud')),
-
-    // Turn LCD back on
-    ld_r_n('a', u8(LCDC.LCD_ON | LCDC.TILE_DATA_8000 | LCDC.BG_ON)),
-    ldh_n_a(HW.LCDC),
-
-    // Load dialogue data pointer (dispatched by scene_id)
-    ...buildSceneDispatch((i) => [ld_rr_nn('de', ref(at(sceneLabels, i).dlg))]),
+    // ==== Dialogue ====
+    ...sceneSwitch(
+      'scene_dlg_ptr',
+      (_s, _p, i) => [ld_rr_nn('de', ref(sceneDialogueLabel(i)))],
+      packedScenes,
+    ),
     call(ref('dlg_open_tree')), // initialize tree and open node 0
 
-    // Dialogue loop — process nodes until conversation ends
-    label('scene_dlg_loop'),
-    halt(),
-    nop(),
-    call(ref('hud_update')), // refresh HUD early in VBlank window
-    call(ref('joy_read')),
-    call(ref('dlg_update')),
-    ld_a_nn(MEM.DLG_STATE),
-    cp_n(u8(0)),
-    jr_cc('nz', ref('scene_dlg_loop')),
-
-    // Node done — check if conversation continues
+    // Process nodes until the conversation ends
+    ...engineLoop('scene_dlg_loop', 'dlg_update', MEM.DLG_STATE),
     ld_a_nn(MEM.DLG_NODE_ID),
-    cp_n(u8(0xff)), // 0xFF = conversation over
+    cp_n(u8(END_OF_CONVERSATION)),
     jr_cc('z', ref('scene_dlg_done')),
-
-    // More nodes — open the next one
     call(ref('dlg_open_node')),
     jr(ref('scene_dlg_loop')),
-
     label('scene_dlg_done'),
 
-    // Load kana data pointer (dispatched by scene_id)
-    ...buildSceneDispatch((i) => [ld_rr_nn('de', ref(at(sceneLabels, i).kana))]),
+    // ==== Kana round ====
+    ...sceneSwitch(
+      'scene_kana_ptr',
+      (_s, _p, i) => [ld_rr_nn('de', ref(sceneKanaLabel(i)))],
+      packedScenes,
+    ),
     call(ref('kana_start')),
+    ...engineLoop('scene_kana_loop', 'kana_update', MEM.KANA_STATE),
 
-    // Kana game loop
-    label('scene_kana_loop'),
-    halt(),
-    nop(),
-    call(ref('hud_update')), // refresh HUD early in VBlank window
-    call(ref('joy_read')),
-    call(ref('kana_update')),
-    ld_a_nn(MEM.KANA_STATE),
-    cp_n(u8(0)),
-    jr_cc('nz', ref('scene_kana_loop')),
-
-    // Check if player died (lives == 0) → game over
+    // Out of lives → game over
     ld_a_nn(MEM.KANA_LIVES),
     cp_n(u8(0)),
     jp_cc('z', ref('game_over')),
 
     // ==== Scene complete — set completion flag and advance ====
-    ...buildSceneDispatch((i) => [ld_r_n('b', u8(1 << i))]),
+    ...sceneSwitch('scene_flag', (_s, _p, i) => [ld_r_n('b', u8(1 << i))], packedScenes),
     ld_a_nn(MEM.SCENE_FLAGS),
     or_r('b'),
     ld_nn_a(MEM.SCENE_FLAGS),
 
-    // Advance to next scene
     ld_a_nn(MEM.SCENE_ID),
     inc_r('a'),
     ld_nn_a(MEM.SCENE_ID),
-
-    // Check if we've done all 5 scenes
     cp_n(u8(SCENES.length)),
     jp_cc('c', ref('scene_load')), // more scenes to go
 
     // ==== Game complete — back to title ====
-    // Turn LCD off to redraw
-    label('game_complete_vblank'),
-    ldh_a_n(HW.LY),
-    cp_n(u8(144)),
-    jr_cc('nz', ref('game_complete_vblank')),
-    xor_r('a'),
-    ldh_n_a(HW.LCDC),
-
+    ...screenOff('game_complete_vblank'),
     jp(ref('title_screen')),
 
     // ==== Game Over ====
     label('game_over'),
-
-    // Turn LCD off
-    label('gameover_vblank'),
-    ldh_a_n(HW.LY),
-    cp_n(u8(144)),
-    jr_cc('nz', ref('gameover_vblank')),
-    xor_r('a'),
-    ldh_n_a(HW.LCDC),
-
-    // Clear tilemap and draw game over screen
-    ...buildClearTilemap(),
-    ...buildWriteRow(6, textToTiles('GAME OVER')),
+    ...screenOff('gameover_vblank'),
+    ...clearTilemap('gameover_clear'),
+    ...writeCenteredRow(6, textToTiles('GAME OVER')),
     call(ref('kana_draw_hud')), // show final score + empty hearts
+    ...screenOn(),
 
-    // Turn LCD on
-    ld_r_n('a', u8(LCDC.LCD_ON | LCDC.TILE_DATA_8000 | LCDC.BG_ON)),
-    ldh_n_a(HW.LCDC),
-
-    // Wait for START
-    label('gameover_loop'),
-    halt(),
-    nop(),
-    call(ref('joy_read')),
-    ld_a_nn(MEM.JOYPAD_NEW),
-    and_n(u8(JOY.START)),
-    jr_cc('z', ref('gameover_loop')),
-
-    // Reset score and lives, back to title
-    xor_r('a'),
-    ld_nn_a(MEM.KANA_SCORE_LO),
-    ld_nn_a(MEM.KANA_SCORE_HI),
-    ld_nn_a(MEM.DELTA_TYPE),
-    ld_nn_a(MEM.DELTA_TIMER),
-    ld_r_n('a', u8(3)),
-    ld_nn_a(MEM.KANA_LIVES),
-
-    // Turn LCD off for title redraw
-    label('gameover_to_title'),
-    ldh_a_n(HW.LY),
-    cp_n(u8(144)),
-    jr_cc('nz', ref('gameover_to_title')),
-    xor_r('a'),
-    ldh_n_a(HW.LCDC),
-
+    ...waitForStart('gameover_loop'),
+    ...resetRunState(),
+    ...screenOff('gameover_to_title'),
     jp(ref('title_screen')),
 
     // ==== Subroutines ====
     ...buildReadJoypad(),
     ...buildDialogueEngine(),
     ...buildKanaEngine(),
+    ...buildDrawHudOps(),
 
     // ==== Data ====
     label('tileData'),
     db(tileData),
 
     // Per-scene dialogue and kana data
-    ...sceneData.scenes.flatMap((scene, i) => [
-      label(at(sceneLabels, i).dlg),
+    ...packedScenes.flatMap((scene, i) => [
+      label(sceneDialogueLabel(i)),
       db(scene.dialogueData),
-      label(at(sceneLabels, i).kana),
+      label(sceneKanaLabel(i)),
       db(scene.kanaData),
     ]),
   ];
+}
+
+/** Assemble the complete game ROM. */
+export function buildRom(): AssembleResult {
+  return assemble(buildProgram(), ROM_HEADER);
 }

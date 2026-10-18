@@ -1,65 +1,69 @@
 /**
  * Dialogue engine for the Game Boy.
  *
- * Renders a text box at the bottom of the screen (rows 12-17),
+ * Renders a text box at the bottom of the screen (rows 11-17),
  * reveals text character-by-character, presents shuffled response choices,
  * and handles cursor navigation with d-pad + A confirm.
  *
- * Supports branching dialogue trees. Each tree has:
- *   [node_count: u8]
- *   [offset_lo, offset_hi] × node_count   — offset table (from tree start)
- *   Per node:
- *     [tile_indices...] 0xFE             — NPC text (0xFE = text end sentinel)
- *     [choice_count: u8]
- *     [next_node × choice_count]          — compact lookup (0xFF = end conversation)
- *     [choice_text...] 0xFE              — choice 0 text
- *     [choice_text...] 0xFE              — choice 1 text
- *     ...
+ * The tree data format is documented in dialogue-data.ts (buildDialogueTree).
+ * Choosing the first authored choice of a node is "good" (+10 score, +1 life);
+ * any other choice is "bad" (-5 score, -1 life, conversation ends at 0 lives).
  */
 
-import { type Op, ref, u8, u16 } from '../asm/types';
+import { MEM, HW, JOY } from '../asm/hardware';
 import {
+  countDownOrReturn,
+  loadPointer,
+  storeByte,
+  storePointer,
+  switchCases,
+  zeroBytes,
+} from '../asm/macros';
+import {
+  adc_r,
+  add_hl_rr,
+  add_r,
+  and_n,
+  call,
+  cp_n,
+  cp_r,
+  dec_r,
+  inc_r,
+  inc_rr,
+  jp,
+  jp_cc,
+  jr,
+  jr_cc,
   label,
+  ld_a_de,
+  ld_a_nn,
+  ld_nn_a,
   ld_r_n,
   ld_r_r,
   ld_rr_nn,
-  ld_a_nn,
-  ld_nn_a,
-  ld_a_de,
-  ldi_hl_a,
-  ldi_a_hl,
   ldh_a_n,
-  ldh_n_a,
-  xor_r,
-  and_n,
-  cp_n,
-  cp_r,
-  add_r,
-  adc_r,
-  sub_n,
-  add_hl_rr,
-  inc_r,
-  inc_rr,
-  dec_r,
-  jr,
-  jr_cc,
-  jp,
-  jp_cc,
-  call,
+  ldi_a_hl,
+  ldi_hl_a,
   ret,
   ret_cc,
+  sub_n,
+  xor_r,
 } from '../asm/ops';
-import { HW, JOY, LCDC, MEM } from '../asm/hardware';
-import { requireTile } from './font';
+import { type Op, ref, u8, u16 } from '../asm/types';
+import { at, hi, lo } from '../asm/util';
+import { TEXT_END } from './dialogue-data';
 import { type Triple } from './fixed';
-import { SCREEN_COLS, tilePos, tilemapAddr, type TilePosition } from './tilemap';
+import { requireTile } from './font';
 import {
-  buildAddScore,
-  buildSubScore,
-  buildSetDelta,
-  DELTA_PLUS_10,
   DELTA_MINUS_5,
+  DELTA_PLUS_10,
+  buildAddScore,
+  buildSetDelta,
+  buildSubScore,
 } from './kana-hud';
+import { DialogueState, END_OF_CONVERSATION, MAX_LIVES } from './state';
+import { SCREEN_COLS, type TilePosition, tilePos, tilemapAddr } from './tilemap';
+import { screenOff, screenOn } from './video';
 
 // Re-export data types and encoder from dialogue-data.ts
 export { buildDialogueTree, defineDialogueTree } from './dialogue-data';
@@ -87,6 +91,10 @@ const CHOICE_CURSOR_POSITIONS: Triple<TilePosition> = [
   tilePos(CHOICE_START_ROW + 2, 2),
 ];
 
+/** Widest text that fits in the box: NPC text starts at col 2, choices at col 3, border at col 19. */
+export const MAX_NPC_TEXT_WIDTH = SCREEN_COLS - 1 - TEXT_START.col;
+export const MAX_CHOICE_TEXT_WIDTH = SCREEN_COLS - 1 - CHOICE_TEXT_POSITIONS[0].col;
+
 // Tile indices for border characters
 const BORDER_TL = requireTile('┌');
 const BORDER_TR = requireTile('┐');
@@ -96,34 +104,60 @@ const BORDER_H = requireTile('─');
 const BORDER_V = requireTile('│');
 const CURSOR_TILE = requireTile('▶');
 
+const DLG_ORDER = [MEM.DLG_ORDER0, MEM.DLG_ORDER1, MEM.DLG_ORDER2] as const;
+
+/** Display orders for three choices: row → logical choice. Index 0 is the identity. */
+const THREE_CHOICE_ORDERS = [
+  [0, 1, 2],
+  [0, 2, 1],
+  [1, 0, 2],
+  [1, 2, 0],
+  [2, 0, 1],
+  [2, 1, 0],
+] as const;
+const TWO_CHOICE_SWAPPED = [1, 0] as const;
+
 // ---------------------------------------------------------------------------
-// Assembly: text box border (drawn with LCD off)
+// Assembly helpers
 // ---------------------------------------------------------------------------
 
-let choicePositionCounter = 0;
-let choiceOrderCounter = 0;
-
-function buildLoadChoicePosition(positions: Triple<TilePosition>, labelPrefix: string): Op[] {
-  const id = `${labelPrefix}_${String(choicePositionCounter++)}`;
-  return [
-    cp_n(u8(0)),
-    jr_cc('nz', ref(`${id}_1`)),
-    ld_rr_nn('hl', u16(tilemapAddr(positions[0]))),
-    jr(ref(`${id}_done`)),
-    label(`${id}_1`),
-    cp_n(u8(1)),
-    jr_cc('nz', ref(`${id}_2`)),
-    ld_rr_nn('hl', u16(tilemapAddr(positions[1]))),
-    jr(ref(`${id}_done`)),
-    label(`${id}_2`),
-    ld_rr_nn('hl', u16(tilemapAddr(positions[2]))),
-    label(`${id}_done`),
-  ];
+/** HL = positions[A] for A in 0..2 */
+function buildLoadChoicePosition(positions: Triple<TilePosition>, name: string): Op[] {
+  return switchCases(
+    positions.map((position) => [ld_rr_nn('hl', u16(tilemapAddr(position)))]),
+    { name },
+  );
 }
 
+/** HL = text position of the display row whose DLG_ORDER entry equals B */
+function buildLoadChoicePositionForLogicalChoice(name: string): Op[] {
+  return switchCases(
+    CHOICE_TEXT_POSITIONS.map((position) => [ld_rr_nn('hl', u16(tilemapAddr(position)))]),
+    { name, compare: (row) => [ld_a_nn(at(DLG_ORDER, row)), cp_r('b')] },
+  );
+}
+
+/** A = DLG_ORDER[A]: map a display row (cursor) to its logical choice */
+function buildLoadLogicalChoiceFromCursor(name: string): Op[] {
+  return switchCases(
+    DLG_ORDER.map((addr) => [ld_a_nn(addr)]),
+    { name },
+  );
+}
+
+/** Write a display order to DLG_ORDER, skipping rows already at their identity value. */
+function writeChoiceOrder(order: readonly number[]): Op[] {
+  return order.flatMap((choice, row) => {
+    if (choice === row) return [];
+    return [choice === 0 ? xor_r('a') : ld_r_n('a', u8(choice)), ld_nn_a(at(DLG_ORDER, row))];
+  });
+}
+
+/** Shuffle the display order of the current node's choices using DIV as entropy. */
 function buildInitChoiceOrder(): Op[] {
-  const id = `dlg_order_${String(choiceOrderCounter++)}`;
+  const done = ref('dlg_order_done');
   return [
+    // Identity order: row i shows choice i
     xor_r('a'),
     ld_nn_a(MEM.DLG_ORDER0),
     inc_r('a'),
@@ -133,163 +167,61 @@ function buildInitChoiceOrder(): Op[] {
 
     ld_a_nn(MEM.DLG_CHOICE_CNT),
     cp_n(u8(2)),
-    jr_cc('z', ref(`${id}_two`)),
+    jr_cc('z', ref('dlg_order_two')),
     cp_n(u8(3)),
-    jr_cc('z', ref(`${id}_three`)),
-    jp(ref(`${id}_done`)),
+    jr_cc('z', ref('dlg_order_three')),
+    jp(done),
 
-    label(`${id}_two`),
+    // Two choices: swap on an odd DIV
+    label('dlg_order_two'),
     ldh_a_n(HW.DIV),
     and_n(u8(1)),
-    jr_cc('z', ref(`${id}_done`)),
-    ld_r_n('a', u8(1)),
-    ld_nn_a(MEM.DLG_ORDER0),
-    xor_r('a'),
-    ld_nn_a(MEM.DLG_ORDER1),
-    jp(ref(`${id}_done`)),
+    jr_cc('z', done),
+    ...writeChoiceOrder(TWO_CHOICE_SWAPPED),
+    jp(done),
 
-    label(`${id}_three`),
+    // Three choices: DIV & 7, folded into 0..5, picks a permutation
+    label('dlg_order_three'),
     ldh_a_n(HW.DIV),
     and_n(u8(7)),
-    cp_n(u8(6)),
-    jr_cc('c', ref(`${id}_three_dispatch`)),
-    sub_n(u8(6)),
+    cp_n(u8(THREE_CHOICE_ORDERS.length)),
+    jr_cc('c', ref('dlg_order_three_dispatch')),
+    sub_n(u8(THREE_CHOICE_ORDERS.length)),
+    label('dlg_order_three_dispatch'),
+    ...switchCases(THREE_CHOICE_ORDERS.map(writeChoiceOrder), {
+      name: 'dlg_order_perm',
+      branch: 'jr',
+      exit: 'jp',
+    }),
 
-    label(`${id}_three_dispatch`),
-    cp_n(u8(0)),
-    jr_cc('nz', ref(`${id}_perm1`)),
-    jp(ref(`${id}_done`)),
-
-    label(`${id}_perm1`),
-    cp_n(u8(1)),
-    jr_cc('nz', ref(`${id}_perm2`)),
-    ld_r_n('a', u8(2)),
-    ld_nn_a(MEM.DLG_ORDER1),
-    ld_r_n('a', u8(1)),
-    ld_nn_a(MEM.DLG_ORDER2),
-    jp(ref(`${id}_done`)),
-
-    label(`${id}_perm2`),
-    cp_n(u8(2)),
-    jr_cc('nz', ref(`${id}_perm3`)),
-    ld_r_n('a', u8(1)),
-    ld_nn_a(MEM.DLG_ORDER0),
-    xor_r('a'),
-    ld_nn_a(MEM.DLG_ORDER1),
-    jp(ref(`${id}_done`)),
-
-    label(`${id}_perm3`),
-    cp_n(u8(3)),
-    jr_cc('nz', ref(`${id}_perm4`)),
-    ld_r_n('a', u8(1)),
-    ld_nn_a(MEM.DLG_ORDER0),
-    ld_r_n('a', u8(2)),
-    ld_nn_a(MEM.DLG_ORDER1),
-    xor_r('a'),
-    ld_nn_a(MEM.DLG_ORDER2),
-    jp(ref(`${id}_done`)),
-
-    label(`${id}_perm4`),
-    cp_n(u8(4)),
-    jr_cc('nz', ref(`${id}_perm5`)),
-    ld_r_n('a', u8(2)),
-    ld_nn_a(MEM.DLG_ORDER0),
-    xor_r('a'),
-    ld_nn_a(MEM.DLG_ORDER1),
-    ld_r_n('a', u8(1)),
-    ld_nn_a(MEM.DLG_ORDER2),
-    jp(ref(`${id}_done`)),
-
-    label(`${id}_perm5`),
-    ld_r_n('a', u8(2)),
-    ld_nn_a(MEM.DLG_ORDER0),
-    ld_r_n('a', u8(1)),
-    ld_nn_a(MEM.DLG_ORDER1),
-    xor_r('a'),
-    ld_nn_a(MEM.DLG_ORDER2),
-
-    label(`${id}_done`),
+    label(done.name),
   ];
 }
 
-function buildLoadChoicePositionForOriginalIndex(labelPrefix: string): Op[] {
-  const id = `${labelPrefix}_${String(choiceOrderCounter++)}`;
+/** One textbox row: left tile, interior (fill tile or cleared), right tile */
+function buildTextboxRow(row: number, left: number, fill: number | 'clear', right: number): Op[] {
+  const interior = SCREEN_COLS - 2;
   return [
-    ld_a_nn(MEM.DLG_ORDER0),
-    cp_r('b'),
-    jr_cc('nz', ref(`${id}_1`)),
-    ld_rr_nn('hl', u16(tilemapAddr(CHOICE_TEXT_POSITIONS[0]))),
-    jr(ref(`${id}_done`)),
-    label(`${id}_1`),
-    ld_a_nn(MEM.DLG_ORDER1),
-    cp_r('b'),
-    jr_cc('nz', ref(`${id}_2`)),
-    ld_rr_nn('hl', u16(tilemapAddr(CHOICE_TEXT_POSITIONS[1]))),
-    jr(ref(`${id}_done`)),
-    label(`${id}_2`),
-    ld_rr_nn('hl', u16(tilemapAddr(CHOICE_TEXT_POSITIONS[2]))),
-    label(`${id}_done`),
+    ld_rr_nn('hl', u16(tilemapAddr(row, 0))),
+    ld_r_n('a', u8(left)),
+    ldi_hl_a(),
+    ...(fill === 'clear'
+      ? [xor_r('a'), ...Array.from({ length: interior }, () => ldi_hl_a())]
+      : Array.from({ length: interior }, () => [ld_r_n('a', u8(fill)), ldi_hl_a()]).flat()),
+    ld_r_n('a', u8(right)),
+    ldi_hl_a(),
   ];
 }
 
-function buildLoadLogicalChoiceFromCursor(labelPrefix: string): Op[] {
-  const id = `${labelPrefix}_${String(choiceOrderCounter++)}`;
-  return [
-    cp_n(u8(0)),
-    jr_cc('nz', ref(`${id}_1`)),
-    ld_a_nn(MEM.DLG_ORDER0),
-    jr(ref(`${id}_done`)),
-    label(`${id}_1`),
-    cp_n(u8(1)),
-    jr_cc('nz', ref(`${id}_2`)),
-    ld_a_nn(MEM.DLG_ORDER1),
-    jr(ref(`${id}_done`)),
-    label(`${id}_2`),
-    ld_a_nn(MEM.DLG_ORDER2),
-    label(`${id}_done`),
-  ];
-}
-
+/** Draw the textbox border and clear its interior (LCD must be off) */
 function buildDrawTextbox(): Op[] {
-  const ops: Op[] = [];
-
-  // Top border row
-  ops.push(ld_rr_nn('hl', u16(tilemapAddr(BOX_TOP_ROW, 0))));
-  ops.push(ld_r_n('a', u8(BORDER_TL)));
-  ops.push(ldi_hl_a());
-  for (let i = 1; i < SCREEN_COLS - 1; i++) {
-    ops.push(ld_r_n('a', u8(BORDER_H)));
-    ops.push(ldi_hl_a());
-  }
-  ops.push(ld_r_n('a', u8(BORDER_TR)));
-  ops.push(ldi_hl_a());
-
-  // Middle rows (content area with side borders)
-  for (let row = BOX_TOP_ROW + 1; row < BOX_TOP_ROW + BOX_ROWS - 1; row++) {
-    ops.push(ld_rr_nn('hl', u16(tilemapAddr(row, 0))));
-    ops.push(ld_r_n('a', u8(BORDER_V)));
-    ops.push(ldi_hl_a());
-    // Clear interior
-    ops.push(xor_r('a'));
-    for (let i = 1; i < SCREEN_COLS - 1; i++) {
-      ops.push(ldi_hl_a());
-    }
-    ops.push(ld_r_n('a', u8(BORDER_V)));
-    ops.push(ldi_hl_a());
-  }
-
-  // Bottom border row
-  ops.push(ld_rr_nn('hl', u16(tilemapAddr(BOX_TOP_ROW + BOX_ROWS - 1, 0))));
-  ops.push(ld_r_n('a', u8(BORDER_BL)));
-  ops.push(ldi_hl_a());
-  for (let i = 1; i < SCREEN_COLS - 1; i++) {
-    ops.push(ld_r_n('a', u8(BORDER_H)));
-    ops.push(ldi_hl_a());
-  }
-  ops.push(ld_r_n('a', u8(BORDER_BR)));
-  ops.push(ldi_hl_a());
-
-  return ops;
+  const bottomRow = BOX_TOP_ROW + BOX_ROWS - 1;
+  const middleRows = Array.from({ length: BOX_ROWS - 2 }, (_, i) => BOX_TOP_ROW + 1 + i);
+  return [
+    ...buildTextboxRow(BOX_TOP_ROW, BORDER_TL, BORDER_H, BORDER_TR),
+    ...middleRows.flatMap((row) => buildTextboxRow(row, BORDER_V, 'clear', BORDER_V)),
+    ...buildTextboxRow(bottomRow, BORDER_BL, BORDER_H, BORDER_BR),
+  ];
 }
 
 // ---------------------------------------------------------------------------
@@ -299,9 +231,10 @@ function buildDrawTextbox(): Op[] {
 /**
  * Build the dialogue engine assembly subroutines.
  *
- * dlg_open: DE = pointer to a node's data in ROM. Draws textbox, starts reveal.
- * dlg_update: Call each frame. When state returns to 0, check DLG_NODE_ID:
- *   0xFF = conversation over, else = next node to open.
+ * dlg_open_tree: DE = pointer to tree data. Opens node 0.
+ * dlg_open_node: Opens node DLG_NODE_ID of the current tree.
+ * dlg_update: Call each frame. When state returns to idle, check DLG_NODE_ID:
+ *   END_OF_CONVERSATION = conversation over, else = next node to open.
  */
 export function buildDialogueEngine(): Op[] {
   return [
@@ -311,45 +244,23 @@ export function buildDialogueEngine(): Op[] {
     // =================================================================
     label('dlg_open'),
 
-    // Wait for VBlank before turning LCD off
-    label('dlg_open_vblank'),
-    ldh_a_n(HW.LY),
-    cp_n(u8(144)),
-    jr_cc('nz', ref('dlg_open_vblank')),
-
-    // Turn off LCD for bulk VRAM writes
-    xor_r('a'),
-    ldh_n_a(HW.LCDC),
-
-    // Draw the textbox border
+    // Redraw the textbox with the LCD off
+    ...screenOff('dlg_open_vblank'),
     ...buildDrawTextbox(),
-
-    // Turn LCD back on
-    ld_r_n('a', u8(LCDC.LCD_ON | LCDC.TILE_DATA_8000 | LCDC.BG_ON)),
-    ldh_n_a(HW.LCDC),
+    ...screenOn(),
 
     // Store node data pointer
-    ld_r_r('a', 'e'),
-    ld_nn_a(MEM.DLG_STR_LO),
-    ld_r_r('a', 'd'),
-    ld_nn_a(MEM.DLG_STR_HI),
+    ...storePointer('de', MEM.DLG_STR_LO, MEM.DLG_STR_HI),
 
-    // Set VRAM write position to start of text row 1, col 2 (inside border)
-    ld_r_n('a', u8(tilemapAddr(TEXT_START) & 0xff)),
-    ld_nn_a(MEM.DLG_VRAM_LO),
-    ld_r_n('a', u8((tilemapAddr(TEXT_START) >> 8) & 0xff)),
-    ld_nn_a(MEM.DLG_VRAM_HI),
+    // Set VRAM write position to the start of the text area (inside border)
+    ...storeByte(MEM.DLG_VRAM_LO, lo(tilemapAddr(TEXT_START))),
+    ...storeByte(MEM.DLG_VRAM_HI, hi(tilemapAddr(TEXT_START))),
 
     // Init state
-    ld_r_n('a', u8(1)), // state = printing
-    ld_nn_a(MEM.DLG_STATE),
-    xor_r('a'),
-    ld_nn_a(MEM.DLG_CHAR_IDX),
-    ld_r_n('a', u8(REVEAL_DELAY)),
-    ld_nn_a(MEM.DLG_DELAY),
-    xor_r('a'),
-    ld_nn_a(MEM.DLG_CURSOR),
-    ld_nn_a(MEM.DLG_RESULT),
+    ...storeByte(MEM.DLG_STATE, DialogueState.PRINTING),
+    ...zeroBytes(MEM.DLG_CHAR_IDX),
+    ...storeByte(MEM.DLG_DELAY, REVEAL_DELAY),
+    ...zeroBytes(MEM.DLG_CURSOR, MEM.DLG_RESULT),
 
     ret(),
 
@@ -358,16 +269,13 @@ export function buildDialogueEngine(): Op[] {
     // =================================================================
     label('dlg_update'),
     ld_a_nn(MEM.DLG_STATE),
-    cp_n(u8(0)),
-    ret_cc('z'), // state 0 = idle, nothing to do
-
-    cp_n(u8(1)),
+    cp_n(u8(DialogueState.IDLE)),
+    ret_cc('z'),
+    cp_n(u8(DialogueState.PRINTING)),
     jp_cc('z', ref('dlg_do_print')),
-
-    cp_n(u8(2)),
+    cp_n(u8(DialogueState.WAITING)),
     jp_cc('z', ref('dlg_do_wait')),
-
-    cp_n(u8(3)),
+    cp_n(u8(DialogueState.CHOOSING)),
     jp(ref('dlg_do_choose')),
 
     // =================================================================
@@ -375,73 +283,38 @@ export function buildDialogueEngine(): Op[] {
     // =================================================================
     label('dlg_do_print'),
 
-    // Decrement delay counter
-    ld_a_nn(MEM.DLG_DELAY),
-    dec_r('a'),
-    ld_nn_a(MEM.DLG_DELAY),
-    ret_cc('nz'), // not time yet
+    ...countDownOrReturn(MEM.DLG_DELAY),
+    ...storeByte(MEM.DLG_DELAY, REVEAL_DELAY),
 
-    // Reset delay
-    ld_r_n('a', u8(REVEAL_DELAY)),
-    ld_nn_a(MEM.DLG_DELAY),
-
-    // Load string pointer into HL
-    ld_a_nn(MEM.DLG_STR_LO),
-    ld_r_r('l', 'a'),
-    ld_a_nn(MEM.DLG_STR_HI),
-    ld_r_r('h', 'a'),
-
-    // Read next tile index
-    ldi_a_hl(), // A = [HL++] = next tile
-
-    // Save updated string pointer
+    // Read the next tile and advance the string pointer
+    ...loadPointer('hl', MEM.DLG_STR_LO, MEM.DLG_STR_HI),
+    ldi_a_hl(),
     ld_r_r('b', 'a'), // save tile in B
-    ld_r_r('a', 'l'),
-    ld_nn_a(MEM.DLG_STR_LO),
-    ld_r_r('a', 'h'),
-    ld_nn_a(MEM.DLG_STR_HI),
+    ...storePointer('hl', MEM.DLG_STR_LO, MEM.DLG_STR_HI),
     ld_r_r('a', 'b'), // restore tile
 
-    // Check for text terminator (0xFE — not 0x00, because tile 0 = space)
-    cp_n(u8(0xfe)),
+    // Check for text terminator (not 0x00, because tile 0 = space)
+    cp_n(u8(TEXT_END)),
     jr_cc('z', ref('dlg_text_done')),
 
-    // Write tile to VRAM position
-    // Load VRAM pointer into HL
-    ld_r_r('b', 'a'), // save tile
-    ld_a_nn(MEM.DLG_VRAM_LO),
-    ld_r_r('l', 'a'),
-    ld_a_nn(MEM.DLG_VRAM_HI),
-    ld_r_r('h', 'a'),
-
-    // Wait for HBlank/VBlank to safely write VRAM
-    // (single tile write is fast enough during HBlank)
+    // Write the tile at the VRAM cursor and advance it.
+    // Called right after HALT, so this single write lands inside VBlank.
+    ld_r_r('b', 'a'),
+    ...loadPointer('hl', MEM.DLG_VRAM_LO, MEM.DLG_VRAM_HI),
     ld_r_r('a', 'b'),
-    ldi_hl_a(), // write tile, advance VRAM pointer
-
-    // Save updated VRAM pointer
-    ld_r_r('a', 'l'),
-    ld_nn_a(MEM.DLG_VRAM_LO),
-    ld_r_r('a', 'h'),
-    ld_nn_a(MEM.DLG_VRAM_HI),
-
+    ldi_hl_a(),
+    ...storePointer('hl', MEM.DLG_VRAM_LO, MEM.DLG_VRAM_HI),
     ret(),
 
     // --- Text finished: read choice count and transition ---
     label('dlg_text_done'),
     // String pointer now points to choice_count byte
-    ld_a_nn(MEM.DLG_STR_LO),
-    ld_r_r('l', 'a'),
-    ld_a_nn(MEM.DLG_STR_HI),
-    ld_r_r('h', 'a'),
+    ...loadPointer('hl', MEM.DLG_STR_LO, MEM.DLG_STR_HI),
     ldi_a_hl(), // A = choice count
     ld_nn_a(MEM.DLG_CHOICE_CNT),
 
     // HL now points to the next_node lookup table. Save this position.
-    ld_r_r('a', 'l'),
-    ld_nn_a(MEM.DLG_META0_LO), // reuse META0 as "next_node table pointer"
-    ld_r_r('a', 'h'),
-    ld_nn_a(MEM.DLG_META0_HI),
+    ...storePointer('hl', MEM.DLG_META0_LO, MEM.DLG_META0_HI),
 
     // Skip past next_node table + good_flag table (choice_count * 2 bytes)
     ld_a_nn(MEM.DLG_CHOICE_CNT),
@@ -451,63 +324,42 @@ export function buildDialogueEngine(): Op[] {
     add_hl_rr('bc'), // HL += choice_count * 2
 
     // Save pointer to first choice text
-    ld_r_r('a', 'l'),
-    ld_nn_a(MEM.DLG_STR_LO),
-    ld_r_r('a', 'h'),
-    ld_nn_a(MEM.DLG_STR_HI),
+    ...storePointer('hl', MEM.DLG_STR_LO, MEM.DLG_STR_HI),
 
     // If 0 choices, go to wait-for-A mode
     ld_a_nn(MEM.DLG_CHOICE_CNT),
     cp_n(u8(0)),
     jr_cc('nz', ref('dlg_setup_choices')),
-    ld_r_n('a', u8(2)), // state = wait
-    ld_nn_a(MEM.DLG_STATE),
+    ...storeByte(MEM.DLG_STATE, DialogueState.WAITING),
     ret(),
 
     // --- Set up choices ---
     label('dlg_setup_choices'),
-    ld_r_n('a', u8(3)), // state = choosing
-    ld_nn_a(MEM.DLG_STATE),
-
+    ...storeByte(MEM.DLG_STATE, DialogueState.CHOOSING),
     ...buildInitChoiceOrder(),
 
-    // Draw choice texts (with LCD off for bulk write)
-    label('dlg_draw_choices_vblank'),
-    ldh_a_n(HW.LY),
-    cp_n(u8(144)),
-    jr_cc('nz', ref('dlg_draw_choices_vblank')),
-
-    xor_r('a'),
-    ldh_n_a(HW.LCDC),
-
-    // Draw each choice on its own row
-    // We read choice strings from the string pointer
-    ld_a_nn(MEM.DLG_STR_LO),
-    ld_r_r('e', 'a'),
-    ld_a_nn(MEM.DLG_STR_HI),
-    ld_r_r('d', 'a'),
+    // Draw each choice on its shuffled row (LCD off for bulk write)
+    ...screenOff('dlg_draw_choices_vblank'),
+    ...loadPointer('de', MEM.DLG_STR_LO, MEM.DLG_STR_HI),
 
     ld_a_nn(MEM.DLG_CHOICE_CNT),
     ld_r_r('c', 'a'), // C = remaining choices
     ld_r_n('b', u8(0)), // B = choice index
 
     label('dlg_draw_choice_loop'),
-    // Calculate VRAM address for this original choice's shuffled display row
-    ...buildLoadChoicePositionForOriginalIndex('dlg_choice_pos'),
+    // HL = text position of the display row showing logical choice B
+    ...buildLoadChoicePositionForLogicalChoice('dlg_choice_pos'),
 
-    label('dlg_choice_write'),
-    // DE = ROM string pointer, HL = VRAM destination
-    // Copy tiles until null terminator: ld_a_de reads [DE] without clobbering HL
+    // Copy tiles from [DE] to [HL] until the text terminator
     label('dlg_choice_char'),
-    ld_a_de(), // A = [DE] (tile index from ROM)
-    inc_rr('de'), // advance source
-    cp_n(u8(0xfe)),
-    jr_cc('z', ref('dlg_choice_str_done')), // 0xFE = end of this choice text
-    ldi_hl_a(), // write tile to VRAM, advance dest
+    ld_a_de(),
+    inc_rr('de'),
+    cp_n(u8(TEXT_END)),
+    jr_cc('z', ref('dlg_choice_str_done')),
+    ldi_hl_a(),
     jr(ref('dlg_choice_char')),
 
     label('dlg_choice_str_done'),
-    // Choice texts are now simple null-terminated strings with no metadata
     inc_r('b'), // next choice index
     dec_r('c'), // remaining--
     jr_cc('nz', ref('dlg_draw_choice_loop')),
@@ -517,13 +369,10 @@ export function buildDialogueEngine(): Op[] {
     ld_r_n('a', u8(CURSOR_TILE)),
     ldi_hl_a(),
 
-    // Turn LCD back on
-    ld_r_n('a', u8(LCDC.LCD_ON | LCDC.TILE_DATA_8000 | LCDC.BG_ON)),
-    ldh_n_a(HW.LCDC),
+    ...screenOn(),
 
     // Init cursor position
-    xor_r('a'),
-    ld_nn_a(MEM.DLG_CURSOR),
+    ...zeroBytes(MEM.DLG_CURSOR),
 
     ret(),
 
@@ -606,28 +455,18 @@ export function buildDialogueEngine(): Op[] {
     // Read next_node = table_base[logical_choice]
     ld_a_nn(MEM.DLG_CURSOR),
     ...buildLoadLogicalChoiceFromCursor('dlg_choice_logical'),
-    ld_r_r('c', 'a'),
+    ld_r_r('c', 'a'), // C = logical choice
 
-    ld_a_nn(MEM.DLG_META0_LO),
-    ld_r_r('l', 'a'),
-    ld_a_nn(MEM.DLG_META0_HI),
-    ld_r_r('h', 'a'),
+    ...loadPointer('hl', MEM.DLG_META0_LO, MEM.DLG_META0_HI),
     ld_r_n('b', u8(0)),
     add_hl_rr('bc'), // HL = table_base + logical_choice
     ldi_a_hl(),
     ld_nn_a(MEM.DLG_NODE_ID),
 
-    // Read good_flag = table_base[choice_count + cursor]
-    // HL is now at table_base + cursor + 1. We need table_base + choice_count + cursor.
-    // Offset from current HL: (choice_count - cursor - 1)
-    // Simpler: reload table_base, add choice_count + cursor
-    ld_a_nn(MEM.DLG_META0_LO),
-    ld_r_r('l', 'a'),
-    ld_a_nn(MEM.DLG_META0_HI),
-    ld_r_r('h', 'a'),
-    // Add choice_count + cursor
+    // Read good_flag = table_base[choice_count + logical_choice]
+    ...loadPointer('hl', MEM.DLG_META0_LO, MEM.DLG_META0_HI),
     ld_a_nn(MEM.DLG_CHOICE_CNT),
-    add_r('c'), // A = choice_count + cursor (C still has cursor from above)
+    add_r('c'), // A = choice_count + logical choice
     ld_r_r('c', 'a'),
     ld_r_n('b', u8(0)),
     add_hl_rr('bc'),
@@ -636,11 +475,11 @@ export function buildDialogueEngine(): Op[] {
     // Score + lives: good = +10 & regain life, bad = -5 & lose life
     cp_n(u8(1)),
     jr_cc('nz', ref('dlg_bad_choice')),
-    // Good: +10 score, +1 life (capped at 3)
+    // Good: +10 score, +1 life (capped at MAX_LIVES)
     ...buildAddScore(10),
     ...buildSetDelta(DELTA_PLUS_10),
     ld_a_nn(MEM.KANA_LIVES),
-    cp_n(u8(3)),
+    cp_n(u8(MAX_LIVES)),
     jr_cc('nc', ref('dlg_score_done')), // already at max
     inc_r('a'),
     ld_nn_a(MEM.KANA_LIVES),
@@ -658,13 +497,10 @@ export function buildDialogueEngine(): Op[] {
     // If lives just hit 0, end conversation → skip to kana
     cp_n(u8(0)),
     jr_cc('nz', ref('dlg_score_done')),
-    ld_r_n('a', u8(0xff)),
-    ld_nn_a(MEM.DLG_NODE_ID),
+    ...storeByte(MEM.DLG_NODE_ID, END_OF_CONVERSATION),
 
     label('dlg_score_done'),
-    // Set state = idle
-    xor_r('a'),
-    ld_nn_a(MEM.DLG_STATE),
+    ...zeroBytes(MEM.DLG_STATE), // idle
     ret(),
 
     // =================================================================
@@ -672,9 +508,7 @@ export function buildDialogueEngine(): Op[] {
     // =================================================================
     label('dlg_erase_cursor'),
     ld_a_nn(MEM.DLG_CURSOR),
-    // Compute VRAM address: 0x9800 + (CHOICE_START_ROW + cursor) * 32 + 2
     ...buildLoadChoicePosition(CHOICE_CURSOR_POSITIONS, 'dlg_erase_pos'),
-    label('dlg_erase_write'),
     xor_r('a'),
     ldi_hl_a(), // write blank tile
     ret(),
@@ -685,7 +519,6 @@ export function buildDialogueEngine(): Op[] {
     label('dlg_draw_cursor'),
     ld_a_nn(MEM.DLG_CURSOR),
     ...buildLoadChoicePosition(CHOICE_CURSOR_POSITIONS, 'dlg_draw_pos'),
-    label('dlg_draw_write'),
     ld_r_n('a', u8(CURSOR_TILE)),
     ldi_hl_a(),
     ret(),
@@ -695,14 +528,8 @@ export function buildDialogueEngine(): Op[] {
     // Stores tree base, sets node 0, opens the first node.
     // =================================================================
     label('dlg_open_tree'),
-    // Save tree base pointer
-    ld_r_r('a', 'e'),
-    ld_nn_a(MEM.DLG_TREE_LO),
-    ld_r_r('a', 'd'),
-    ld_nn_a(MEM.DLG_TREE_HI),
-    // Start at node 0
-    xor_r('a'),
-    ld_nn_a(MEM.DLG_NODE_ID),
+    ...storePointer('de', MEM.DLG_TREE_LO, MEM.DLG_TREE_HI),
+    ...zeroBytes(MEM.DLG_NODE_ID), // start at node 0
     // Fall through to dlg_open_node
 
     // =================================================================
@@ -710,11 +537,7 @@ export function buildDialogueEngine(): Op[] {
     // Looks up the offset table, computes ROM pointer, calls dlg_open.
     // =================================================================
     label('dlg_open_node'),
-    // Load tree base into HL
-    ld_a_nn(MEM.DLG_TREE_LO),
-    ld_r_r('l', 'a'),
-    ld_a_nn(MEM.DLG_TREE_HI),
-    ld_r_r('h', 'a'),
+    ...loadPointer('hl', MEM.DLG_TREE_LO, MEM.DLG_TREE_HI),
     // HL = tree base. Skip node_count byte.
     inc_rr('hl'),
     // Offset table entry = base + 1 + node_id * 2
