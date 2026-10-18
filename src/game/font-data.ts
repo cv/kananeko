@@ -16,7 +16,7 @@ export type Glyph = [string, string, string, string, string, string, string, str
 import { LATIN_UPPER, DIGITS_PUNCT, BORDER } from './glyphs-latin';
 import { HIRAGANA } from './glyphs-hiragana';
 import { KATAKANA } from './glyphs-katakana';
-import { CAT, SCENE_ICONS } from './glyphs-icons';
+import { CAT, SCENE_ICONS, UI_ICONS } from './glyphs-icons';
 
 export const ALL_GLYPHS: Record<string, Glyph> = {
   ...LATIN_UPPER,
@@ -26,6 +26,7 @@ export const ALL_GLYPHS: Record<string, Glyph> = {
   ...BORDER,
   ...CAT,
   ...SCENE_ICONS,
+  ...UI_ICONS,
 };
 
 // Cat tile indices for easy reference
@@ -38,6 +39,12 @@ export const CAT_TILES = {
   BLANK: '\uE011',
   HEART_FULL: '\uE012',
   HEART_EMPTY: '\uE013',
+} as const;
+
+// UI tiles
+export const UI_TILES = {
+  /** D-pad arrows in direction-index order: UP, DOWN, LEFT, RIGHT */
+  ARROWS: ['\uE030', '\uE031', '\uE032', '\uE033'],
 } as const;
 
 // Scene icon tile pairs [left, right]

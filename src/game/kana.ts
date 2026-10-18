@@ -53,11 +53,14 @@ import {
   ldi_hl_a,
   ret,
   ret_cc,
+  srl,
+  sub_r,
 } from '../asm/ops';
 import { type Op, type TileIndex, ref, u8, u16 } from '../asm/types';
+import { at } from '../asm/util';
 import { type NonEmpty, type Quad, type Triple, type TupleIndex } from './fixed';
-import { requireTile, textToTiles } from './font';
-import { CAT_TILES } from './font-data';
+import { requireTile, requireTiles, textToTiles } from './font';
+import { CAT_TILES, UI_TILES } from './font-data';
 import {
   DELTA_MINUS_100,
   DELTA_PLUS_10,
@@ -69,8 +72,8 @@ import {
   buildSubScore,
 } from './kana-hud';
 import { KanaState } from './state';
-import { tilePos, tilemapAddr } from './tilemap';
-import { clearTilemap, screenOff, screenOn } from './video';
+import { type TilePosition, tilePos, tilemapAddr } from './tilemap';
+import { clearTilemap, screenOff, screenOn, vramPut, writeCenteredRow } from './video';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -112,22 +115,62 @@ export function defineKanaQuestion<const Chars extends NonEmpty<Kana>>(
 // Layout
 // ---------------------------------------------------------------------------
 
-const WORD_ROW = 6;
+//  row 2     どれ かな?          prompt / feedback message
+//  rows 4-6  ┌────────┐
+//            │ こ□にちは │        word, centered in the box
+//            └────────┘
+//  row 9          ▲
+//  row 10         X             UP option
+//  row 12     ◀ X 🐱 X ▷         LEFT option, cat, RIGHT option
+//  row 14         X             DOWN option
+//  row 15         ▼
 
-const OPT_UP = tilePos(3, 10);
-const OPT_DOWN = tilePos(9, 10);
-const OPT_LEFT = tilePos(6, 2);
-const OPT_RIGHT = tilePos(6, 17);
-const OPTION_POSITIONS = [OPT_UP, OPT_DOWN, OPT_LEFT, OPT_RIGHT] as const;
-// Positions ordered: 0=UP, 1=DOWN, 2=LEFT, 3=RIGHT (matches direction encoding)
+const PROMPT_ROW = 2;
+const WORD_BOX = { top: 4, left: 5, innerWidth: 8 } as const;
+const WORD_ROW = WORD_BOX.top + 1;
+const WORD_INNER_COL = WORD_BOX.left + 1;
+/** Longest word the box can hold */
+export const MAX_KANA_WORD_LENGTH = WORD_BOX.innerWidth;
+
+const DPAD_ROW = 12;
+const DPAD_COL = 10;
+// Ordered by direction index: 0=UP, 1=DOWN, 2=LEFT, 3=RIGHT
+const OPTION_POSITIONS = [
+  tilePos(DPAD_ROW - 2, DPAD_COL),
+  tilePos(DPAD_ROW + 2, DPAD_COL),
+  tilePos(DPAD_ROW, DPAD_COL - 2),
+  tilePos(DPAD_ROW, DPAD_COL + 2),
+] as const;
+const ARROW_POSITIONS = [
+  tilePos(DPAD_ROW - 3, DPAD_COL),
+  tilePos(DPAD_ROW + 3, DPAD_COL),
+  tilePos(DPAD_ROW, DPAD_COL - 3),
+  tilePos(DPAD_ROW, DPAD_COL + 3),
+] as const;
+const DPAD_CENTER = tilePos(DPAD_ROW, DPAD_COL);
+
+/** Screen positions for tests and tools */
+export const KANA_LAYOUT = {
+  promptRow: PROMPT_ROW,
+  word: { row: WORD_ROW, col: WORD_INNER_COL, width: WORD_BOX.innerWidth },
+  options: OPTION_POSITIONS,
+} as const;
+
+/** Messages shown on the prompt row, all padded to the same width */
+export const KANA_MESSAGES = {
+  prompt: 'どれ かな?',
+  correct: 'せいかい!',
+  retry: 'もう いちど!',
+  reveal: 'ざんねん...',
+} as const;
+const MESSAGE_WIDTH = Math.max(...Object.values(KANA_MESSAGES).map((m) => Array.from(m).length));
 
 // Game constants
-const FEEDBACK_FRAMES = 30;
+const FEEDBACK_FRAMES = 40;
 const SCORE_FIRST_TRY = 100;
 const SCORE_SECOND_TRY = 10;
 const SCORE_DEATH_PENALTY = 100;
 const MAX_ATTEMPTS = 2; // 0-indexed: attempt 0, 1, 2 = 3 tries
-const WORD_COL = 7;
 
 // D-pad buttons in direction-index order (0=UP, 1=DOWN, 2=LEFT, 3=RIGHT),
 // matching OPTION_POSITIONS and MEM.KANA_CORRECT_POS.
@@ -152,6 +195,48 @@ const ANSWER_LAYOUTS = [
 
 // Tile constants
 const BLANK_TILE: TileIndex = requireTile(CAT_TILES.BLANK);
+const CAT_ICON: TileIndex = requireTile(CAT_TILES.ICON);
+const ARROW_TILES = requireTiles(UI_TILES.ARROWS);
+
+/** Prompt-row message, centered and padded so every message fully replaces the last */
+function showMessage(text: string): Op[] {
+  const tiles = textToTiles(text);
+  const left = Math.floor((MESSAGE_WIDTH - tiles.length) / 2);
+  const padded = [
+    ...Array<number>(left).fill(0),
+    ...tiles,
+    ...Array<number>(MESSAGE_WIDTH - tiles.length - left).fill(0),
+  ];
+  return writeCenteredRow(PROMPT_ROW, padded, { lcdOn: true });
+}
+
+/** The parts of the round screen that don't change between questions (LCD off) */
+function buildRoundFrame(): Op[] {
+  const { top, left, innerWidth } = WORD_BOX;
+  const right = left + innerWidth + 1;
+  const tileAt = (pos: TilePosition, tile: number): Op[] => [
+    ld_rr_nn('hl', u16(tilemapAddr(pos))),
+    ld_r_n('a', u8(tile)),
+    ldi_hl_a(),
+  ];
+  const horizontal = (row: number, l: string, r: string): Op[] => [
+    ld_rr_nn('hl', u16(tilemapAddr(row, left))),
+    ...[
+      requireTile(l),
+      ...Array<number>(innerWidth).fill(requireTile('─')),
+      requireTile(r),
+    ].flatMap((tile) => [ld_r_n('a', u8(tile)), ldi_hl_a()]),
+  ];
+  return [
+    ...writeCenteredRow(PROMPT_ROW, textToTiles(KANA_MESSAGES.prompt)),
+    ...horizontal(top, '┌', '┐'),
+    ...tileAt(tilePos(top + 1, left), requireTile('│')),
+    ...tileAt(tilePos(top + 1, right), requireTile('│')),
+    ...horizontal(top + 2, '└', '┘'),
+    ...ARROW_POSITIONS.flatMap((pos, dir) => tileAt(pos, at(ARROW_TILES, dir))),
+    ...tileAt(DPAD_CENTER, CAT_ICON),
+  ];
+}
 
 function buildAnswerLayout(layout: AnswerLayout): Op[] {
   return ANSWER_SLOT_ORDER.flatMap((optionIndex) => {
@@ -170,6 +255,9 @@ export function buildKanaData(questions: readonly KanaQuestion[]): Uint8Array {
 
   for (const q of questions) {
     const tiles = textToTiles(q.word);
+    if (tiles.length > MAX_KANA_WORD_LENGTH) {
+      throw new RangeError(`Kana word too long for the box: ${q.word}`);
+    }
     bytes.push(tiles.length);
 
     for (const tile of tiles) {
@@ -191,7 +279,12 @@ export function buildKanaData(questions: readonly KanaQuestion[]): Uint8Array {
 // Assembly: kana engine
 // ---------------------------------------------------------------------------
 
-const WORD_ADDR = tilemapAddr(WORD_ROW, WORD_COL);
+const WORD_INNER_ADDR = tilemapAddr(WORD_ROW, WORD_INNER_COL);
+
+/** HL += A (clobbers A) */
+function addAToHL(name: string): Op[] {
+  return [add_r('l'), ld_r_r('l', 'a'), jr_cc('nc', ref(name)), inc_r('h'), label(name)];
+}
 
 /** Switch to a feedback state and start its countdown. */
 function enterFeedback(state: (typeof KanaState)['ADVANCE_FEEDBACK' | 'RETRY_FEEDBACK']): Op[] {
@@ -258,30 +351,32 @@ export function buildKanaEngine(): Op[] {
     jp_cc('z', ref('kana_all_done')),
     ld_r_r('c', 'a'), // C = word length
 
-    // Copy the word's tiles to the word row
-    ld_rr_nn('hl', u16(WORD_ADDR)),
-    ld_r_n('b', u8(0)), // B = tile counter
+    ...buildRoundFrame(),
+
+    // HL = start of the word, centered in the box: inner + (width - length) / 2
+    ld_r_n('a', u8(WORD_BOX.innerWidth)),
+    sub_r('c'),
+    srl('a'),
+    ld_rr_nn('hl', u16(WORD_INNER_ADDR)),
+    ...addAToHL('kana_word_centered'),
+    ...storePointer('hl', MEM.KANA_BLANK_LO, MEM.KANA_BLANK_HI), // word start, for now
+
+    // Copy the word's tiles
     label('kana_draw_word'),
     ld_a_de(),
     inc_rr('de'),
     ldi_hl_a(),
-    inc_r('b'),
     dec_r('c'),
     jr_cc('nz', ref('kana_draw_word')),
 
-    // Read blank_position and overwrite that tile with BLANK_TILE
+    // Read blank_position; remember that cell and cover it with BLANK_TILE
     ld_a_de(),
     inc_rr('de'),
-    ld_r_r('b', 'a'), // B = blank_position
-    ld_rr_nn('hl', u16(WORD_ADDR)),
-    // HL += B (8-bit add with carry into H)
-    ld_r_r('c', 'b'),
-    ld_r_r('a', 'l'),
-    add_r('c'),
-    ld_r_r('l', 'a'),
-    jr_cc('nc', ref('kana_no_carry')),
-    inc_r('h'),
-    label('kana_no_carry'),
+    ld_r_r('b', 'a'),
+    ...loadPointer('hl', MEM.KANA_BLANK_LO, MEM.KANA_BLANK_HI),
+    ld_r_r('a', 'b'),
+    ...addAToHL('kana_blank_found'),
+    ...storePointer('hl', MEM.KANA_BLANK_LO, MEM.KANA_BLANK_HI),
     ld_r_n('a', u8(BLANK_TILE)),
     ldi_hl_a(),
 
@@ -356,6 +451,8 @@ export function buildKanaEngine(): Op[] {
     ...buildClearDelta(),
 
     label('kana_correct_done'),
+    ...showMessage(KANA_MESSAGES.correct),
+    call(ref('kana_reveal')),
     ...enterFeedback(KanaState.ADVANCE_FEEDBACK),
     ret(),
 
@@ -369,6 +466,7 @@ export function buildKanaEngine(): Op[] {
     inc_r('a'),
     ld_nn_a(MEM.KANA_ATTEMPTS),
     ...buildClearDelta(),
+    ...showMessage(KANA_MESSAGES.retry),
     ...enterFeedback(KanaState.RETRY_FEEDBACK),
     ret(),
 
@@ -376,6 +474,8 @@ export function buildKanaEngine(): Op[] {
     label('kana_death'),
     ...buildSubScore(SCORE_DEATH_PENALTY),
     ...buildSetDelta(DELTA_MINUS_100),
+    ...showMessage(KANA_MESSAGES.reveal),
+    call(ref('kana_reveal')), // show the answer before moving on
 
     ld_a_nn(MEM.KANA_LIVES),
     dec_r('a'),
@@ -402,7 +502,17 @@ export function buildKanaEngine(): Op[] {
     // =================================================================
     label('kana_wrong_fb'),
     ...countDownOrReturn(MEM.KANA_FEEDBACK_TIMER),
+    ...showMessage(KANA_MESSAGES.prompt),
     ...storeByte(MEM.KANA_STATE, KanaState.AWAITING),
+    ret(),
+
+    // =================================================================
+    // kana_reveal — Put the correct kana into the word's blank cell.
+    // =================================================================
+    label('kana_reveal'),
+    ...loadPointer('hl', MEM.KANA_BLANK_LO, MEM.KANA_BLANK_HI),
+    ld_a_nn(MEM.KANA_SHUFFLE), // shuffle slot 0 always holds the correct tile
+    ...vramPut(),
     ret(),
 
     // =================================================================

@@ -120,6 +120,8 @@ export const MEM = {
   SCENE_FLAGS: u16(0xc051), // Per-scene completion bitfield
   GAME_MODE: u16(0xc052), // 0=title, 1=dialogue, 2=kana, 3=transition
   TITLE_TIMER: u16(0xc053), // Title-screen animation timer (1 tick per frame)
+  KANA_BLANK_LO: u16(0xc054), // VRAM address of the blanked kana in the word (lo)
+  KANA_BLANK_HI: u16(0xc055), // VRAM address of the blanked kana in the word (hi)
 } as const satisfies Record<string, U16>;
 
 // Joypad bit flags (active-high after our read routine)

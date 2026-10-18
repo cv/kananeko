@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { CHAR_MAP, TILE_COUNT, buildTileData, requireTile, textToTiles } from '@game/font';
-import { buildKanaData, defineKanaQuestion } from '@game/kana';
+import { MAX_KANA_WORD_LENGTH, buildKanaData, defineKanaQuestion } from '@game/kana';
 import { packScene, SCENES } from '@game/scene';
 import { centerStartCol, tilemapAddr, tilePos } from '@game/tilemap';
 import { rgb } from '@game/video';
@@ -52,6 +52,13 @@ describe('defineKanaQuestion', () => {
 describe('buildKanaData', () => {
   it('terminates the question list with a zero length', () => {
     expect([...buildKanaData([])]).toEqual([0]);
+  });
+
+  it('rejects words too long for the word box', () => {
+    const word = 'あ'.repeat(MAX_KANA_WORD_LENGTH + 1);
+    expect(() =>
+      buildKanaData([{ word, blankIndex: 0, correct: 'あ', distractors: ['い', 'う', 'え'] }]),
+    ).toThrow(/too long/);
   });
 });
 
