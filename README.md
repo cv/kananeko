@@ -8,13 +8,13 @@ The whole thing is hand-assembled from TypeScript. No engine, no SDK — just ra
 
 ## 🗾 Locations
 
-| Scene | Name | Vibe |
-|-------|------|------|
-| えき | Station | Arriving somewhere new |
-| みち | Street | Wandering around town |
-| レストラン | Restaurant | Ordering food (poorly) |
-| コンビニ | Convenience store | Late-night snack run |
-| こうえん | Park | A quiet ending |
+| Scene      | Name              | Vibe                   |
+| ---------- | ----------------- | ---------------------- |
+| えき       | Station           | Arriving somewhere new |
+| みち       | Street            | Wandering around town  |
+| レストラン | Restaurant        | Ordering food (poorly) |
+| コンビニ   | Convenience store | Late-night snack run   |
+| こうえん   | Park              | A quiet ending         |
 
 ## 🎮 How it works
 

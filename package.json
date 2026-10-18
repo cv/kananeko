@@ -1,10 +1,17 @@
 {
-  "name": "jrpgen",
+  "name": "kananeko",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "private": true,
+  "description": "A tiny Game Boy Color ROM where a cat teaches you kana, assembled entirely from TypeScript.",
+  "license": "MIT",
+  "author": "Carlos Villela",
+  "type": "module",
+  "engines": {
+    "node": ">=25"
+  },
   "scripts": {
     "build": "tsx src/build.ts",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:slow": "vitest run --reporter=verbose --slowTestThreshold=1000",
     "test:coverage": "vitest run --coverage",
@@ -12,26 +19,20 @@
     "lint": "eslint --max-warnings 0 .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "hooks:install": "npx @j178/prek install -t pre-commit -t commit-msg"
+    "check": "npm run typecheck && npm run lint && npm run format:check && npm test",
+    "hooks:install": "prek install -t pre-commit -t commit-msg"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@j178/prek": "^0.3.8",
-    "@types/node": "^25.5.2",
-    "@vitest/coverage-v8": "^4.1.2",
-    "eslint": "^10.2.0",
-    "pngjs": "^7.0.0",
-    "prettier": "^3.8.1",
-    "tsx": "^4.21.0",
-    "typescript": "^6.0.2",
-    "typescript-eslint": "^8.58.0",
-    "vitest": "^4.1.2"
-  },
-  "dependencies": {
-    "serverboy": "^0.0.7"
+    "@j178/prek": "^0.5.5",
+    "@types/node": "^25.9.9",
+    "@vitest/coverage-v8": "^5.0.5",
+    "eslint": "^10.13.0",
+    "prettier": "^3.9.10",
+    "serverboy": "^0.0.7",
+    "tsx": "^4.23.15",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.71.2",
+    "vitest": "^5.0.5"
   }
 }

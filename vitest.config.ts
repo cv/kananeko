@@ -1,12 +1,9 @@
 import { defineConfig } from 'vitest/config';
-import path from 'path';
 
 export default defineConfig({
   resolve: {
-    alias: {
-      '@asm': path.resolve(__dirname, 'src/asm'),
-      '@game': path.resolve(__dirname, 'src/game'),
-    },
+    // Path aliases (@asm/*, @game/*) are read from tsconfig.json.
+    tsconfigPaths: true,
   },
   test: {
     testTimeout: 30000,

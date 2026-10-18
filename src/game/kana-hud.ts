@@ -59,10 +59,7 @@ export const DELTA_MINUS_5 = 3;
 export const DELTA_MINUS_100 = 4;
 
 export type DeltaType =
-  | typeof DELTA_PLUS_100
-  | typeof DELTA_PLUS_10
-  | typeof DELTA_MINUS_5
-  | typeof DELTA_MINUS_100;
+  typeof DELTA_PLUS_100 | typeof DELTA_PLUS_10 | typeof DELTA_MINUS_5 | typeof DELTA_MINUS_100;
 
 export type ScoreDelta = 5 | 10 | 100;
 

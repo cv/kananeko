@@ -3,7 +3,7 @@ import * as path from 'path';
 import { assemble } from './asm/assembler';
 import { buildProgram } from './game/main';
 
-const outDir = path.join(__dirname, '..', 'build');
+const outDir = path.join(import.meta.dirname, '..', 'build');
 fs.mkdirSync(outDir, { recursive: true });
 
 const program = buildProgram();

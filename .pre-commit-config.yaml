@@ -8,8 +8,7 @@ repos:
         name: prettier
         entry: bash -c '. "$NVM_DIR/nvm.sh" && node node_modules/.bin/prettier --check "$@"' --
         language: system
-        files: \.(ts|json|yaml|yml)$
-        exclude: (^|/)vitest\.config\.ts$
+        files: \.(ts|js|json|yaml|yml|md)$
 
       - id: eslint
         name: eslint

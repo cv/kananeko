@@ -6,8 +6,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-const THRESHOLD_FILE = path.join(__dirname, '..', '.coverage-threshold.json');
-const COVERAGE_SUMMARY = path.join(__dirname, '..', 'coverage', 'coverage-summary.json');
+const THRESHOLD_FILE = path.join(import.meta.dirname, '..', '.coverage-threshold.json');
+const COVERAGE_SUMMARY = path.join(import.meta.dirname, '..', 'coverage', 'coverage-summary.json');
 
 interface CoverageMetrics {
   lines: number;
