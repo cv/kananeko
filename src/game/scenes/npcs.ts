@@ -5,6 +5,7 @@
 
 import { type NpcLook } from '../npc-art';
 import { rgb } from '../video';
+import { INK } from '../palette';
 
 const SKIN = {
   light: rgb(0xf8, 0xd8, 0xb8),
@@ -12,7 +13,7 @@ const SKIN = {
   tan: rgb(0xc8, 0x90, 0x68),
 } as const;
 const HAIR = {
-  black: rgb(0x20, 0x18, 0x18),
+  black: INK, // dark hair doubles as the outline: the game's one ink
   brown: rgb(0x58, 0x30, 0x18),
   grey: rgb(0x70, 0x70, 0x78),
   blonde: rgb(0xa0, 0x78, 0x20),
