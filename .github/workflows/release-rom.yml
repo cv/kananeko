@@ -160,6 +160,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ steps.meta.outputs.tag }}
           RELEASE_TITLE: ${{ steps.meta.outputs.title }}
+          RELEASE_TARGET: ${{ steps.meta.outputs.commit_sha }}
         shell: bash
         run: |
           set -euo pipefail
@@ -173,8 +174,11 @@ jobs:
               --prerelease
             gh release upload "$RELEASE_TAG" "${assets[@]}" --clobber
           else
+            # --target: without it the tag lands on the branch tip, which is wrong
+            # for every commit but the last when one push carries several commits.
             gh release create "$RELEASE_TAG" \
               "${assets[@]}" \
+              --target "$RELEASE_TARGET" \
               --title "$RELEASE_TITLE" \
               --notes-file release-notes.md \
               --prerelease
