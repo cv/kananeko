@@ -301,6 +301,7 @@ export function buildDialogueEngine(): Op[] {
     // dlg_update — Called each frame. Dispatches based on dlg_state.
     // =================================================================
     label('dlg_update'),
+    call(ref('npc_update')), // idle bob of the speaker
     ld_a_nn(MEM.DLG_STATE),
     cp_n(u8(DialogueState.IDLE)),
     ret_cc('z'),
@@ -572,6 +573,7 @@ export function buildDialogueEngine(): Op[] {
     // Looks up the offset table, computes ROM pointer, calls dlg_open.
     // =================================================================
     label('dlg_open_node'),
+    call(ref('npc_select')), // show whoever speaks at this node
     ...loadPointer('hl', MEM.DLG_TREE_LO, MEM.DLG_TREE_HI),
     // HL = tree base. Skip node_count byte.
     inc_rr('hl'),

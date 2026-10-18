@@ -130,6 +130,10 @@ export const MEM = {
   FADE_TABLE_LO: u16(0xc056), // Palette set on screen (lo)
   FADE_TABLE_HI: u16(0xc057), // Palette set on screen (hi)
   IS_CGB: u16(0xc060), // 1 on a Game Boy Color (A = $11 at boot), else 0
+  NPC_TABLE_LO: u16(0xc061), // Current scene's NPC segment table (lo)
+  NPC_TABLE_HI: u16(0xc062), // Current scene's NPC segment table (hi)
+  NPC_CURRENT: u16(0xc063), // NPC on screen ($FF = none)
+  NPC_TIMER: u16(0xc064), // Frame counter for the NPC's idle bob
 } as const satisfies Record<string, U16>;
 
 // Joypad bit flags (active-high after our read routine)

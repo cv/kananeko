@@ -16,6 +16,7 @@ import { packScene, SCENES } from '@game/scene';
 import { centerStartCol, tilemapAddr, tilePos } from '@game/tilemap';
 import { bgTileAddr, encodeAttributeRuns, rgb } from '@game/video';
 import { HEARTS, PAL, buildPaletteSet, paletteOf, paletteOfCell } from '@game/color';
+import { MAX_CAST, packCast } from '@game/npc';
 import { ENDING_COLORS, GAME_OVER_COLORS, TITLE_COLORS } from '@game/scenes/colors';
 import {
   BACKDROP,
@@ -217,6 +218,50 @@ describe('encodeAttributeRuns', () => {
     expect([...encodeAttributeRuns([0, 0, 0, 2, 2, 5])]).toEqual([3, 0, 2, 2, 1, 5, 0]);
     expect([...encodeAttributeRuns(Array<number>(300).fill(1))]).toEqual([255, 1, 45, 1, 0]);
   });
+});
+
+describe('packCast', () => {
+  const look = SCENES[0].cast.npcs[0];
+  if (look === undefined) throw new Error('station has no cast');
+
+  it('packs 4 tiles and one palette per NPC, and an $FF-terminated segment table', () => {
+    const packed = packCast({
+      npcs: [look],
+      segments: [
+        { from: 0, npc: 0 },
+        { from: 5, npc: null },
+      ],
+    });
+    expect(packed.tiles.length).toBe(4 * 16);
+    expect(packed.palettes.length).toBe(8);
+    expect([...packed.table]).toEqual([0, 0, 5, 0xff, 0xff]);
+  });
+
+  it('rejects out-of-order segments, unknown NPCs, and oversized casts', () => {
+    expect(() =>
+      packCast({
+        npcs: [look],
+        segments: [
+          { from: 3, npc: 0 },
+          { from: 3, npc: 0 },
+        ],
+      }),
+    ).toThrow(/ascending/);
+    expect(() => packCast({ npcs: [look], segments: [{ from: 0, npc: 1 }] })).toThrow(/No NPC/);
+    expect(() =>
+      packCast({ npcs: Array<typeof look>(MAX_CAST + 1).fill(look), segments: [] }),
+    ).toThrow(/At most/);
+  });
+
+  it.each(SCENES.map((s) => [s.name, s.cast] as const))(
+    'starts %s with someone to talk to and covers every segment with a real node',
+    (_name, cast) => {
+      expect(cast.segments[0]).toEqual({ from: 0, npc: 0 });
+      for (const { npc } of cast.segments) {
+        if (npc !== null) expect(cast.npcs[npc]).toBeDefined();
+      }
+    },
+  );
 });
 
 describe('scene colors', () => {

@@ -35,6 +35,7 @@ import {
 import { type Op, type U16, ref, u8, u16 } from '../asm/types';
 import { buildCopyRows, drawBackdrop, loadSceneTiles } from './backdrop';
 import { buildSpriteData, buildSpriteInit, runDma } from './sprites';
+import { buildNpcRoutines, loadCast } from './npc';
 import { DIALOGUE_LAYOUT, buildDialogueEngine } from './dialogue';
 import { buildTileData, requireTile, requireTiles, textToTiles } from './font';
 import { CAT_TILES } from './font-data';
@@ -121,6 +122,11 @@ const TITLE_FADE = 'title_fade';
 
 function resultFadeLabel(screen: { readonly name: string }): string {
   return `${screen.name}_fade`;
+}
+
+export function castLabels(sceneIndex: number): { tiles: string; palettes: string; table: string } {
+  const prefix = `scene${String(sceneIndex)}_npc`;
+  return { tiles: `${prefix}_tiles`, palettes: `${prefix}_palettes`, table: `${prefix}_table` };
 }
 
 export function sceneColorsLabel(sceneIndex: number): string {
@@ -448,6 +454,7 @@ export function buildProgram(): Op[] {
           packed.sceneTileData.length,
         ),
         ...drawBackdrop(sceneBackdropLabel(i)),
+        ...loadCast(`scene${String(i)}_cast`, castLabels(i), packed.cast),
         ...cgbAttributes(`scene${String(i)}_colors`, [
           ld_rr_nn('hl', u16(tilemapAddr(BACKDROP.top, 0))),
           ld_rr_nn('de', ref(sceneColorsLabel(i))),
@@ -493,6 +500,7 @@ export function buildProgram(): Op[] {
     call(ref('dlg_open_node')),
     jr(ref('scene_dlg_loop')),
     label('scene_dlg_done'),
+    call(ref('npc_hide')),
 
     // ==== Kana round ====
     ...sceneSwitch(
@@ -541,6 +549,7 @@ export function buildProgram(): Op[] {
     ...buildFadeRoutines(),
     ...buildClearScreen(),
     ...buildAttributeRuns(),
+    ...buildNpcRoutines(),
 
     // ==== Data ====
     ...buildSpriteData(),
@@ -570,6 +579,12 @@ export function buildProgram(): Op[] {
       db(packed.paletteSet),
       label(sceneColorsLabel(i)),
       db(packed.backdropAttributes),
+      label(castLabels(i).tiles),
+      db(packed.cast.tiles),
+      label(castLabels(i).palettes),
+      db(packed.cast.palettes),
+      label(castLabels(i).table),
+      db(packed.cast.table),
     ]),
     ...[ENDING, GAME_OVER].flatMap((screen) => [
       label(resultFadeLabel(screen)),

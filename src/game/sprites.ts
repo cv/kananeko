@@ -31,7 +31,7 @@ const DMA_HRAM = u16(0xff80);
 export const OAM_Y_OFFSET = 16;
 export const OAM_X_OFFSET = 8;
 
-export const SPRITE_SLOT = { cursor: 0 } as const;
+export const SPRITE_SLOT = { cursor: 0, npc: 1 } as const;
 
 /** Sprite tile indices (in the sprite-only $8000-$87FF block) */
 export const SPRITE_TILES = { cursor: 0 } as const;

@@ -11,6 +11,15 @@ import { textToTiles } from './font';
 import { SCENE_ICON_TILES } from './font-data';
 import { type Pair, type Quint } from './fixed';
 import { type ColorScheme, buildPaletteSet, paletteOfCell } from './color';
+import { type PackedCast, packCast } from './npc';
+import {
+  CONBINI_CAST,
+  PARK_CAST,
+  RESTAURANT_CAST,
+  STATION_CAST,
+  STREET_CAST,
+  type SceneCast,
+} from './scenes/npcs';
 import { encodeAttributeRuns } from './video';
 import { STATION_DIALOGUE } from './scenes/station';
 import { STREET_DIALOGUE } from './scenes/street';
@@ -46,6 +55,8 @@ export interface Scene {
   readonly kanaQuestions: KanaRound;
   /** GBC colors: palettes and which backdrop cells use which */
   readonly colors: ColorScheme;
+  /** Conversation partners shown as sprites */
+  readonly cast: SceneCast;
   /** Illustration above the dialogue box (see backdrop.ts) */
   readonly backdrop: Backdrop;
 }
@@ -66,6 +77,7 @@ export const SCENES = defineScenes([
   {
     name: 'えき',
     icon: SCENE_ICON_TILES.TRAIN,
+    cast: STATION_CAST,
     backdrop: STATION_BACKDROP,
     colors: STATION_COLORS,
     dialogue: STATION_DIALOGUE,
@@ -80,6 +92,7 @@ export const SCENES = defineScenes([
   {
     name: 'みち',
     icon: SCENE_ICON_TILES.HOUSE,
+    cast: STREET_CAST,
     backdrop: STREET_BACKDROP,
     colors: STREET_COLORS,
     dialogue: STREET_DIALOGUE,
@@ -94,6 +107,7 @@ export const SCENES = defineScenes([
   {
     name: 'レストラン',
     icon: SCENE_ICON_TILES.BOWL,
+    cast: RESTAURANT_CAST,
     backdrop: RESTAURANT_BACKDROP,
     colors: RESTAURANT_COLORS,
     dialogue: RESTAURANT_DIALOGUE,
@@ -108,6 +122,7 @@ export const SCENES = defineScenes([
   {
     name: 'コンビニ',
     icon: SCENE_ICON_TILES.SHOP,
+    cast: CONBINI_CAST,
     backdrop: CONBINI_BACKDROP,
     colors: CONBINI_COLORS,
     dialogue: CONBINI_DIALOGUE,
@@ -122,6 +137,7 @@ export const SCENES = defineScenes([
   {
     name: 'こうえん',
     icon: SCENE_ICON_TILES.TREE,
+    cast: PARK_CAST,
     backdrop: PARK_BACKDROP,
     colors: PARK_COLORS,
     dialogue: PARK_DIALOGUE,
@@ -147,6 +163,8 @@ export interface PackedScene {
   readonly backdropData: Uint8Array;
   /** Pixel data of the scene's own BG tiles (see SCENE_TILE_BASE) */
   readonly sceneTileData: Uint8Array;
+  /** NPC sprites, palettes, and who speaks when */
+  readonly cast: PackedCast;
   /** GBC palette set (see buildPaletteSet) */
   readonly paletteSet: Uint8Array;
   /** Run-length encoded backdrop palettes (see encodeAttributeRuns) */
@@ -161,6 +179,7 @@ export function packScene(scene: Scene): PackedScene {
     kanaData: buildKanaData(scene.kanaQuestions),
     backdropData: art.backdrop,
     sceneTileData: art.tileData,
+    cast: packCast(scene.cast),
     paletteSet: buildPaletteSet(scene.colors),
     backdropAttributes: encodeAttributeRuns(
       scene.backdrop.flatMap((row) =>
