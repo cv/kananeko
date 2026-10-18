@@ -183,16 +183,16 @@ export const UI_ICONS: Record<string, Glyph> = {
     '##......',
     '........',
   ],
-  // Paw print (the choice cursor sprite)
+  // Paw print (the choice cursor sprite): three toe beans fanned over a round pad
   '\uE037': [
-    '.++..++.',
-    '.++..++.',
-    '+......+',
-    '+.++++.+',
+    '...++...',
+    '++.++.++',
+    '++....++',
+    '........',
+    '..++++..',
     '.++++++.',
     '.++++++.',
     '..++++..',
-    '........',
   ],
   // Up (sits above the UP option)
   '\uE030': [
