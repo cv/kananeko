@@ -6,6 +6,7 @@ import { checkpoint, runnerAt } from '../helpers/checkpoints';
 import { GameRunner } from '../helpers/game-runner';
 import { BACKDROP } from '@game/backdrop';
 import { DIALOGUE_LAYOUT } from '@game/dialogue';
+import { UI_TILES } from '@game/font-data';
 import { DialogueState } from '@game/state';
 import {
   inkBounds,
@@ -131,7 +132,9 @@ describe('Given a scene has loaded', () => {
       const runner = waitForPicture(runnerAt(checkpoint.sceneStart(i)).frames(4));
       const length = Array.from(name).length;
       const col = DIALOGUE_LAYOUT.nameCol(length);
-      expect(readText(runner, DIALOGUE_LAYOUT.boxTop, col, length + 2)).toBe(` ${name} `);
+      expect(readText(runner, DIALOGUE_LAYOUT.boxTop, col, length + 2)).toBe(
+        `${UI_TILES.TAG_LEFT}${name}${UI_TILES.TAG_RIGHT}`,
+      );
     },
   );
 

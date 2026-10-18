@@ -21,7 +21,9 @@ import {
 import { type Op, type U16, ref, u8, u16 } from '../asm/types';
 import { hi } from '../asm/util';
 import { encodeGlyph, glyphOf } from './font';
-import { type Palette, rgb } from './video';
+import { type Palette } from './video';
+import { HUES, INK, PAPER } from './palette';
+import { UI_TILES } from './font-data';
 
 /** Shadow OAM: 40 sprites x 4 bytes, page-aligned for DMA */
 export const SHADOW_OAM = u16(0xc100);
@@ -37,7 +39,7 @@ export const SPRITE_SLOT = { cursor: 0, npc: 1 } as const;
 export const SPRITE_TILES = { cursor: 0 } as const;
 
 /** Glyphs copied into sprite tile memory at boot, in SPRITE_TILES order */
-const SPRITE_GLYPHS = ['▶'] as const;
+const SPRITE_GLYPHS = [UI_TILES.PAW] as const;
 
 const FIELD_OFFSET = { y: 0, x: 1, tile: 2, attr: 3 } as const;
 
@@ -60,13 +62,8 @@ const DMA_ROUTINE = [
   0xc9, //                ret
 ] as const;
 
-/** Sprite palette: transparent, light, mid, ink */
-const OBJ_PALETTE: Palette = [
-  rgb(0xff, 0xff, 0xff),
-  rgb(0xc0, 0xc0, 0xc0),
-  rgb(0x60, 0x60, 0x60),
-  rgb(0x18, 0x18, 0x20),
-];
+/** Sprite palette 0 (the paw cursor): transparent, then sakura and ink */
+const OBJ_PALETTE: Palette = [PAPER, ...HUES.sakura, INK];
 
 /** Clear the shadow OAM, install the DMA routine, and set sprite palettes. */
 export function buildSpriteInit(): Op[] {

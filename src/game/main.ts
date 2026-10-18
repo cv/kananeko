@@ -57,7 +57,7 @@ import { buildNpcRoutines, loadCast } from './npc';
 import { buildAnimRoutines, loadAnimation } from './anim';
 import { DIALOGUE_LAYOUT, buildDialogueEngine } from './dialogue';
 import { buildTileData, requireTile, requireTiles, textToTiles } from './font';
-import { CAT_TILES } from './font-data';
+import { CAT_TILES, UI_TILES } from './font-data';
 import { buildReadJoypad } from './joypad';
 import { buildKanaData, buildKanaEngine } from './kana';
 import {
@@ -100,7 +100,7 @@ export const ROM_HEADER: ROMHeader = {
 // ---------------------------------------------------------------------------
 
 const TITLE = 'カナネコ';
-const SUBTITLE = 'はじめよう!';
+const SUBTITLE = 'ねこと にほんごの たび';
 
 // Cat portrait tile rows (4x3 grid)
 const CAT_ROWS = [
@@ -109,13 +109,17 @@ const CAT_ROWS = [
   requireTiles(CAT_TILES.ROW2),
 ] as const;
 const CAT_SAD_ROWS = CAT_TILES.SAD_ROWS.map((row) => row.map((ch) => requireTile(ch)));
-const START_BOX_TOP = textToTiles('┌─────────────┐');
-const START_BOX_ON = textToTiles('│ PRESS START │');
-const START_BOX_OFF = textToTiles('│             │');
-const START_BOX_BOTTOM = textToTiles('└─────────────┘');
+const START_BOX_TOP = textToTiles('┌────────────┐');
+const START_BOX_ON = textToTiles('│ スタートを おしてね ▕');
+const START_BOX_OFF = textToTiles('│            ▕');
+const START_BOX_BOTTOM = textToTiles('└▁▁▁▁▁▁▁▁▁▁▁▁┘');
 const START_PROMPT_ROW = 13;
 /** TITLE_TIMER bit that toggles the START prompt (every 32 frames) */
 const BLINK_BIT = 0x20;
+
+/** Caps of the location name tag on the dialogue box's top edge: ─( えき )─ */
+const NAME_TAG_LEFT = requireTile(UI_TILES.TAG_LEFT);
+const NAME_TAG_RIGHT = requireTile(UI_TILES.TAG_RIGHT);
 
 // Ending screen content
 const ENDING_TITLE = 'おめでとう!';
@@ -337,7 +341,7 @@ const ENDING: ResultScreen = {
 const GAME_OVER: ResultScreen = {
   name: 'game_over',
   cat: CAT_SAD_ROWS,
-  title: 'GAME OVER',
+  title: 'ゲームオーバー',
   colors: GAME_OVER_COLORS,
   blink: false, // the sad portrait keeps its own eyes
 };
@@ -676,7 +680,10 @@ export function buildProgram(): Op[] {
           'hl',
           u16(tilemapAddr(DIALOGUE_LAYOUT.boxTop, DIALOGUE_LAYOUT.nameCol(packed.nameRow.length))),
         ),
-        ...[0, ...packed.nameRow, 0].flatMap((tile) => [ld_r_n('a', u8(tile)), ldi_hl_a()]),
+        ...[NAME_TAG_LEFT, ...packed.nameRow, NAME_TAG_RIGHT].flatMap((tile) => [
+          ld_r_n('a', u8(tile)),
+          ldi_hl_a(),
+        ]),
       ],
       packedScenes,
     ),

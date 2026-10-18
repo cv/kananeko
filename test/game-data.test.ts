@@ -32,7 +32,11 @@ import { BACKDROP_GLYPHS } from '@game/glyphs-backdrop';
 describe('font', () => {
   it('maps space to the blank tile 0 and every glyph to a later tile', () => {
     expect(CHAR_MAP[' ']).toBe(0);
-    expect(textToTiles('Aあア┌▶').every((tile) => tile > 0)).toBe(true);
+    expect(textToTiles('1あア┌▕').every((tile) => tile > 0)).toBe(true);
+  });
+
+  it('prints no latin letters: every label is Japanese', () => {
+    expect(Object.keys(CHAR_MAP).filter((ch) => /[A-Za-z]/u.test(ch))).toEqual([]);
   });
 
   it('keeps tile indices clear of the 0xFE/0xFF data sentinels', () => {
@@ -72,7 +76,7 @@ describe('font', () => {
   });
 
   it('looks up glyph art by character', () => {
-    expect(glyphOf('▶')).toHaveLength(8);
+    expect(glyphOf('─')).toHaveLength(8);
     expect(() => glyphOf('漢')).toThrow(/Character not in font/);
   });
 

@@ -256,20 +256,20 @@ function buildRoundFrame(): Op[] {
     ld_r_n('a', u8(tile)),
     ldi_hl_a(),
   ];
-  const horizontal = (row: number, l: string, r: string): Op[] => [
+  const horizontal = (row: number, l: string, edge: string, r: string): Op[] => [
     ld_rr_nn('hl', u16(tilemapAddr(row, left))),
     ...[
       requireTile(l),
-      ...Array<number>(innerWidth).fill(requireTile('─')),
+      ...Array<number>(innerWidth).fill(requireTile(edge)),
       requireTile(r),
     ].flatMap((tile) => [ld_r_n('a', u8(tile)), ldi_hl_a()]),
   ];
   return [
     ...writeCenteredRow(PROMPT_ROW, textToTiles(KANA_MESSAGES.prompt)),
-    ...horizontal(top, '┌', '┐'),
+    ...horizontal(top, '┌', '─', '┐'),
     ...tileAt(tilePos(top + 1, left), requireTile('│')),
-    ...tileAt(tilePos(top + 1, right), requireTile('│')),
-    ...horizontal(top + 2, '└', '┘'),
+    ...tileAt(tilePos(top + 1, right), requireTile('▕')),
+    ...horizontal(top + 2, '└', '▁', '┘'),
     ...ARROW_POSITIONS.flatMap((pos, dir) => tileAt(pos, at(ARROW_TILES, dir))),
     ...tileAt(DPAD_CENTER, CAT_FACES.neutral),
   ];

@@ -18,7 +18,7 @@ describe('Given the game over screen', () => {
     const runner = waitForPicture(
       loseAllKanaLives(runnerAt(checkpoint.kanaStart(3)).setLives(1)).frames(SETTLE_FRAMES),
     );
-    expect(row(runner, 6)).toBe('GAME OVER');
+    expect(row(runner, 6)).toBe('ゲームオーバー');
     expect(row(runner, 10)).toBe(`とくてん ${String(runner.kanaScore).padStart(5, '0')}`);
     expect(readText(runner, 3, 8, 4)).toBe(CAT_TILES.SAD_ROWS[1].join(''));
     const stamps = SCENES.map((scene) => scene.icon.join(''));

@@ -20,11 +20,11 @@ import { KATAKANA } from './glyphs-katakana';
 import { CAT, CAT_BLINK_CHARS, CAT_SAD_CHARS, SCENE_ICONS, UI_ICONS } from './glyphs-icons';
 
 /**
- * Latin letters the game actually prints (PRESS START, GAME OVER). Every letter is
+ * Latin letters the game prints: none, all labels are Japanese. Every letter is
  * defined in glyphs-latin.ts, but only these take up tiles and ROM; add a letter
  * here if new UI text needs it (the build fails with "Character not in font").
  */
-const LATIN_IN_ROM = 'AEGMOPRSTV';
+const LATIN_IN_ROM = '';
 
 function pick(glyphs: Record<string, Glyph>, chars: string): Record<string, Glyph> {
   return Object.fromEntries(Object.entries(glyphs).filter(([ch]) => chars.includes(ch)));
@@ -65,6 +65,11 @@ export const CAT_TILES = {
 export const UI_TILES = {
   /** D-pad arrows in direction-index order: UP, DOWN, LEFT, RIGHT */
   ARROWS: ['\uE030', '\uE031', '\uE032', '\uE033'],
+  /** Name tag caps on a box's top edge */
+  TAG_LEFT: '\uE035',
+  TAG_RIGHT: '\uE036',
+  /** The choice cursor (a sprite) */
+  PAW: '\uE037',
 } as const;
 
 // Scene icon tile pairs [left, right]

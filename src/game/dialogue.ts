@@ -112,8 +112,11 @@ const BORDER_TL = requireTile('┌');
 const BORDER_TR = requireTile('┐');
 const BORDER_BL = requireTile('└');
 const BORDER_BR = requireTile('┘');
-const BORDER_H = requireTile('─');
-const BORDER_V = requireTile('│');
+const BORDER_TOP = requireTile('─');
+const BORDER_LEFT = requireTile('│');
+const BORDER_RIGHT = requireTile('▕'); // with the shadow
+const BORDER_BOTTOM = requireTile('▁'); // with the shadow
+
 /** Cursor sprite position for the first choice row (OAM coordinates) */
 const CURSOR_Y = CHOICE_START_ROW * 8 + OAM_Y_OFFSET;
 const CURSOR_X = CHOICE_CURSOR_COL * 8 + OAM_X_OFFSET;
@@ -227,9 +230,9 @@ function buildDrawTextbox(): Op[] {
   const middleRows = Array.from({ length: BOX_ROWS - 2 }, (_, i) => BOX_TOP_ROW + 1 + i);
   return [
     label('dlg_draw_box'),
-    ...buildTextboxRow(BOX_TOP_ROW, BORDER_TL, BORDER_H, BORDER_TR),
-    ...middleRows.flatMap((row) => buildTextboxRow(row, BORDER_V, 'clear', BORDER_V)),
-    ...buildTextboxRow(bottomRow, BORDER_BL, BORDER_H, BORDER_BR),
+    ...buildTextboxRow(BOX_TOP_ROW, BORDER_TL, BORDER_TOP, BORDER_TR),
+    ...middleRows.flatMap((row) => buildTextboxRow(row, BORDER_LEFT, 'clear', BORDER_RIGHT)),
+    ...buildTextboxRow(bottomRow, BORDER_BL, BORDER_BOTTOM, BORDER_BR),
     ret(),
   ];
 }
