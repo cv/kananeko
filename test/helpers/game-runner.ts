@@ -134,6 +134,25 @@ export class GameRunner {
     return this;
   }
 
+  /** Hold B for `frames` frames */
+  holdB(frames: number): this {
+    for (let i = 0; i < frames; i++) {
+      this.gb.pressKey(Gameboy.KEYMAP.B);
+      this.gb.doFrame();
+    }
+    return this;
+  }
+
+  /** Hold B (fast-forward) until `done`, or for at most `frames` frames; returns the frames held */
+  holdBUntil(done: () => boolean, frames: number): number {
+    for (let i = 0; i < frames; i++) {
+      if (done()) return i;
+      this.gb.pressKey(Gameboy.KEYMAP.B);
+      this.gb.doFrame();
+    }
+    throw new Error(`Still not done after holding B for ${String(frames)} frames`);
+  }
+
   /** Press a key for one frame */
   private pressKey(key: number): this {
     this.gb.pressKey(key);

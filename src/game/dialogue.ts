@@ -87,6 +87,8 @@ const CHOICE_START_ROW = 12;
 /** Choices sit on every other row so they don't run together */
 const CHOICE_ROW_STEP = 2;
 const REVEAL_DELAY = 3; // frames between each character reveal
+/** Characters revealed each frame while B is held (fast-forward) */
+export const FAST_REVEAL_CHARS = 3;
 
 const TEXT_START = tilePos(TEXT_ROW_1, 2);
 const CHOICE_TEXT_POSITIONS: Triple<TilePosition> = [
@@ -385,13 +387,26 @@ export function buildDialogueEngine(): Op[] {
     jp(ref('dlg_do_choose')),
 
     // =================================================================
-    // dlg_do_print — Reveal one character per REVEAL_DELAY frames
+    // dlg_do_print — Reveal one character per REVEAL_DELAY frames, or
+    // FAST_REVEAL_CHARS every frame while B is held
     // =================================================================
     label('dlg_do_print'),
+    ld_a_nn(MEM.JOYPAD_CUR),
+    and_n(u8(JOY.B)),
+    jr_cc('z', ref('dlg_print_slow')),
+    ...Array.from({ length: FAST_REVEAL_CHARS - 1 }, () => [
+      call(ref('dlg_print_char')),
+      ld_a_nn(MEM.DLG_STATE),
+      cp_n(u8(DialogueState.PRINTING)),
+      ret_cc('nz'), // the text ended
+    ]).flat(),
+    jr(ref('dlg_print_char')),
 
+    label('dlg_print_slow'),
     ...countDownOrReturn(MEM.DLG_DELAY),
     ...storeByte(MEM.DLG_DELAY, REVEAL_DELAY),
 
+    label('dlg_print_char'),
     // Read the next tile (expanding the compression) and advance the string pointer
     call(ref('text_next')),
 
