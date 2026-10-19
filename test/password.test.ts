@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { MEM } from '@asm/hardware';
 import { call, ld_nn_a } from '@asm/ops';
-import { ref, u16 } from '@asm/types';
+import { u16 } from '@asm/types';
 import { storeByte } from '@asm/macros';
 import { CHAR_MAP } from '@game/font';
 import { MAX_SCORE } from '@game/kana-hud';
@@ -20,6 +20,7 @@ import { SCENES } from '@game/scene';
 import { MAX_LIVES } from '@game/state';
 import { buildVramPut } from '@game/video';
 import { SCRATCH, runProgram } from './helpers/run-program';
+import { PASS_ENCODE, PASS_DECODE, PASS_APPLY } from '@game/labels';
 
 const SCENE_COUNT = SCENES.length;
 const SCORES = [0, 5, 255, 256, 1234, 12345, MAX_SCORE];
@@ -114,7 +115,7 @@ function gameEncode({ scene, lives, score }: Progress): string {
       ...storeByte(MEM.KANA_LIVES, lives),
       ...storeByte(MEM.KANA_SCORE_LO, score & 0xff),
       ...storeByte(MEM.KANA_SCORE_HI, score >> 8),
-      call(ref('pass_encode')),
+      call(PASS_ENCODE),
     ],
     ROUTINES,
   );
@@ -129,9 +130,9 @@ function gameDecode(password: string): { valid: boolean; memory: Uint8Array } {
       ...Array.from(password).flatMap((kana, i) =>
         storeByte(u16(MEM.PASS_CHARS + i), PASSWORD_ALPHABET.indexOf(kana)),
       ),
-      call(ref('pass_decode')),
+      call(PASS_DECODE),
       ld_nn_a(u16(SCRATCH)),
-      call(ref('pass_apply')),
+      call(PASS_APPLY),
     ],
     ROUTINES,
   );

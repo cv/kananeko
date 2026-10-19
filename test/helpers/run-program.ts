@@ -7,7 +7,10 @@ import Gameboy from 'serverboy';
 import { assemble } from '@asm/assembler';
 import { di, jr, label } from '@asm/ops';
 import { storeByte } from '@asm/macros';
-import { type Op, ref, u16 } from '@asm/types';
+import { type Op, u16, Label } from '@asm/types';
+
+// Labels placed in this module
+const __HALT = new Label('__halt');
 
 /** WRAM scratch area tests can use freely ($C100-$CEFF) */
 export const SCRATCH = 0xc100;
@@ -18,14 +21,7 @@ const MAX_FRAMES = 600;
 /** Assemble `ops`, run until they finish, and return the address space. */
 export function runProgram(ops: readonly Op[], data: readonly Op[] = []): Uint8Array {
   const { rom } = assemble(
-    [
-      di(),
-      ...ops,
-      ...storeByte(DONE_FLAG, DONE_VALUE),
-      label('__halt'),
-      jr(ref('__halt')),
-      ...data,
-    ],
+    [di(), ...ops, ...storeByte(DONE_FLAG, DONE_VALUE), label(__HALT), jr(__HALT), ...data],
     { title: 'TEST' },
   );
 

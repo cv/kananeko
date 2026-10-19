@@ -10,11 +10,12 @@ import {
   sceneTilesLabel,
 } from '@game/main';
 import { SCENES, buildSceneData } from '@game/scene';
+import type { Label } from '@asm/types';
 import { rom, symbols } from './helpers/game-runner';
 
-function bytesAt(label: string, length: number): Uint8Array {
-  const addr = symbols.get(label);
-  if (addr === undefined) throw new Error(`Missing label ${label}`);
+function bytesAt(label: string | Label, length: number): Uint8Array {
+  const addr = symbols.get(String(label));
+  if (addr === undefined) throw new Error(`Missing label ${String(label)}`);
   return rom.slice(addr, addr + length);
 }
 

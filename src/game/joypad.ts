@@ -28,10 +28,13 @@ import {
   ret,
 } from '../asm/ops';
 import { HW, MEM } from '../asm/hardware';
+import { JOY_READ } from './labels';
+
+// Labels placed in this module
 
 export function buildReadJoypad(): Op[] {
   return [
-    label('joy_read'),
+    label(JOY_READ),
 
     // Save previous state
     ld_a_nn(MEM.JOYPAD_CUR),

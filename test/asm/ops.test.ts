@@ -2,12 +2,16 @@
 
 import { describe, expect, it } from 'vitest';
 import * as op from '@asm/ops';
-import { type Op, ioReg, ref, s8, u8, u16 } from '@asm/types';
+import { type Op, ioReg, s8, u8, u16, Label } from '@asm/types';
 import { hi, lo } from '@asm/util';
+
+// Labels placed in this module
+const HERE = new Label('here');
+const X = new Label('x');
 
 function bytes(o: Op): number[] {
   if (o.kind !== 'inst') throw new Error(`expected an instruction, got ${o.kind}`);
-  return o.bytes;
+  return [...o.bytes];
 }
 
 const ENCODINGS: [string, Op, number[]][] = [
@@ -106,36 +110,37 @@ describe('opcode encoding', () => {
 
 describe('label references', () => {
   it.each([
-    ['JR', op.jr(ref('x')), 0x18],
-    ['JR NZ', op.jr_cc('nz', ref('x')), 0x20],
-    ['JR Z', op.jr_cc('z', ref('x')), 0x28],
-    ['JR NC', op.jr_cc('nc', ref('x')), 0x30],
-    ['JR C', op.jr_cc('c', ref('x')), 0x38],
+    ['JR', op.jr(X), 0x18],
+    ['JR NZ', op.jr_cc('nz', X), 0x20],
+    ['JR Z', op.jr_cc('z', X), 0x28],
+    ['JR NC', op.jr_cc('nc', X), 0x30],
+    ['JR C', op.jr_cc('c', X), 0x38],
   ])('%s emits a rel8 placeholder', (_m, instruction, opcode) => {
     expect(instruction).toEqual({
       kind: 'inst',
       bytes: [opcode, 0x00],
-      refs: [{ offset: 1, label: 'x', type: 'rel8' }],
+      refs: [{ type: 'rel8', offset: 1, target: X }],
     });
   });
 
   it.each([
-    ['JP', op.jp(ref('x')), 0xc3],
-    ['JP Z', op.jp_cc('z', ref('x')), 0xca],
-    ['CALL', op.call(ref('x')), 0xcd],
-    ['LD HL', op.ld_rr_nn('hl', ref('x')), 0x21],
+    ['JP', op.jp(X), 0xc3],
+    ['JP Z', op.jp_cc('z', X), 0xca],
+    ['CALL', op.call(X), 0xcd],
+    ['LD HL', op.ld_rr_nn('hl', X), 0x21],
   ])('%s emits an imm16 placeholder', (_m, instruction, opcode) => {
     expect(instruction).toEqual({
       kind: 'inst',
       bytes: [opcode, 0x00, 0x00],
-      refs: [{ offset: 1, label: 'x', type: 'imm16' }],
+      refs: [{ type: 'imm16', offset: 1, target: X }],
     });
   });
 });
 
 describe('pseudo-ops', () => {
   it('emits labels, origins, and raw data', () => {
-    expect(op.label('here')).toEqual({ kind: 'label', name: 'here' });
+    expect(op.label(HERE)).toEqual({ kind: 'label', label: HERE });
+    expect(op.pool()).toEqual({ kind: 'pool' });
     expect(op.org(u16(0x4000))).toEqual({ kind: 'org', address: 0x4000 });
     expect(op.db([1, 2, 3])).toEqual({ kind: 'data', bytes: new Uint8Array([1, 2, 3]) });
   });

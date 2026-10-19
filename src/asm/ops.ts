@@ -9,8 +9,9 @@ import {
   type R16StackName,
   CC,
   type CCName,
-  type LabelRef,
-  isRef,
+  Label,
+  Pooled,
+  type Target,
   type U8,
   type U16,
   type IoRegOffset,
@@ -21,32 +22,41 @@ import { hi, lo } from './util';
 // Helpers
 // ---------------------------------------------------------------------------
 
-function inst(bytes: number[], refs?: OpRef[]): Op {
+function inst(bytes: readonly number[], refs?: readonly OpRef[]): Op {
   return refs !== undefined ? { kind: 'inst', bytes, refs } : { kind: 'inst', bytes };
 }
 
-/** Opcode followed by a 16-bit little-endian immediate or a label to resolve */
-function instImm16(opcode: number, value: U16 | LabelRef): Op {
-  if (isRef(value)) {
-    return inst([opcode, 0x00, 0x00], [{ offset: 1, label: value.name, type: 'imm16' }]);
+function isTarget(value: U16 | Target): value is Target {
+  return value instanceof Label || value instanceof Pooled;
+}
+
+/** Opcode followed by a 16-bit little-endian immediate, label or pooled data */
+function instImm16(opcode: number, value: U16 | Target): Op {
+  if (isTarget(value)) {
+    return inst([opcode, 0x00, 0x00], [{ type: 'imm16', offset: 1, target: value }]);
   }
   return inst([opcode, lo(value), hi(value)]);
 }
 
 /** A 16-bit data word (little-endian), e.g. a label's address in a pointer table */
-export function dw(value: U16 | LabelRef): Op {
-  if (isRef(value)) return inst([0x00, 0x00], [{ offset: 0, label: value.name, type: 'imm16' }]);
+export function dw(value: U16 | Target): Op {
+  if (isTarget(value)) return inst([0x00, 0x00], [{ type: 'imm16', offset: 0, target: value }]);
   return inst([lo(value), hi(value)]);
 }
 
 /** Opcode followed by a signed 8-bit offset to a label */
-function instRel8(opcode: number, target: LabelRef): Op {
-  return inst([opcode, 0x00], [{ offset: 1, label: target.name, type: 'rel8' }]);
+function instRel8(opcode: number, target: Label): Op {
+  return inst([opcode, 0x00], [{ type: 'rel8', offset: 1, target }]);
 }
 
-/** Insert a named label into the program */
-export function label(name: string): Op {
-  return { kind: 'label', name };
+/** Place a label at this point in the program */
+export function label(l: Label): Op {
+  return { kind: 'label', label: l };
+}
+
+/** Where the assembler stores all Pooled data the program refers to */
+export function pool(): Op {
+  return { kind: 'pool' };
 }
 
 /** Set the assembler origin address */
@@ -132,7 +142,7 @@ export function ldd_hl_a(): Op {
 // ---------------------------------------------------------------------------
 
 /** LD r16, nn — immediate or label */
-export function ld_rr_nn(dst: R16Name, value: U16 | LabelRef): Op {
+export function ld_rr_nn(dst: R16Name, value: U16 | Target): Op {
   return instImm16(0x01 + R16[dst] * 16, value);
 }
 
@@ -260,22 +270,22 @@ export function dec_rr(rr: R16Name): Op {
 // ---------------------------------------------------------------------------
 
 /** JR offset (unconditional relative jump to label) */
-export function jr(target: LabelRef): Op {
+export function jr(target: Label): Op {
   return instRel8(0x18, target);
 }
 
 /** JR cc, offset (conditional relative jump to label) */
-export function jr_cc(cc: CCName, target: LabelRef): Op {
+export function jr_cc(cc: CCName, target: Label): Op {
   return instRel8(0x20 + CC[cc] * 8, target);
 }
 
 /** JP nn (unconditional absolute jump) */
-export function jp(target: U16 | LabelRef): Op {
+export function jp(target: U16 | Label): Op {
   return instImm16(0xc3, target);
 }
 
 /** JP cc, nn */
-export function jp_cc(cc: CCName, target: U16 | LabelRef): Op {
+export function jp_cc(cc: CCName, target: U16 | Label): Op {
   return instImm16(0xc2 + CC[cc] * 8, target);
 }
 
@@ -284,7 +294,7 @@ export function jp_cc(cc: CCName, target: U16 | LabelRef): Op {
 // ---------------------------------------------------------------------------
 
 /** CALL nn */
-export function call(target: U16 | LabelRef): Op {
+export function call(target: U16 | Label): Op {
   return instImm16(0xcd, target);
 }
 

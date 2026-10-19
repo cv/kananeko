@@ -42,7 +42,7 @@ import {
   and_n,
   xor_r,
 } from '../asm/ops';
-import { type Op, ref, u8, u16 } from '../asm/types';
+import { type Op, u8, u16, Label } from '../asm/types';
 import { hi, lo } from '../asm/util';
 import { sliceArt } from './art';
 import { CAT_FACES, type CatFace, catArt } from './cat-art';
@@ -50,6 +50,20 @@ import { encodeGlyph } from './font';
 import { HUES, INK, PAPER } from './palette';
 import { OAM_X_OFFSET, OAM_Y_OFFSET, SPRITE_SLOT, oamField } from './sprites';
 import type { Palette } from './video';
+import { CAT_REST, CAT_REACT, CAT_TICK } from './labels';
+
+// Labels placed in this module
+const CAT_TILES = new Label('cat_tiles');
+const CAT_PLACE = new Label('cat_place');
+const CAT_PLACE_ROW = new Label('cat_place_row');
+const CAT_PLACE_COL = new Label('cat_place_col');
+const CAT_HIDE = new Label('cat_hide');
+const CAT_HIDE_SLOT = new Label('cat_hide_slot');
+const CAT_SET_FACE = new Label('cat_set_face');
+const CAT_SHOW_FACE = new Label('cat_show_face');
+const CAT_FACE_TILE = new Label('cat_face_tile');
+const CAT_TICK_REST = new Label('cat_tick_rest');
+const CAT_TICK_BLINK = new Label('cat_tick_blink');
 
 export { CAT_FACES, type CatFace };
 
@@ -97,12 +111,12 @@ export function faceTile(face: CatFace): number {
 
 /** Call cat_place for a spot */
 export function placeCat(spot: { readonly x: number; readonly y: number }): Op[] {
-  return [ld_r_n('b', u8(spot.x)), ld_r_n('c', u8(spot.y)), call(ref('cat_place'))];
+  return [ld_r_n('b', u8(spot.x)), ld_r_n('c', u8(spot.y)), call(CAT_PLACE)];
 }
 
-/** Call cat_react / cat_rest with a face */
-export function catFace(routine: 'cat_react' | 'cat_rest', face: CatFace): Op[] {
-  return [ld_r_n('a', u8(FACE[face])), call(ref(routine))];
+/** Call CAT_REACT or CAT_REST with a face */
+export function catFace(routine: typeof CAT_REACT, face: CatFace): Op[] {
+  return [ld_r_n('a', u8(FACE[face])), call(routine)];
 }
 
 /** At boot: copy the cat's tiles to sprite memory and set its GBC palette */
@@ -111,7 +125,7 @@ export function buildCatInit(): Op[] {
     ...copyBlock(
       'cat_tile_copy',
       u16(MEM.OBJ_TILES + CAT_SPRITE_BASE * 16),
-      ref('cat_tiles'),
+      CAT_TILES,
       buildCatTiles().length,
     ),
     ld_r_n('a', u8(0x80 | (CAT_OBJ_PALETTE * 8))), // auto-increment from palette 7
@@ -127,13 +141,13 @@ export function buildCatInit(): Op[] {
 
 /** The cat's sprite tiles (copied at boot) */
 export function buildCatData(): Op[] {
-  return [label('cat_tiles'), db(buildCatTiles())];
+  return [label(CAT_TILES), db(buildCatTiles())];
 }
 
 export function buildCatRoutines(): Op[] {
   return [
     // cat_place: B = left, C = top
-    label('cat_place'),
+    label(CAT_PLACE),
     ld_r_r('a', 'b'),
     add_n(u8(OAM_X_OFFSET)),
     ld_nn_a(MEM.CAT_X),
@@ -143,11 +157,11 @@ export function buildCatRoutines(): Op[] {
     ld_rr_nn('hl', oamField(SPRITE_SLOT.cat, 'y')),
     ld_r_n('d', u8(CAT_SPRITE_BASE)), // D = tile
     ld_r_n('e', u8(ROWS)),
-    label('cat_place_row'),
+    label(CAT_PLACE_ROW),
     ld_a_nn(MEM.CAT_X),
     ld_r_r('b', 'a'), // B = OAM x of the current column
     ...storeByte(MEM.CAT_COL, COLS),
-    label('cat_place_col'),
+    label(CAT_PLACE_COL),
     ld_r_r('a', 'c'),
     ldi_hl_a(),
     ld_r_r('a', 'b'),
@@ -163,52 +177,52 @@ export function buildCatRoutines(): Op[] {
     ld_a_nn(MEM.CAT_COL),
     dec_r('a'),
     ld_nn_a(MEM.CAT_COL),
-    jr_cc('nz', ref('cat_place_col')),
+    jr_cc('nz', CAT_PLACE_COL),
     ld_r_r('a', 'c'),
     add_n(u8(8)),
     ld_r_r('c', 'a'),
     dec_r('e'),
-    jr_cc('nz', ref('cat_place_row')),
-    jr(ref('cat_show_face')),
+    jr_cc('nz', CAT_PLACE_ROW),
+    jr(CAT_SHOW_FACE),
 
     // cat_hide
-    label('cat_hide'),
+    label(CAT_HIDE),
     ld_rr_nn('hl', oamField(SPRITE_SLOT.cat, 'y')),
     ld_r_n('b', u8(COLS * ROWS)),
     xor_r('a'),
-    label('cat_hide_slot'),
+    label(CAT_HIDE_SLOT),
     ldi_hl_a(),
     inc_rr('hl'),
     inc_rr('hl'),
     inc_rr('hl'),
     dec_r('b'),
-    jr_cc('nz', ref('cat_hide_slot')),
+    jr_cc('nz', CAT_HIDE_SLOT),
     ret(),
 
     // cat_rest: A = resting face
-    label('cat_rest'),
+    label(CAT_REST),
     ld_nn_a(MEM.CAT_REST),
     ...zeroBytes(MEM.CAT_TIMER), // clobbers A
     ld_a_nn(MEM.CAT_REST),
-    jr(ref('cat_set_face')),
+    jr(CAT_SET_FACE),
 
     // cat_react: A = face for REACT_FRAMES
-    label('cat_react'),
+    label(CAT_REACT),
     ld_r_r('b', 'a'),
     ...storeByte(MEM.CAT_TIMER, REACT_FRAMES),
     ld_r_r('a', 'b'),
-    label('cat_set_face'),
+    label(CAT_SET_FACE),
     ld_nn_a(MEM.CAT_FACE),
 
     // cat_show_face: point the middle row's sprites at CAT_FACE's tiles
-    label('cat_show_face'),
+    label(CAT_SHOW_FACE),
     ld_a_nn(MEM.CAT_FACE),
     add_r('a'),
     add_r('a'),
     add_n(u8(faceTile('neutral'))),
     ld_rr_nn('hl', oamField(FACE_SLOT, 'tile')),
     ld_r_n('b', u8(COLS)),
-    label('cat_face_tile'),
+    label(CAT_FACE_TILE),
     ld_r_r('hl_ptr', 'a'),
     inc_r('a'),
     inc_rr('hl'),
@@ -216,20 +230,20 @@ export function buildCatRoutines(): Op[] {
     inc_rr('hl'),
     inc_rr('hl'),
     dec_r('b'),
-    jr_cc('nz', ref('cat_face_tile')),
+    jr_cc('nz', CAT_FACE_TILE),
     ret(),
 
     // cat_tick: end a reaction when its time is up; blink while resting neutral
-    label('cat_tick'),
+    label(CAT_TICK),
     ld_a_nn(MEM.CAT_TIMER),
     or_r('a'),
-    jr_cc('z', ref('cat_tick_rest')),
+    jr_cc('z', CAT_TICK_REST),
     dec_r('a'),
     ld_nn_a(MEM.CAT_TIMER),
     ret_cc('nz'),
     ld_a_nn(MEM.CAT_REST),
-    jr(ref('cat_set_face')),
-    label('cat_tick_rest'),
+    jr(CAT_SET_FACE),
+    label(CAT_TICK_REST),
     ld_a_nn(MEM.CAT_REST),
     cp_n(u8(FACE.neutral)),
     ret_cc('nz'), // only a neutral cat blinks
@@ -238,13 +252,13 @@ export function buildCatRoutines(): Op[] {
     ld_nn_a(MEM.CAT_BLINK),
     and_n(u8(BLINK_PERIOD - 1)),
     cp_n(u8(BLINK_PERIOD - BLINK_FRAMES)),
-    jr_cc('z', ref('cat_tick_blink')),
+    jr_cc('z', CAT_TICK_BLINK),
     or_r('a'),
     ret_cc('nz'),
     ld_r_n('a', u8(FACE.neutral)),
-    jr(ref('cat_set_face')),
-    label('cat_tick_blink'),
+    jr(CAT_SET_FACE),
+    label(CAT_TICK_BLINK),
     ld_r_n('a', u8(FACE.blink)),
-    jp(ref('cat_set_face')),
+    jp(CAT_SET_FACE),
   ];
 }

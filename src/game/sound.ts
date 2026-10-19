@@ -55,8 +55,26 @@ import {
   sub_n,
   xor_r,
 } from '../asm/ops';
-import { type Op, type U16, ioReg, ref, u16, u8 } from '../asm/types';
+import { type Op, type U16, ioReg, u16, u8, Label, labelFamily } from '../asm/types';
 import { copyBytes, storeByte } from '../asm/macros';
+import { SOUND_TICK, SFX_PLAY, MUSIC_PLAY } from './labels';
+
+// Labels placed in this module
+const VOICE_TICK = new Label('voice_tick');
+const VOICE_STEP = new Label('voice_step');
+const VOICE_LENGTH = new Label('voice_length');
+const VOICE_STORE = new Label('voice_store');
+const VOICE_LOOP = new Label('voice_loop');
+const VOICE_END = new Label('voice_end');
+const VOICE_NOTE = new Label('voice_note');
+const VOICE_PLAY = new Label('voice_play');
+const SFX_START = new Label('sfx_start');
+const SFX_DONE = new Label('sfx_done');
+const MUSIC_DONE = new Label('music_done');
+const NOTE_PERIODS = new Label('note_periods');
+const WAVE_DATA = new Label('wave_data');
+const SFX_TABLE = new Label('sfx_table');
+const MUSIC_TABLE = new Label('music_table');
 
 // ---------------------------------------------------------------------------
 // Notes
@@ -268,7 +286,7 @@ export function songId(name: SongName): number {
 
 /** Play a song, unless it's already playing. Preserves every register and the flags. */
 export function playMusic(name: SongName): Op[] {
-  return [push('af'), ld_r_n('a', u8(songId(name))), call(ref('music_play')), pop('af')];
+  return [push('af'), ld_r_n('a', u8(songId(name))), call(MUSIC_PLAY), pop('af')];
 }
 
 /** How many frames a sequence lasts, up to its end or loop */
@@ -287,6 +305,10 @@ export function sequenceFrames(source: string): number {
 
 const SFX_NAMES = Object.keys(SFX) as SfxName[];
 
+const sfxData = labelFamily((name: SfxName) => `sfx_data_${name}`);
+const songMelody = labelFamily((name: SongName) => `song_${name}_melody`);
+const songBass = labelFamily((name: SongName) => `song_${name}_bass`);
+
 /** SFX_ID before any effect has played */
 export const SFX_NONE = 0;
 
@@ -297,7 +319,7 @@ export function sfxId(name: SfxName): number {
 
 /** Play a sound effect. Preserves every register and the flags. */
 export function playSfx(name: SfxName): Op[] {
-  return [push('af'), ld_r_n('a', u8(sfxId(name))), call(ref('sfx_play')), pop('af')];
+  return [push('af'), ld_r_n('a', u8(sfxId(name))), call(SFX_PLAY), pop('af')];
 }
 
 // ---------------------------------------------------------------------------
@@ -344,7 +366,7 @@ export function buildSoundInit(): Op[] {
     ldh_n_a(HW.NR51), // every channel on both sides
     xor_r('a'),
     ldh_n_a(HW.NR30), // the wave DAC must be off to load the waveform
-    ...copyBytes('sound_wave_copy', u16(0xff00 + HW.WAVE_RAM), ref('wave_data'), WAVE.length),
+    ...copyBytes('sound_wave_copy', u16(0xff00 + HW.WAVE_RAM), WAVE_DATA, WAVE.length),
   ];
 }
 
@@ -358,16 +380,16 @@ export function buildSoundInit(): Op[] {
  */
 export function buildSoundDriver(): Op[] {
   return [
-    label('sound_tick'),
+    label(SOUND_TICK),
     ...VOICE_CHANNELS.flatMap((channel, voice) => [
       ld_rr_nn('hl', voiceField(voice, 'PTR_LO')),
       ld_r_n('c', u8(channel)),
-      call(ref('voice_tick')),
+      call(VOICE_TICK),
     ]),
     ret(),
 
     // voice_tick: HL = voice, C = its channel's first register
-    label('voice_tick'),
+    label(VOICE_TICK),
     inc_r('l'), // PTR_HI: 0 while idle
     ld_r_r('a', 'hl_ptr'),
     or_r('a'),
@@ -380,34 +402,34 @@ export function buildSoundDriver(): Op[] {
     dec_r('l'),
     ld_r_r('e', 'hl_ptr'), // DE = the next step, HL = the voice
 
-    label('voice_step'),
+    label(VOICE_STEP),
     ld_a_de(),
     inc_rr('de'),
     cp_n(u8(SEQ.LENGTH)),
-    jr_cc('c', ref('voice_note')),
+    jr_cc('c', VOICE_NOTE),
     ld_r_r('b', 'l'),
     cp_n(u8(SEQ.ENVELOPE)),
-    jr_cc('c', ref('voice_length')),
+    jr_cc('c', VOICE_LENGTH),
     cp_n(u8(SEQ.LOOP)),
-    jr_cc('z', ref('voice_loop')),
-    jr_cc('nc', ref('voice_end')),
+    jr_cc('z', VOICE_LOOP),
+    jr_cc('nc', VOICE_END),
     // $C0 nn / $C1 nn: the ENVELOPE or DUTY field
     sub_n(u8(SEQ.ENVELOPE - VOICE.ENVELOPE)),
     add_r('l'),
     ld_r_r('l', 'a'),
     ld_a_de(),
     inc_rr('de'),
-    jr(ref('voice_store')),
+    jr(VOICE_STORE),
 
-    label('voice_length'),
+    label(VOICE_LENGTH),
     and_n(u8(MAX_LENGTH)),
     ...Array.from({ length: VOICE.LENGTH }, () => inc_r('l')),
-    label('voice_store'),
+    label(VOICE_STORE),
     ld_r_r('hl_ptr', 'a'),
     ld_r_r('l', 'b'),
-    jr(ref('voice_step')),
+    jr(VOICE_STEP),
 
-    label('voice_loop'),
+    label(VOICE_LOOP),
     ld_r_r('a', 'l'),
     add_n(u8(VOICE.START_LO)),
     ld_r_r('l', 'a'),
@@ -415,16 +437,16 @@ export function buildSoundDriver(): Op[] {
     ld_r_r('d', 'hl_ptr'),
     ld_r_r('e', 'a'),
     ld_r_r('l', 'b'),
-    jr(ref('voice_step')),
+    jr(VOICE_STEP),
 
-    label('voice_end'),
+    label(VOICE_END),
     inc_r('l'),
     xor_r('a'),
     ld_r_r('hl_ptr', 'a'), // PTR_HI = 0: idle
     ret(),
 
     // A = a note or a rest: save the position, hold it for LENGTH frames, play it
-    label('voice_note'),
+    label(VOICE_NOTE),
     ld_r_r('b', 'a'),
     ld_r_r('hl_ptr', 'e'),
     inc_r('l'),
@@ -438,7 +460,7 @@ export function buildSoundDriver(): Op[] {
     inc_r('l'), // ENVELOPE
     ld_r_r('a', 'b'),
     cp_n(u8(SEQ.REST)),
-    jr_cc('nz', ref('voice_play')),
+    jr_cc('nz', VOICE_PLAY),
     // A rest: zero volume (on the pulse channels this also turns the DAC off until
     // the next note restarts it)
     inc_r('c'),
@@ -447,7 +469,7 @@ export function buildSoundDriver(): Op[] {
     ldh_c_a(),
     ret(),
 
-    label('voice_play'),
+    label(VOICE_PLAY),
     // Register 0: off, then $80. Restarting the wave channel while it plays can
     // corrupt its waveform on a DMG, so its DAC goes off and on first; on channel 1
     // this turns the sweep off, and channel 2 has no register 0.
@@ -468,7 +490,7 @@ export function buildSoundDriver(): Op[] {
     add_r('a'),
     ld_r_r('e', 'a'),
     ld_r_n('d', u8(0)),
-    ld_rr_nn('hl', ref('note_periods')),
+    ld_rr_nn('hl', NOTE_PERIODS),
     add_hl_rr('de'),
     ldi_a_hl(),
     ldh_c_a(), // period, low byte
@@ -479,19 +501,19 @@ export function buildSoundDriver(): Op[] {
     ret(),
 
     // sfx_play: A = effect ID
-    label('sfx_play'),
+    label(SFX_PLAY),
     push('bc'),
     push('de'),
     push('hl'),
     ld_r_r('c', 'a'),
-    ld_rr_nn('hl', ref('sfx_table')),
+    ld_rr_nn('hl', SFX_TABLE),
     ld_r_n('b', u8(0)),
     add_hl_rr('bc'),
     add_hl_rr('bc'),
     add_hl_rr('bc'), // 3 bytes each: address, priority
     ld_a_nn(voiceField(SFX_VOICE, 'PTR_HI')),
     or_r('a'),
-    jr_cc('z', ref('sfx_start')),
+    jr_cc('z', SFX_START),
     inc_rr('hl'),
     inc_rr('hl'),
     ld_a_nn(MEM.SFX_PRIO),
@@ -500,8 +522,8 @@ export function buildSoundDriver(): Op[] {
     dec_rr('hl'),
     dec_rr('hl'),
     cp_r('b'),
-    jr_cc('c', ref('sfx_done')), // a more important effect is playing
-    label('sfx_start'),
+    jr_cc('c', SFX_DONE), // a more important effect is playing
+    label(SFX_START),
     // The VBlank handler skips the voice while PTR_HI is 0, so it never sees it half set
     xor_r('a'),
     ld_nn_a(voiceField(SFX_VOICE, 'PTR_HI')),
@@ -522,7 +544,7 @@ export function buildSoundDriver(): Op[] {
     ld_nn_a(voiceField(SFX_VOICE, 'TIMER')), // the first step plays on the next frame
     ld_r_r('a', 'd'),
     ld_nn_a(voiceField(SFX_VOICE, 'PTR_HI')),
-    label('sfx_done'),
+    label(SFX_DONE),
     pop('hl'),
     pop('de'),
     pop('bc'),
@@ -530,13 +552,13 @@ export function buildSoundDriver(): Op[] {
 
     // music_play: A = song ID (MUSIC_NONE: silence); does nothing if it's playing.
     // Clobbers A, preserves BC, DE, HL.
-    label('music_play'),
+    label(MUSIC_PLAY),
     push('bc'),
     push('de'),
     push('hl'),
     ld_rr_nn('hl', MEM.MUSIC_ID),
     cp_r('hl_ptr'),
-    jr_cc('z', ref('music_done')),
+    jr_cc('z', MUSIC_DONE),
     ld_r_r('hl_ptr', 'a'),
     ld_r_r('c', 'a'),
     // Stop both music voices and quiet their channels
@@ -547,14 +569,14 @@ export function buildSoundDriver(): Op[] {
     ldh_n_a(ioReg(0x1c)), // NR32: channel 3's output level
     ld_r_r('a', 'c'),
     or_r('a'),
-    jr_cc('z', ref('music_done')),
+    jr_cc('z', MUSIC_DONE),
     // HL = the song's two sequence addresses (4 bytes per song, from ID 1)
     dec_r('a'),
     add_r('a'),
     add_r('a'),
     ld_r_r('e', 'a'),
     ld_r_n('d', u8(0)),
-    ld_rr_nn('hl', ref('music_table')),
+    ld_rr_nn('hl', MUSIC_TABLE),
     add_hl_rr('de'),
     ...[0, 1].flatMap((voice) => [
       ldi_a_hl(),
@@ -571,7 +593,7 @@ export function buildSoundDriver(): Op[] {
       ld_r_r('a', 'd'),
       ld_nn_a(voiceField(voice, 'PTR_HI')), // last: the voice starts now
     ]),
-    label('music_done'),
+    label(MUSIC_DONE),
     pop('hl'),
     pop('de'),
     pop('bc'),
@@ -583,25 +605,22 @@ export function buildSoundDriver(): Op[] {
 export function buildSoundData(): Op[] {
   const periods = notePeriods();
   return [
-    label('note_periods'),
+    label(NOTE_PERIODS),
     db(periods.flatMap((p) => [p & 0xff, p >> 8])),
-    label('wave_data'),
+    label(WAVE_DATA),
     db(WAVE),
     // Effect n is at entry n (entry 0, SFX_NONE, is never played)
-    label('sfx_table'),
+    label(SFX_TABLE),
     db([0, 0, 0]),
-    ...SFX_NAMES.flatMap((name) => [dw(ref(`sfx_data_${name}`)), db([SFX[name].priority])]),
-    ...SFX_NAMES.flatMap((name) => [
-      label(`sfx_data_${name}`),
-      db(encodeSequence(SFX[name].sequence)),
-    ]),
+    ...SFX_NAMES.flatMap((name) => [dw(sfxData(name)), db([SFX[name].priority])]),
+    ...SFX_NAMES.flatMap((name) => [label(sfxData(name)), db(encodeSequence(SFX[name].sequence))]),
     // Song n is at entry n - 1: melody, then bass
-    label('music_table'),
-    ...SONG_NAMES.flatMap((name) => [dw(ref(`song_${name}_melody`)), dw(ref(`song_${name}_bass`))]),
+    label(MUSIC_TABLE),
+    ...SONG_NAMES.flatMap((name) => [dw(songMelody(name)), dw(songBass(name))]),
     ...SONG_NAMES.flatMap((name) => [
-      label(`song_${name}_melody`),
+      label(songMelody(name)),
       db(encodeSequence(SONGS[name].melody)),
-      label(`song_${name}_bass`),
+      label(songBass(name)),
       db(encodeSequence(SONGS[name].bass)),
     ]),
   ];

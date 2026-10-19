@@ -4,13 +4,18 @@ import { describe, expect, it } from 'vitest';
 import { MEM } from '@asm/hardware';
 import { storePointer, zeroBytes } from '@asm/macros';
 import { call, cp_n, db, jr_cc, label, ld_a_nn, ld_nn_a, ld_rr_nn, ldi_hl_a } from '@asm/ops';
-import { ref, u8, u16 } from '@asm/types';
+import { u8, u16, Label } from '@asm/types';
 import { TEXT_END } from '@game/dialogue-data';
 import { buildTextNext } from '@game/dialogue';
 import { textToTiles } from '@game/font';
 import { SCENES, dialogueCodec, sceneQuiz } from '@game/scene';
 import { TEXT_STACK_SIZE, buildTextCodec } from '@game/text-codec';
 import { SCRATCH, runProgram } from './helpers/run-program';
+import { TEXT_DICT, TEXT_NEXT } from '@game/labels';
+
+// Labels placed in this module
+const NEXT = new Label('next');
+const LINE = new Label('line');
 
 describe('buildTextCodec', () => {
   const strings = [
@@ -102,23 +107,23 @@ describe('text_next', () => {
 
     const mem = runProgram(
       [
-        ld_rr_nn('hl', ref('line')),
+        ld_rr_nn('hl', LINE),
         ...storePointer('hl', MEM.DLG_STR_LO, MEM.DLG_STR_HI),
         ...zeroBytes(MEM.TEXT_SP),
         ld_rr_nn('hl', u16(SCRATCH)),
-        label('next'),
-        call(ref('text_next')),
+        label(NEXT),
+        call(TEXT_NEXT),
         ldi_hl_a(),
         cp_n(u8(TEXT_END)),
-        jr_cc('nz', ref('next')),
+        jr_cc('nz', NEXT),
         ld_a_nn(MEM.TEXT_SP),
         ld_nn_a(u16(SCRATCH + 0x80)),
       ],
       [
         ...buildTextNext(codec.base),
-        label('text_dict'),
+        label(TEXT_DICT),
         db(codec.pairs.flat()),
-        label('line'),
+        label(LINE),
         db([...codec.encode(deepest), TEXT_END]),
       ],
     );

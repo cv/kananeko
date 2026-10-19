@@ -14,7 +14,7 @@ import {
   ld_r_r,
   ld_rr_nn,
 } from '@asm/ops';
-import { type Op, ref, u8, u16 } from '@asm/types';
+import { type Op, u8, u16, Label } from '@asm/types';
 import {
   NOTE_NAMES,
   SEQ,
@@ -34,6 +34,10 @@ import {
   voiceField,
 } from '@game/sound';
 import { SCRATCH, runProgram } from './helpers/run-program';
+import { SOUND_TICK, SFX_PLAY, MUSIC_PLAY } from '@game/labels';
+
+// Labels placed in this module
+const SEQ_DATA = new Label('seq_data');
 
 describe('Given the note table', () => {
   it('tunes A4 to 440 Hz on the pulse channels', () => {
@@ -118,16 +122,16 @@ let tickLoops = 0;
 
 /** Step the sound `count` (1-255) frames */
 function ticks(count: number): Op[] {
-  const loop = `ticks_${String(tickLoops++)}`;
+  const loop = new Label(`ticks_${String(tickLoops++)}`);
   return [
     ld_r_n('a', u8(count)),
     ld_nn_a(u16(SCRATCH)),
     label(loop),
-    call(ref('sound_tick')),
+    call(SOUND_TICK),
     ld_a_nn(u16(SCRATCH)),
     dec_r('a'),
     ld_nn_a(u16(SCRATCH)),
-    jr_cc('nz', ref(loop)),
+    jr_cc('nz', loop),
   ];
 }
 
@@ -139,14 +143,11 @@ function runSound(setup: readonly Op[], count: number, data: readonly Op[] = [])
   );
 }
 
-const play = (name: keyof typeof SFX): Op[] => [
-  ld_r_n('a', u8(sfxId(name))),
-  call(ref('sfx_play')),
-];
+const play = (name: keyof typeof SFX): Op[] => [ld_r_n('a', u8(sfxId(name))), call(SFX_PLAY)];
 
 /** Point voice 0 (pulse channel 2) at a sequence labelled `seq` */
 const startVoice0: Op[] = [
-  ld_rr_nn('hl', ref('seq')),
+  ld_rr_nn('hl', SEQ_DATA),
   ...(
     [
       ['PTR_LO', 'l'],
@@ -212,7 +213,7 @@ describe('Given the songs', () => {
   });
 });
 
-const playSong = (id: number): Op[] => [ld_r_n('a', u8(id)), call(ref('music_play'))];
+const playSong = (id: number): Op[] => [ld_r_n('a', u8(id)), call(MUSIC_PLAY)];
 
 describe('Given a song starts', () => {
   it('plays its melody and bass on the music voices', () => {
@@ -243,7 +244,7 @@ describe('Given a song starts', () => {
 });
 
 describe('Given a looping sequence', () => {
-  const seq = [label('seq'), db(encodeSequence('w1 v70 l2 c4 r loop'))];
+  const seq = [label(SEQ_DATA), db(encodeSequence('w1 v70 l2 c4 r loop'))];
 
   it('starts over after its last step, holding each for its length', () => {
     // c4 (2 frames), rest (2 frames), then c4 again: frame 5 restarts the loop

@@ -26,12 +26,18 @@ import {
   ret,
   ret_cc,
 } from '../asm/ops';
-import { type Op, ref, u8 } from '../asm/types';
+import { type Op, u8, Label } from '../asm/types';
 import { sliceArt } from './art';
 import { encodeGlyph } from './font';
 import { type NpcLook, npcArt } from './npc-art';
 import type { SceneCast } from './scenes/npcs';
 import { OAM_X_OFFSET, OAM_Y_OFFSET, SPRITE_SLOT, oamField } from './sprites';
+import { NPC_SELECT, NPC_UPDATE, NPC_HIDE } from './labels';
+
+// Labels placed in this module
+const NPC_SCAN = new Label('npc_scan');
+const NPC_FOUND = new Label('npc_found');
+const NPC_BOB_SET = new Label('npc_bob_set');
 
 /** NPC_CURRENT when nobody is shown */
 export const NPC_NONE = 0xff;
@@ -91,27 +97,27 @@ export function buildNpcRoutines(): Op[] {
   const field = (i: number, f: 'y' | 'x' | 'tile' | 'attr'): ReturnType<typeof oamField> =>
     oamField(SPRITE_SLOT.npc + i, f);
   return [
-    label('npc_select'),
+    label(NPC_SELECT),
     ...loadPointer('hl', MEM.NPC_TABLE_LO, MEM.NPC_TABLE_HI),
     ld_a_nn(MEM.DLG_NODE_ID),
     ld_r_r('b', 'a'),
     ld_r_n('c', u8(NONE)),
-    label('npc_scan'),
+    label(NPC_SCAN),
     ldi_a_hl(), // segment start node ($FF = end of table)
     cp_n(u8(NONE)),
-    jr_cc('z', ref('npc_found')),
+    jr_cc('z', NPC_FOUND),
     ld_r_r('d', 'a'),
     ld_r_r('a', 'b'),
     cp_r('d'),
-    jr_cc('c', ref('npc_found')), // node is before this segment
+    jr_cc('c', NPC_FOUND), // node is before this segment
     ldi_a_hl(),
     ld_r_r('c', 'a'),
-    jr(ref('npc_scan')),
-    label('npc_found'),
+    jr(NPC_SCAN),
+    label(NPC_FOUND),
     ld_r_r('a', 'c'),
     ld_nn_a(MEM.NPC_CURRENT),
     cp_n(u8(NONE)),
-    jp_cc('z', ref('npc_hide')),
+    jp_cc('z', NPC_HIDE),
     // D = first tile (NPC_TILE_BASE + 4 * npc), E = attributes (GBC palette npc + 1)
     add_r('a'),
     add_r('a'),
@@ -136,7 +142,7 @@ export function buildNpcRoutines(): Op[] {
     ...zeroBytes(MEM.NPC_TIMER),
     // fall through to place it
 
-    label('npc_update'),
+    label(NPC_UPDATE),
     ld_a_nn(MEM.NPC_CURRENT),
     cp_n(u8(NONE)),
     ret_cc('z'),
@@ -145,9 +151,9 @@ export function buildNpcRoutines(): Op[] {
     ld_nn_a(MEM.NPC_TIMER),
     and_n(u8(BOB_BIT)),
     ld_a_nn(MEM.NPC_Y), // LD leaves the flags from AND
-    jr_cc('z', ref('npc_bob_set')),
+    jr_cc('z', NPC_BOB_SET),
     dec_r('a'),
-    label('npc_bob_set'),
+    label(NPC_BOB_SET),
     ld_nn_a(field(0, 'y')),
     ld_nn_a(field(1, 'y')),
     add_n(u8(8)),
@@ -155,7 +161,7 @@ export function buildNpcRoutines(): Op[] {
     ld_nn_a(field(3, 'y')),
     ret(),
 
-    label('npc_hide'),
+    label(NPC_HIDE),
     ...zeroBytes(field(0, 'y'), field(1, 'y'), field(2, 'y'), field(3, 'y')),
     ...storeByte(MEM.NPC_CURRENT, NONE),
     ret(),

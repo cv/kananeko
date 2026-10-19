@@ -30,7 +30,7 @@ import {
   ret_cc,
   xor_r,
 } from './ops';
-import { type LabelRef, type Op, type U16, ref, u8, u16 } from './types';
+import { Label, type Op, type Target, type U16, u8, u16 } from './types';
 import { lo } from './util';
 
 /** First scanline of the vertical blank period. */
@@ -38,7 +38,8 @@ const VBLANK_LINE = 144;
 
 /** Busy-wait until the LCD reaches VBlank (LY == 144). */
 export function waitVBlank(name: string): Op[] {
-  return [label(name), ldh_a_n(HW.LY), cp_n(u8(VBLANK_LINE)), jr_cc('nz', ref(name))];
+  const loop = new Label(name);
+  return [label(loop), ldh_a_n(HW.LY), cp_n(u8(VBLANK_LINE)), jr_cc('nz', loop)];
 }
 
 /** Wait for VBlank, then switch the LCD off so VRAM can be written freely. */
@@ -104,53 +105,56 @@ function checkPages(macro: string, pages: number): void {
 /** Fill `pages` (1-255) × 256 bytes starting at `dst` with zero. Clobbers A, BC, HL. */
 export function zeroPages(name: string, dst: U16, pages: number): Op[] {
   checkPages('zeroPages', pages);
+  const loop = new Label(name);
   return [
     ld_rr_nn('hl', dst),
     xor_r('a'),
     ld_r_n('b', u8(pages)),
     ld_r_n('c', u8(0)),
-    label(name),
+    label(loop),
     ldi_hl_a(),
     dec_r('c'),
-    jr_cc('nz', ref(name)),
+    jr_cc('nz', loop),
     dec_r('b'),
-    jr_cc('nz', ref(name)),
+    jr_cc('nz', loop),
   ];
 }
 
 /** Copy `count` (1-256) bytes from `src` to `dst`. Clobbers A, B, DE, HL. */
-export function copyBytes(name: string, dst: U16, src: U16 | LabelRef, count: number): Op[] {
+export function copyBytes(name: string, dst: U16, src: U16 | Target, count: number): Op[] {
   if (!Number.isInteger(count) || count < 1 || count > 256)
     throw new RangeError(`copyBytes count must be 1-256, got ${String(count)}`);
+  const loop = new Label(name);
   return [
     ld_rr_nn('hl', dst),
     ld_rr_nn('de', src),
     ld_r_n('b', lo(count)), // 256 wraps to 0, which DEC/JR NZ treats as 256
-    label(name),
+    label(loop),
     ld_a_de(),
     ldi_hl_a(),
     inc_rr('de'),
     dec_r('b'),
-    jr_cc('nz', ref(name)),
+    jr_cc('nz', loop),
   ];
 }
 
 /** Copy exactly `count` (1-65535) bytes from `src` to `dst`. Clobbers A, BC, DE, HL. */
-export function copyBlock(name: string, dst: U16, src: U16 | LabelRef, count: number): Op[] {
+export function copyBlock(name: string, dst: U16, src: U16 | Target, count: number): Op[] {
   if (!Number.isInteger(count) || count < 1 || count > 0xffff)
     throw new RangeError(`copyBlock count must be 1-65535, got ${String(count)}`);
+  const loop = new Label(name);
   return [
     ld_rr_nn('hl', dst),
     ld_rr_nn('de', src),
     ld_rr_nn('bc', u16(count)),
-    label(name),
+    label(loop),
     ld_a_de(),
     ldi_hl_a(),
     inc_rr('de'),
     dec_rr('bc'),
     ld_r_r('a', 'b'),
     or_r('c'),
-    jr_cc('nz', ref(name)),
+    jr_cc('nz', loop),
   ];
 }
 
@@ -158,14 +162,15 @@ export function copyBlock(name: string, dst: U16, src: U16 | LabelRef, count: nu
  * Copy `count` (1-65535) bytes of 1bpp tile data to `dst`, writing each byte twice
  * (both bit planes), so set pixels become color 3. Clobbers A, BC, DE, HL.
  */
-export function expandOneBit(name: string, dst: U16, src: U16 | LabelRef, count: number): Op[] {
+export function expandOneBit(name: string, dst: U16, src: U16 | Target, count: number): Op[] {
   if (!Number.isInteger(count) || count < 1 || count > 0xffff)
     throw new RangeError(`expandOneBit count must be 1-65535, got ${String(count)}`);
+  const loop = new Label(name);
   return [
     ld_rr_nn('hl', dst),
     ld_rr_nn('de', src),
     ld_rr_nn('bc', u16(count)),
-    label(name),
+    label(loop),
     ld_a_de(),
     inc_rr('de'),
     ldi_hl_a(),
@@ -173,26 +178,27 @@ export function expandOneBit(name: string, dst: U16, src: U16 | LabelRef, count:
     dec_rr('bc'),
     ld_r_r('a', 'b'),
     or_r('c'),
-    jr_cc('nz', ref(name)),
+    jr_cc('nz', loop),
   ];
 }
 
 /** Copy `pages` (1-255) × 256 bytes from `src` to `dst`. Clobbers A, BC, DE, HL. */
-export function copyPages(name: string, dst: U16, src: U16 | LabelRef, pages: number): Op[] {
+export function copyPages(name: string, dst: U16, src: U16 | Target, pages: number): Op[] {
   checkPages('copyPages', pages);
+  const loop = new Label(name);
   return [
     ld_rr_nn('hl', dst),
     ld_rr_nn('de', src),
     ld_r_n('b', u8(pages)),
     ld_r_n('c', u8(0)),
-    label(name),
+    label(loop),
     ld_a_de(),
     ldi_hl_a(),
     inc_rr('de'),
     dec_r('c'),
-    jr_cc('nz', ref(name)),
+    jr_cc('nz', loop),
     dec_r('b'),
-    jr_cc('nz', ref(name)),
+    jr_cc('nz', loop),
   ];
 }
 
@@ -220,7 +226,7 @@ export interface SwitchOptions {
  */
 export function switchCases(cases: readonly (readonly Op[])[], options: SwitchOptions): Op[] {
   const { name, compare = (i): Op[] => [cp_n(u8(i))], branch = 'jr', exit = 'jr' } = options;
-  const done = ref(`${name}_done`);
+  const done = new Label(`${name}_done`);
   const ops: Op[] = [];
 
   cases.forEach((body, i) => {
@@ -229,16 +235,16 @@ export function switchCases(cases: readonly (readonly Op[])[], options: SwitchOp
       ops.push(...body);
       return;
     }
-    const next = ref(`${name}_case${String(i + 1)}`);
+    const next = new Label(`${name}_case${String(i + 1)}`);
     ops.push(...compare(i), branch === 'jr' ? jr_cc('nz', next) : jp_cc('nz', next), ...body);
     if (exit !== 'none') {
       ops.push(exit === 'jr' ? jr(done) : jp(done));
     }
-    ops.push(label(next.name));
+    ops.push(label(next));
   });
 
   if (exit !== 'none') {
-    ops.push(label(done.name));
+    ops.push(label(done));
   }
   return ops;
 }

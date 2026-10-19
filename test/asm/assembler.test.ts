@@ -10,8 +10,19 @@ import {
   globalChecksum,
   headerChecksum,
 } from '@asm/assembler';
-import { call, db, jp, jr, jr_cc, label, nop, org } from '@asm/ops';
-import { type Op, ref, u16 } from '@asm/types';
+import { call, db, dw, jp, jr, jr_cc, label, ld_rr_nn, nop, org, pool, ret } from '@asm/ops';
+import { type Op, Label, Pooled, labelFamily, u16 } from '@asm/types';
+
+// Labels placed in this module
+const START = new Label('start');
+const AFTER = new Label('after');
+const TARGET = new Label('target');
+const LOOP = new Label('loop');
+const NEXT = new Label('next');
+const BLOB = new Label('blob');
+const A = new Label('a');
+const FAR = new Label('far');
+const NOWHERE = new Label('nowhere');
 
 const HEADER = { title: 'TEST' };
 
@@ -21,13 +32,13 @@ function build(program: Op[]): ReturnType<typeof assemble> {
 
 describe('label resolution', () => {
   it('assigns labels the address of the following instruction', () => {
-    const { symbols } = build([label('start'), nop(), nop(), label('after')]);
+    const { symbols } = build([label(START), nop(), nop(), label(AFTER)]);
     expect(symbols.get('start')).toBe(PROGRAM_START);
     expect(symbols.get('after')).toBe(PROGRAM_START + 2);
   });
 
   it('patches forward imm16 references little-endian', () => {
-    const { rom } = build([call(ref('target')), nop(), label('target')]);
+    const { rom } = build([call(TARGET), nop(), label(TARGET)]);
     const target = PROGRAM_START + 4;
     expect([...rom.slice(PROGRAM_START, PROGRAM_START + 3)]).toEqual([
       0xcd,
@@ -37,31 +48,115 @@ describe('label resolution', () => {
   });
 
   it('patches rel8 offsets relative to the end of the instruction', () => {
-    const { rom } = build([label('loop'), jr(ref('loop')), jr_cc('z', ref('next')), label('next')]);
+    const { rom } = build([label(LOOP), jr(LOOP), jr_cc('z', NEXT), label(NEXT)]);
     expect(rom[PROGRAM_START + 1]).toBe(0xfe); // -2: back to itself
     expect(rom[PROGRAM_START + 3]).toBe(0x00); // falls through
   });
 
   it('places code and data at org addresses', () => {
-    const { rom, symbols } = build([org(u16(0x4000)), label('blob'), db([0xde, 0xad])]);
+    const { rom, symbols } = build([org(u16(0x4000)), label(BLOB), db([0xde, 0xad])]);
     expect(symbols.get('blob')).toBe(0x4000);
     expect([rom[0x4000], rom[0x4001]]).toEqual([0xde, 0xad]);
   });
 });
 
-describe('validation', () => {
-  it('rejects undefined labels', () => {
-    expect(() => build([jp(ref('nowhere'))])).toThrow(/Undefined label: "nowhere"/);
+describe('label families', () => {
+  it('give the same Label for the same key', () => {
+    const scene = labelFamily((i: number) => `scene${String(i)}`);
+    expect(scene(1)).toBe(scene(1));
+    expect(scene(1)).not.toBe(scene(2));
+    expect(scene(2).name).toBe('scene2');
+  });
+});
+
+describe('pooled data', () => {
+  const list = (...bytes: number[]): Pooled => new Pooled('list', bytes);
+
+  it('stores identical data once, at pool(), in order of first reference', () => {
+    const { rom, symbols } = build([
+      ld_rr_nn('hl', list(7, 8)),
+      ld_rr_nn('de', list(9)),
+      dw(list(7, 8)),
+      pool(),
+    ]);
+    const first = PROGRAM_START + 3 + 3 + 2;
+    expect(symbols.get('list_0')).toBe(first);
+    expect(symbols.get('list_1')).toBe(first + 2);
+    expect(symbols.size).toBe(2);
+    expect(Array.from(rom.slice(first, first + 3))).toEqual([7, 8, 9]);
+    // Both references to [7, 8] point at the one copy
+    expect([rom[PROGRAM_START + 1], rom[PROGRAM_START + 2]]).toEqual([first & 0xff, first >> 8]);
+    expect([rom[PROGRAM_START + 6], rom[PROGRAM_START + 7]]).toEqual([first & 0xff, first >> 8]);
   });
 
-  it('rejects duplicate labels', () => {
-    expect(() => build([label('a'), nop(), label('a')])).toThrow(/Duplicate label: "a"/);
+  it('needs exactly one pool() when anything is pooled', () => {
+    expect(() => build([ld_rr_nn('hl', list(1))])).toThrow(/no pool\(\)/);
+    expect(() => build([pool(), pool()])).toThrow(/only one pool\(\)/);
+    expect(build([nop()]).symbols.size).toBe(0);
+  });
+
+  it('rejects bytes out of range', () => {
+    expect(() => list(256)).toThrow(RangeError);
+  });
+});
+
+describe('unreferenced labels', () => {
+  it('lists labels nothing refers to', () => {
+    const { unreferenced } = build([
+      label(START),
+      call(TARGET),
+      label(LOOP),
+      jr(LOOP),
+      label(TARGET),
+      ret(),
+      label(AFTER),
+      ld_rr_nn('hl', list(1)),
+      pool(),
+    ]);
+    expect(unreferenced).toEqual(['start', 'after']);
+  });
+
+  it('counts the VBlank handler as referenced and jumps to it from $0040', () => {
+    const { rom, unreferenced } = assemble([nop(), label(TARGET), ret()], {
+      ...HEADER,
+      vblankHandler: TARGET,
+    });
+    expect(unreferenced).toEqual([]);
+    const target = PROGRAM_START + 1;
+    expect(Array.from(rom.slice(0x40, 0x43))).toEqual([0xc3, target & 0xff, target >> 8]);
+  });
+
+  function list(...bytes: number[]): Pooled {
+    return new Pooled('list', bytes);
+  }
+});
+
+describe('validation', () => {
+  it('rejects undefined labels', () => {
+    expect(() => build([jp(NOWHERE)])).toThrow(/Undefined label: "nowhere"/);
+  });
+
+  it('rejects a label placed twice', () => {
+    expect(() => build([label(A), nop(), label(A)])).toThrow(/"a" is placed twice/);
+  });
+
+  it('rejects two labels with the same name', () => {
+    expect(() => build([label(A), nop(), label(new Label('a'))])).toThrow(/Duplicate label: "a"/);
+  });
+
+  it('matches labels by identity, not by name', () => {
+    expect(() => build([label(new Label('nowhere')), jp(NOWHERE)])).toThrow(
+      /Undefined label: "nowhere".*different Label with that name/,
+    );
+  });
+
+  it('rejects invalid label names', () => {
+    expect(() => new Label('no spaces')).toThrow(/Invalid label name/);
+    expect(() => new Label('')).toThrow(/Invalid label name/);
   });
 
   it('rejects relative jumps beyond ±127 bytes', () => {
-    expect(() => build([jr(ref('far')), db(new Uint8Array(200)), label('far')])).toThrow(
-      /out of range/,
-    );
+    expect(() => build([jr(FAR), db(new Uint8Array(200)), label(FAR)])).toThrow(/out of range/);
   });
 
   it('rejects programs that run past the end of the ROM', () => {

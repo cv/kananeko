@@ -19,12 +19,18 @@ import {
   ldh_n_a,
   ldi_hl_a,
 } from '../asm/ops';
-import { type Op, type U16, ref, u8, u16 } from '../asm/types';
+import { type Op, type U16, u8, u16, Label } from '../asm/types';
 import { hi, lo } from '../asm/util';
 import { encodeGlyph, glyphOf } from './font';
 import type { Palette } from './video';
 import { HUES, INK, PAPER } from './palette';
 import { UI_TILES } from './font-data';
+import { SPRITES_OFF } from './labels';
+
+// Labels placed in this module
+const SPRITE_COPY_DMA = new Label('sprite_copy_dma');
+const DMA_ROUTINE = new Label('dma_routine');
+const SPRITE_TILES = new Label('sprite_tiles');
 
 /** Shadow OAM: 40 sprites x 4 bytes, page-aligned for DMA */
 export const SHADOW_OAM = u16(0xc100);
@@ -37,9 +43,9 @@ export const OAM_X_OFFSET = 8;
 export const SPRITE_SLOT = { cursor: 0, npc: 1, cat: 5 } as const;
 
 /** Sprite tile indices (in the sprite-only $8000-$87FF block) */
-export const SPRITE_TILES = { cursor: 0 } as const;
+export const SPRITE_TILE = { cursor: 0 } as const;
 
-/** Glyphs copied into sprite tile memory at boot, in SPRITE_TILES order */
+/** Glyphs copied into sprite tile memory at boot, in SPRITE_TILE order */
 const SPRITE_GLYPHS = [UI_TILES.PAW] as const;
 
 const FIELD_OFFSET = { y: 0, x: 1, tile: 2, attr: 3 } as const;
@@ -50,7 +56,7 @@ export function oamField(slot: number, field: keyof typeof FIELD_OFFSET): U16 {
 }
 
 /** Start OAM DMA from the shadow page, then wait the 160 M-cycles it takes. */
-const DMA_ROUTINE = [
+const DMA_ROUTINE_BYTES = [
   0x3e,
   hi(SHADOW_OAM), // ld a, high(SHADOW_OAM)
   0xe0,
@@ -70,16 +76,16 @@ const OBJ_PALETTE: Palette = [PAPER, ...HUES.sakura, INK];
 export function buildSpriteInit(): Op[] {
   return [
     ...zeroPages('sprite_clear', SHADOW_OAM, 1),
-    ...copyBytes('sprite_tile_copy', MEM.OBJ_TILES, ref('sprite_tiles'), SPRITE_TILE_BYTES),
+    ...copyBytes('sprite_tile_copy', MEM.OBJ_TILES, SPRITE_TILES, SPRITE_TILE_BYTES),
     ld_rr_nn('hl', DMA_HRAM),
-    ld_rr_nn('de', ref('dma_routine')),
-    ld_r_n('b', u8(DMA_ROUTINE.length)),
-    label('sprite_copy_dma'),
+    ld_rr_nn('de', DMA_ROUTINE),
+    ld_r_n('b', u8(DMA_ROUTINE_BYTES.length)),
+    label(SPRITE_COPY_DMA),
     ld_a_de(),
     inc_rr('de'),
     ldi_hl_a(),
     dec_r('b'),
-    jr_cc('nz', ref('sprite_copy_dma')),
+    jr_cc('nz', SPRITE_COPY_DMA),
 
     ld_r_n('a', u8(0xe4)), // DMG: color index → shade, same as the background
     ldh_n_a(HW.OBP0),
@@ -97,14 +103,14 @@ export function buildSpriteInit(): Op[] {
 /** The DMA routine's bytes, copied to HRAM at boot, and the sprite tiles */
 export function buildSpriteData(): Op[] {
   const tiles = SPRITE_GLYPHS.flatMap((ch) => Array.from(encodeGlyph(glyphOf(ch))));
-  return [label('dma_routine'), db([...DMA_ROUTINE]), label('sprite_tiles'), db(tiles)];
+  return [label(DMA_ROUTINE), db([...DMA_ROUTINE_BYTES]), label(SPRITE_TILES), db(tiles)];
 }
 
 const SPRITE_TILE_BYTES = SPRITE_GLYPHS.length * 16;
 
 /** Subroutine sprites_off: take every sprite off screen (before a fade or screen change) */
 export function buildSpriteRoutines(): Op[] {
-  return [label('sprites_off'), ...zeroPages('sprites_off_clear', SHADOW_OAM, 1), jp(DMA_HRAM)];
+  return [label(SPRITES_OFF), ...zeroPages('sprites_off_clear', SHADOW_OAM, 1), jp(DMA_HRAM)];
 }
 
 /** Copy the shadow OAM to OAM. Call right after HALT (VBlank). */

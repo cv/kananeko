@@ -26,12 +26,17 @@ import {
   swap,
   xor_r,
 } from '../asm/ops';
-import { type Op, ref, u8 } from '../asm/types';
+import { type Op, u8, Label } from '../asm/types';
 import type { SceneArt } from './backdrop';
 import { encodeGlyph } from './font';
 import { SCENERY, isProp } from './scenery';
 import type { TileAnimation } from './scenes/animations';
 import { bgTileAddr, vramPut } from './video';
+import { ANIM_TICK } from './labels';
+
+// Labels placed in this module
+const ANIM_FRAME_OK = new Label('anim_frame_ok');
+const ANIM_COPY = new Label('anim_copy');
 
 const MAX_FRAMES = 16; // frame offset is computed with SWAP (frame * 16 < 256)
 
@@ -68,7 +73,7 @@ export function packAnimation(animation: TileAnimation | undefined, art: SceneAr
 /** Subroutine anim_tick: advance the scene's tile animation (call once per frame, LCD on). */
 export function buildAnimRoutines(): Op[] {
   return [
-    label('anim_tick'),
+    label(ANIM_TICK),
     ...loadPointer('hl', MEM.ANIM_LO, MEM.ANIM_HI),
     ldi_a_hl(),
     ld_r_r('e', 'a'), // DE = tile's VRAM address
@@ -90,9 +95,9 @@ export function buildAnimRoutines(): Op[] {
     ld_a_nn(MEM.ANIM_FRAME),
     inc_r('a'),
     cp_r('b'),
-    jr_cc('c', ref('anim_frame_ok')),
+    jr_cc('c', ANIM_FRAME_OK),
     xor_r('a'),
-    label('anim_frame_ok'),
+    label(ANIM_FRAME_OK),
     ld_nn_a(MEM.ANIM_FRAME),
     swap('a'), // A = frame * 16
     ld_r_r('c', 'a'),
@@ -101,7 +106,7 @@ export function buildAnimRoutines(): Op[] {
 
     // Copy 16 bytes from [HL] to VRAM at DE
     ld_r_n('b', u8(16)),
-    label('anim_copy'),
+    label(ANIM_COPY),
     ldi_a_hl(),
     push('hl'),
     ld_r_r('h', 'd'),
@@ -111,7 +116,7 @@ export function buildAnimRoutines(): Op[] {
     ld_r_r('e', 'l'),
     pop('hl'),
     dec_r('b'),
-    jr_cc('nz', ref('anim_copy')),
+    jr_cc('nz', ANIM_COPY),
     ret(),
   ];
 }

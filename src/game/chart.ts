@@ -38,14 +38,14 @@ import {
   cpl,
 } from '../asm/ops';
 import { HW } from '../asm/hardware';
-import { type Op, ref, u8 } from '../asm/types';
+import { type Op, u8, Label } from '../asm/types';
 import { storeByte, zeroBytes } from '../asm/macros';
 import { paletteOf } from './color';
 import { CHAR_MAP, requireTile, textToTiles } from './font';
 import { PASSWORD_LABEL, passwordLineCol } from './password';
 import { CHART_COLORS } from './scenes/colors';
 import { playSfx } from './sound';
-import { SPRITE_SLOT, SPRITE_TILES, oamField, runDma } from './sprites';
+import { SPRITE_SLOT, SPRITE_TILE, oamField, runDma } from './sprites';
 import { centerStartCol, tilemapAddr } from './tilemap';
 import {
   clearScreen,
@@ -56,6 +56,28 @@ import {
   screenOff,
   writeCenteredRow,
 } from './video';
+import {
+  PASS_ENCODE,
+  PASS_DRAW,
+  JOY_READ,
+  CHART_SEEN,
+  CHART_MISSED,
+  CHART_UNMISS,
+  CHART_BIT,
+  CHART_SHOW,
+} from './labels';
+
+// Labels placed in this module
+const CHART_OF_TILE = new Label('chart_of_tile');
+const CHART_LAYOUT = new Label('chart_layout');
+const CHART_MARK = new Label('chart_mark');
+const CHART_MARK_DONE = new Label('chart_mark_done');
+const CHART_BIT_SHIFT = new Label('chart_bit_shift');
+const CHART_ENTRY = new Label('chart_entry');
+const CHART_ENTRY_DRAW = new Label('chart_entry_draw');
+const CHART_ENTRY_NEXT = new Label('chart_entry_next');
+const CHART_NO_PASSWORD = new Label('chart_no_password');
+const CHART_WAIT = new Label('chart_wait');
 
 /** The chart's rows (consonants), five vowels each; spaces are gaps */
 const CHART_ROWS = [
@@ -135,9 +157,9 @@ export function buildChartData(): Op[] {
     if (index >= 0) ofTile[tile] = index;
   }
   return [
-    label('chart_of_tile'),
+    label(CHART_OF_TILE),
     db(ofTile),
-    label('chart_layout'),
+    label(CHART_LAYOUT),
     db(
       Array.from(CHART_KANA).flatMap((ch, i) => {
         const { row, col } = chartCell(i);
@@ -154,21 +176,21 @@ export function buildChartData(): Op[] {
  * chart_bit                  A = entry, HL = a bit set → HL = its byte, B = its bit
  * chart_show                 the chart screen; C = 1 to show the password too
  */
-export function buildChartRoutines(fade: string): Op[] {
+export function buildChartRoutines(fade: Label): Op[] {
   const missed = paletteOf(CHART_COLORS, 'missed');
   return [
-    label('chart_seen'),
+    label(CHART_SEEN),
     push('hl'),
     ld_rr_nn('hl', MEM.KANA_SEEN),
-    jr(ref('chart_mark')),
-    label('chart_missed'),
+    jr(CHART_MARK),
+    label(CHART_MISSED),
     push('hl'),
     ld_rr_nn('hl', MEM.KANA_MISSED),
-    label('chart_mark'),
+    label(CHART_MARK),
     push('bc'),
     push('de'),
     ld_a_nn(MEM.KANA_SHUFFLE), // the right answer's tile
-    ld_rr_nn('de', ref('chart_of_tile')),
+    ld_rr_nn('de', CHART_OF_TILE),
     push('hl'),
     ld_r_r('l', 'a'),
     ld_r_n('h', u8(0)),
@@ -176,39 +198,39 @@ export function buildChartRoutines(fade: string): Op[] {
     ld_r_r('a', 'hl_ptr'),
     pop('hl'),
     cp_n(u8(NO_ENTRY)),
-    jr_cc('z', ref('chart_mark_done')),
-    call(ref('chart_bit')),
+    jr_cc('z', CHART_MARK_DONE),
+    call(CHART_BIT),
     ld_r_r('a', 'hl_ptr'),
     or_r('b'),
     ld_r_r('hl_ptr', 'a'),
-    label('chart_mark_done'),
+    label(CHART_MARK_DONE),
     pop('de'),
     pop('bc'),
     pop('hl'),
     ret(),
 
     // chart_unmiss: the answer (KANA_SHUFFLE) was practiced right: clear its miss
-    label('chart_unmiss'),
+    label(CHART_UNMISS),
     push('hl'),
     push('bc'),
     push('de'),
     ld_a_nn(MEM.KANA_SHUFFLE),
-    ld_rr_nn('de', ref('chart_of_tile')),
+    ld_rr_nn('de', CHART_OF_TILE),
     ld_r_r('l', 'a'),
     ld_r_n('h', u8(0)),
     add_hl_rr('de'),
     ld_r_r('a', 'hl_ptr'),
     cp_n(u8(NO_ENTRY)),
-    jr_cc('z', ref('chart_mark_done')),
+    jr_cc('z', CHART_MARK_DONE),
     ld_rr_nn('hl', MEM.KANA_MISSED),
-    call(ref('chart_bit')),
+    call(CHART_BIT),
     ld_r_r('a', 'b'),
     cpl(),
     and_r('hl_ptr'),
     ld_r_r('hl_ptr', 'a'),
-    jr(ref('chart_mark_done')),
+    jr(CHART_MARK_DONE),
 
-    label('chart_bit'),
+    label(CHART_BIT),
     ld_r_r('b', 'a'),
     srl('a'),
     srl('a'),
@@ -219,14 +241,14 @@ export function buildChartRoutines(fade: string): Op[] {
     ld_r_r('a', 'b'),
     and_n(u8(7)),
     ld_r_n('b', u8(1)),
-    label('chart_bit_shift'),
+    label(CHART_BIT_SHIFT),
     or_r('a'),
     ret_cc('z'),
     sla('b'),
     dec_r('a'),
-    jr(ref('chart_bit_shift')),
+    jr(CHART_BIT_SHIFT),
 
-    label('chart_show'),
+    label(CHART_SHOW),
     push('bc'),
     ...fadeOut(),
     ...screenOff('chart_vblank'),
@@ -234,9 +256,9 @@ export function buildChartRoutines(fade: string): Op[] {
     ...writeCenteredRow(LAYOUT.titleRow, textToTiles(CHART_TITLE)),
     ...writeCenteredRow(LAYOUT.nextRow, textToTiles(CHART_NEXT)),
     // Each kana: itself if answered right, a dash if not yet; red if ever missed
-    ld_rr_nn('de', ref('chart_layout')),
+    ld_rr_nn('de', CHART_LAYOUT),
     ld_r_n('c', u8(0)),
-    label('chart_entry'),
+    label(CHART_ENTRY),
     ld_a_de(),
     inc_rr('de'),
     ld_r_r('l', 'a'),
@@ -247,54 +269,54 @@ export function buildChartRoutines(fade: string): Op[] {
     push('de'),
     ld_r_r('a', 'c'),
     ld_rr_nn('hl', MEM.KANA_SEEN),
-    call(ref('chart_bit')),
+    call(CHART_BIT),
     ld_r_r('a', 'hl_ptr'),
     and_r('b'),
     pop('de'),
     pop('hl'),
     ld_a_de(), // the kana's tile
     inc_rr('de'),
-    jr_cc('nz', ref('chart_entry_draw')),
+    jr_cc('nz', CHART_ENTRY_DRAW),
     ld_r_n('a', u8(UNSEEN)),
-    label('chart_entry_draw'),
+    label(CHART_ENTRY_DRAW),
     ld_r_r('hl_ptr', 'a'),
     // On the GBC, the missed ones' cells get the red palette (VRAM bank 1)
     ld_a_nn(MEM.IS_CGB),
     or_r('a'),
-    jr_cc('z', ref('chart_entry_next')),
+    jr_cc('z', CHART_ENTRY_NEXT),
     push('hl'),
     push('de'),
     ld_r_r('a', 'c'),
     ld_rr_nn('hl', MEM.KANA_MISSED),
-    call(ref('chart_bit')),
+    call(CHART_BIT),
     ld_r_r('a', 'hl_ptr'),
     and_r('b'),
     pop('de'),
     pop('hl'),
-    jr_cc('z', ref('chart_entry_next')),
+    jr_cc('z', CHART_ENTRY_NEXT),
     ld_r_n('a', u8(1)),
     ldh_n_a(HW.VBK),
     ld_hl_n(u8(missed)),
     ld_r_n('a', u8(0)),
     ldh_n_a(HW.VBK),
-    label('chart_entry_next'),
+    label(CHART_ENTRY_NEXT),
     inc_r('c'),
     ld_r_r('a', 'c'),
     cp_n(u8(CHART_KANA.length)),
-    jr_cc('nz', ref('chart_entry')),
+    jr_cc('nz', CHART_ENTRY),
 
     // The password for what comes next
     pop('bc'),
     ld_r_r('a', 'c'),
     or_r('a'),
-    jr_cc('z', ref('chart_no_password')),
-    call(ref('pass_encode')),
+    jr_cc('z', CHART_NO_PASSWORD),
+    call(PASS_ENCODE),
     ...drawTiles(
       tilemapAddr(CHART_PASSWORD_ROW, passwordLineCol()),
       textToTiles(`${PASSWORD_LABEL} `),
     ),
-    call(ref('pass_draw')),
-    label('chart_no_password'),
+    call(PASS_DRAW),
+    label(CHART_NO_PASSWORD),
     ...fadeIn(fade),
     // The paw beside つぎへ
     ...storeByte(oamField(SPRITE_SLOT.cursor, 'y'), LAYOUT.nextRow * 8 + 16),
@@ -302,16 +324,16 @@ export function buildChartRoutines(fade: string): Op[] {
       oamField(SPRITE_SLOT.cursor, 'x'),
       centerStartCol(Array.from(CHART_NEXT).length) * 8 - 1,
     ),
-    ...storeByte(oamField(SPRITE_SLOT.cursor, 'tile'), SPRITE_TILES.cursor),
+    ...storeByte(oamField(SPRITE_SLOT.cursor, 'tile'), SPRITE_TILE.cursor),
     ...zeroBytes(oamField(SPRITE_SLOT.cursor, 'attr')),
     ...storeByte(MEM.CHART_WAIT, 1),
-    label('chart_wait'),
+    label(CHART_WAIT),
     ...frameWait(),
     ...runDma(),
-    call(ref('joy_read')),
+    call(JOY_READ),
     ld_a_nn(MEM.JOYPAD_NEW),
     and_n(u8(JOY.A | JOY.START)),
-    jr_cc('z', ref('chart_wait')),
+    jr_cc('z', CHART_WAIT),
     ...zeroBytes(MEM.CHART_WAIT),
     ...playSfx('confirm'),
     ret(),

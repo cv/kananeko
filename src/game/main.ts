@@ -48,9 +48,10 @@ import {
   ret,
   ret_cc,
   sla,
+  pool,
   xor_r,
 } from '../asm/ops';
-import { type Op, type U16, ref, u8, u16 } from '../asm/types';
+import { type Op, type U16, u8, u16, Label, labelFamily } from '../asm/types';
 import { SCENE_TILE_BASE } from './backdrop';
 import { buildSpriteData, buildSpriteInit, buildSpriteRoutines, runDma } from './sprites';
 import {
@@ -120,9 +121,7 @@ import {
   bgTileAddr,
   buildFrameWait,
   buildDrawTiles,
-  buildTileLists,
-  resetTileLists,
-  tileListLabel,
+  tileList,
   buildDrawRuns,
   buildClearScreen,
   buildFadeData,
@@ -138,12 +137,70 @@ import {
   writeCenteredRow,
   drawTiles,
 } from './video';
+import {
+  CAT_REST,
+  CAT_TICK,
+  NPC_HIDE,
+  DLG_OPEN_TREE,
+  DLG_OPEN_NODE,
+  DLG_DRAW_BOX,
+  DLG_UPDATE,
+  JOY_READ,
+  KANA_START,
+  KANA_UPDATE,
+  HUD_UPDATE,
+  KANA_DRAW_HUD,
+  SCORE_DIGITS,
+  MENU_DRAW,
+  MENU_UPDATE,
+  PASS_ENCODE,
+  PASS_DRAW,
+  PASSWORD_SCREEN,
+  SCENE_DESC,
+  CHART_SHOW,
+  PRACTICE_START,
+  PRACTICE_RAND,
+  SPEED_FILL,
+  VBLANK_HANDLER,
+  DRAW_RUNS,
+  DRAW_TILES,
+  FADE_IN,
+  PLAY_ROUND,
+  TITLE_SCREEN,
+  SCENE_LOAD,
+  TEXT_DICT,
+  SHARED_PALETTES,
+} from './labels';
+
+// Labels placed in this module
+const TABLE_FIND = new Label('table_find');
+const TABLE_SCAN = new Label('table_scan');
+const TABLE_ABSENT = new Label('table_absent');
+const TABLE_FOUND = new Label('table_found');
+const ROUND_CHECK = new Label('round_check');
+const CHANCE_CHECK = new Label('chance_check');
+const CHANCE_NOT_BAD = new Label('chance_not_bad');
+const CHANCE_FIND = new Label('chance_find');
+const DRAW_STAMPS = new Label('draw_stamps');
+const DRAW_START_BOX = new Label('draw_start_box');
+const TITLE_BLINK = new Label('title_blink');
+const TITLE_PROMPT_ON = new Label('title_prompt_on');
+const INIT_NOT_CGB = new Label('init_not_cgb');
+const TITLE_DEBOUNCE = new Label('title_debounce');
+const TITLE_LOOP = new Label('title_loop');
+const TITLE_NEW_GAME = new Label('title_new_game');
+const SCENE_NO_ROUND = new Label('scene_no_round');
+const SCENE_OPEN_NODE = new Label('scene_open_node');
+const SCENE_COMPLETE = new Label('scene_complete');
+const SCENE_LAST_DONE = new Label('scene_last_done');
+const SCENE_DRAW = new Label('scene_draw');
+const SCENE_CAST_PALETTE = new Label('scene_cast_palette');
 
 export const ROM_HEADER: ROMHeader = {
   title: 'KANANEKO',
   cgbFlag: 0x80, // CGB+DMG compatible
   destinationCode: 0x00, // Japan
-  vblankHandler: 'vblank_handler', // counts frames (see buildFrameWait)
+  vblankHandler: VBLANK_HANDLER, // counts frames (see buildFrameWait)
 };
 
 // ---------------------------------------------------------------------------
@@ -178,7 +235,7 @@ const ENDING_ROWS = { cat: 2, title: 6, stamps: 8, score: 10, password: 16 } as 
 // ---------------------------------------------------------------------------
 
 interface FontSegment {
-  readonly label: string;
+  readonly label: Label;
   readonly first: number;
   readonly oneBit: boolean;
   readonly data: Uint8Array;
@@ -197,7 +254,7 @@ const FONT_SEGMENTS: readonly FontSegment[] = ((): FontSegment[] => {
   return ranges
     .filter((r) => r.end > r.first)
     .map(({ label, first, end, oneBit: isOne }) => ({
-      label,
+      label: new Label(label),
       first,
       oneBit: isOne,
       data: isOne
@@ -210,51 +267,34 @@ const FONT_SEGMENTS: readonly FontSegment[] = ((): FontSegment[] => {
 // Program helpers
 // ---------------------------------------------------------------------------
 
-export function sceneDialogueLabel(sceneIndex: number): string {
-  return `scene${String(sceneIndex)}_dlg`;
+const sceneLabel = (part: string): ((sceneIndex: number) => Label) =>
+  labelFamily((sceneIndex: number) => `scene${String(sceneIndex)}_${part}`);
+
+export const sceneDialogueLabel = sceneLabel('dlg');
+export const sceneChancesLabel = sceneLabel('chances');
+export const sceneRoundsLabel = sceneLabel('rounds');
+export const sceneFadeLabel = sceneLabel('fade');
+export const sceneAnimationLabel = sceneLabel('anim');
+export const sceneColorsLabel = sceneLabel('colors');
+export const sceneTilesLabel = sceneLabel('tiles');
+export const sceneBackdropLabel = sceneLabel('backdrop');
+const castTilesLabel = sceneLabel('npc_tiles');
+const castPalettesLabel = sceneLabel('npc_palettes');
+const castTableLabel = sceneLabel('npc_table');
+
+export function castLabels(sceneIndex: number): { tiles: Label; palettes: Label; table: Label } {
+  return {
+    tiles: castTilesLabel(sceneIndex),
+    palettes: castPalettesLabel(sceneIndex),
+    table: castTableLabel(sceneIndex),
+  };
 }
 
-const SPEED_ROUND_LABEL = 'speed_round';
-
-export function sceneChancesLabel(sceneIndex: number): string {
-  return `scene${String(sceneIndex)}_chances`;
-}
-
-export function sceneRoundsLabel(sceneIndex: number): string {
-  return `scene${String(sceneIndex)}_rounds`;
-}
-
-export function sceneFadeLabel(sceneIndex: number): string {
-  return `scene${String(sceneIndex)}_fade`;
-}
-
-const TITLE_FADE = 'title_fade';
-const CHART_FADE = 'chart_fade';
-
-function resultFadeLabel(screen: { readonly name: string }): string {
-  return `${screen.name}_fade`;
-}
-
-export function castLabels(sceneIndex: number): { tiles: string; palettes: string; table: string } {
-  const prefix = `scene${String(sceneIndex)}_npc`;
-  return { tiles: `${prefix}_tiles`, palettes: `${prefix}_palettes`, table: `${prefix}_table` };
-}
-
-export function sceneAnimationLabel(sceneIndex: number): string {
-  return `scene${String(sceneIndex)}_anim`;
-}
-
-export function sceneColorsLabel(sceneIndex: number): string {
-  return `scene${String(sceneIndex)}_colors`;
-}
-
-export function sceneTilesLabel(sceneIndex: number): string {
-  return `scene${String(sceneIndex)}_tiles`;
-}
-
-export function sceneBackdropLabel(sceneIndex: number): string {
-  return `scene${String(sceneIndex)}_backdrop`;
-}
+const SPEED_ROUND_LABEL = new Label('speed_round');
+const TITLE_FADE = new Label('title_fade');
+const CHART_FADE = new Label('chart_fade');
+const resultFadeLabel = labelFamily((screen: ResultScreen) => `${screen.entry.name}_fade`);
+const SCENE_DLG_LOOP = new Label('scene_dlg_loop');
 
 /** Reset score, delta flash, streak, and lives (plus any extra bytes to zero) for a new run. */
 function resetRunState(...alsoZero: U16[]): Op[] {
@@ -275,18 +315,18 @@ function resetRunState(...alsoZero: U16[]): Op[] {
  * Per-frame engine loop: wait a frame, refresh HUD and input, run `update`,
  * and repeat while the engine's state byte is non-zero.
  */
-function engineLoop(name: string, update: string, stateAddr: U16): Op[] {
+function engineLoop(loop: Label, update: Label, stateAddr: U16): Op[] {
   return [
-    label(name),
+    label(loop),
     ...frameWait(),
     ...runDma(),
-    call(ref('hud_update')), // refresh HUD early in VBlank window
-    call(ref('cat_tick')),
-    call(ref('joy_read')),
-    call(ref(update)),
+    call(HUD_UPDATE), // refresh HUD early in VBlank window
+    call(CAT_TICK),
+    call(JOY_READ),
+    call(update),
     ld_a_nn(stateAddr),
     cp_n(u8(0)),
-    jr_cc('nz', ref(name)),
+    jr_cc('nz', loop),
   ];
 }
 
@@ -301,28 +341,28 @@ function engineLoop(name: string, update: string, stateAddr: U16): Op[] {
  */
 function buildRoundRoutines(): Op[] {
   return [
-    label('table_find'),
+    label(TABLE_FIND),
     push('hl'), // table start, for the offset
     ldi_a_hl(),
     ld_r_r('b', 'a'), // entries left
     ld_r_n('c', u8(1)),
-    label('table_scan'),
+    label(TABLE_SCAN),
     ld_r_r('a', 'b'),
     or_r('a'),
-    jr_cc('z', ref('table_absent')),
+    jr_cc('z', TABLE_ABSENT),
     ldi_a_hl(),
     cp_r('d'),
-    jr_cc('z', ref('table_found')),
+    jr_cc('z', TABLE_FOUND),
     inc_rr('hl'), // skip the offset
     inc_rr('hl'),
     sla('c'),
     dec_r('b'),
-    jr(ref('table_scan')),
-    label('table_absent'),
+    jr(TABLE_SCAN),
+    label(TABLE_ABSENT),
     pop('hl'),
     xor_r('a'), // Z
     ret(),
-    label('table_found'),
+    label(TABLE_FOUND),
     ldi_a_hl(),
     ld_r_r('e', 'a'),
     ld_r_r('d', 'hl_ptr'), // DE = offset
@@ -334,11 +374,11 @@ function buildRoundRoutines(): Op[] {
     or_r('a'), // NZ
     ret(),
 
-    label('round_check'),
+    label(ROUND_CHECK),
     ...loadPointer('hl', MEM.ROUNDS_LO, MEM.ROUNDS_HI),
     ld_a_nn(MEM.DLG_NODE_ID),
     ld_r_r('d', 'a'),
-    call(ref('table_find')),
+    call(TABLE_FIND),
     ret_cc('z'),
     ld_a_nn(MEM.ROUNDS_DONE),
     and_r('c'),
@@ -347,13 +387,13 @@ function buildRoundRoutines(): Op[] {
     or_r('c'),
     ld_nn_a(MEM.ROUNDS_DONE),
     ...storeByte(MEM.KANA_MODE, KanaMode.NORMAL),
-    jr(ref('play_round')),
+    jr(PLAY_ROUND),
 
-    label('chance_check'),
+    label(CHANCE_CHECK),
     ld_a_nn(MEM.DLG_PICK),
     ld_r_r('b', 'a'),
     and_n(u8(BAD_PICK)),
-    jr_cc('z', ref('chance_not_bad')),
+    jr_cc('z', CHANCE_NOT_BAD),
     ld_a_nn(MEM.KANA_LIVES),
     or_r('a'),
     ret_cc('z'), // the conversation is over anyway
@@ -361,34 +401,34 @@ function buildRoundRoutines(): Op[] {
     or_n(u8(REDEEM_KEY)),
     ld_r_r('d', 'a'),
     ld_r_n('a', u8(KanaMode.REDEEM)),
-    jr(ref('chance_find')),
-    label('chance_not_bad'),
+    jr(CHANCE_FIND),
+    label(CHANCE_NOT_BAD),
     ld_r_r('a', 'b'),
     or_r('a'),
     ret_cc('nz'), // only the first reply can be a fill-in
     ld_a_nn(MEM.DLG_FROM_NODE),
     ld_r_r('d', 'a'),
     ld_r_n('a', u8(KanaMode.SAY_IT)),
-    label('chance_find'),
+    label(CHANCE_FIND),
     ld_nn_a(MEM.KANA_MODE),
     ...loadPointer('hl', MEM.CHANCES_LO, MEM.CHANCES_HI),
-    call(ref('table_find')),
+    call(TABLE_FIND),
     ret_cc('z'),
 
-    label('play_round'),
+    label(PLAY_ROUND),
     push('de'),
-    call(ref('npc_hide')),
+    call(NPC_HIDE),
     pop('de'),
-    call(ref('kana_start')),
-    ...engineLoop('round_loop', 'kana_update', MEM.KANA_STATE),
+    call(KANA_START),
+    ...engineLoop(new Label('round_loop'), KANA_UPDATE, MEM.KANA_STATE),
     ...storeByte(MEM.ROUND_RAN, 1),
     ret(),
   ];
 }
 
 interface ResultScreen {
-  /** Label the game jumps to; also the prefix for internal labels */
-  readonly name: string;
+  /** Where the game jumps to; its name prefixes the screen's internal labels */
+  readonly entry: Label;
   /** The cat's face here (a neutral cat blinks) */
   readonly face: CatFace;
   readonly title: string;
@@ -400,15 +440,15 @@ interface ResultScreen {
 }
 
 const ENDING: ResultScreen = {
-  name: 'game_complete',
+  entry: new Label('game_complete'),
   face: 'happy',
   song: 'ending',
   title: ENDING_TITLE,
   colors: ENDING_COLORS,
 };
 
-const GAME_OVER: ResultScreen = {
-  name: 'game_over',
+const GAME_OVER_SCREEN: ResultScreen = {
+  entry: new Label('game_over'),
   face: 'sad',
   song: 'gameOver',
   password: true,
@@ -423,11 +463,11 @@ const STAMP_ROW_WIDTH = SCENES.length * 3 - 1;
 function drawClearedStamps(name: string, row: number): Op[] {
   const startCol = centerStartCol(STAMP_ROW_WIDTH);
   return SCENES.flatMap((scene, i) => {
-    const skip = `${name}_stamp${String(i)}_skip`;
+    const skip = new Label(`${name}_stamp${String(i)}_skip`);
     return [
       ld_a_nn(MEM.SCENE_FLAGS),
       and_n(u8(1 << i)),
-      jr_cc('z', ref(skip)),
+      jr_cc('z', skip),
       ld_rr_nn('hl', u16(tilemapAddr(row, startCol + i * 3))),
       ...requireTiles(scene.icon).flatMap((tile) => [ld_r_n('a', u8(tile)), ldi_hl_a()]),
       label(skip),
@@ -437,67 +477,69 @@ function drawClearedStamps(name: string, row: number): Op[] {
 
 /** Subroutine draw_stamps: the result screens' row of cleared-scene stamps (LCD off) */
 function buildDrawStamps(): Op[] {
-  return [label('draw_stamps'), ...drawClearedStamps('draw_stamps', ENDING_ROWS.stamps), ret()];
+  return [label(DRAW_STAMPS), ...drawClearedStamps('draw_stamps', ENDING_ROWS.stamps), ret()];
 }
 
 /** End-of-run screen: cat, title, cleared-scene stamps, final score; START returns to the title. */
 function buildResultScreen(screen: ResultScreen): Op[] {
-  const { name } = screen;
+  const { entry } = screen;
+  const { name } = entry;
+  const loop = new Label(`${name}_loop`);
   const labelTiles = textToTiles(ENDING_SCORE_LABEL);
   const scoreCol = centerStartCol(labelTiles.length + SCORE_DIGIT_COUNT);
   return [
-    label(name),
+    label(entry),
     ...fadeOut(),
     ...screenOff(`${name}_vblank`),
     ...playMusic(screen.song),
     ...clearScreen(),
     ...zeroBytes(MEM.TITLE_TIMER), // prompt starts visible
 
-    call(ref('kana_draw_hud')),
+    call(KANA_DRAW_HUD),
     ...writeCenteredRow(ENDING_ROWS.title, textToTiles(screen.title)),
-    call(ref('draw_stamps')),
+    call(DRAW_STAMPS),
     ld_rr_nn('hl', u16(tilemapAddr(ENDING_ROWS.score, scoreCol))),
     ...labelTiles.flatMap((tile) => [ld_r_n('a', u8(tile)), ldi_hl_a()]),
-    call(ref('score_digits')),
+    call(SCORE_DIGITS),
     ...buildDrawScoreDigits(ENDING_ROWS.score, scoreCol + labelTiles.length),
-    call(ref('draw_start_box')),
+    call(DRAW_START_BOX),
     ...(screen.password === true
       ? [
           ...storeByte(MEM.KANA_LIVES, MAX_LIVES), // continuing starts with full hearts
-          call(ref('pass_encode')),
+          call(PASS_ENCODE),
           ...drawTiles(
             tilemapAddr(ENDING_ROWS.password, passwordLineCol()),
             textToTiles(`${PASSWORD_LABEL} `),
           ),
-          call(ref('pass_draw')),
+          call(PASS_DRAW),
         ]
       : []),
     ...fadeIn(resultFadeLabel(screen)),
-    ...catFace('cat_rest', screen.face),
+    ...catFace(CAT_REST, screen.face),
     ...placeCat(CAT_SPOTS.portrait),
 
-    label(`${name}_loop`),
+    label(loop),
     ...frameWait(),
     ...runDma(),
-    call(ref('joy_read')),
-    call(ref('title_blink')),
-    call(ref('cat_tick')),
+    call(JOY_READ),
+    call(TITLE_BLINK),
+    call(CAT_TICK),
     ld_a_nn(MEM.JOYPAD_NEW),
     and_n(u8(JOY.START)),
-    jr_cc('z', ref(`${name}_loop`)),
+    jr_cc('z', loop),
     ...playSfx('confirm'),
 
     ...resetRunState(MEM.SCENE_FLAGS),
     ...fadeOut(),
     ...screenOff(`${name}_to_title`),
-    jp(ref('title_screen')),
+    jp(TITLE_SCREEN),
   ];
 }
 
 /** Subroutine: draw the framed PRESS START prompt (LCD off). */
 function buildDrawStartBox(): Op[] {
   return [
-    label('draw_start_box'),
+    label(DRAW_START_BOX),
     ...writeCenteredRow(START_PROMPT_ROW - 1, START_BOX_TOP),
     ...writeCenteredRow(START_PROMPT_ROW, START_BOX_ON),
     ...writeCenteredRow(START_PROMPT_ROW + 1, START_BOX_BOTTOM),
@@ -508,7 +550,7 @@ function buildDrawStartBox(): Op[] {
 /** Subroutine: tick TITLE_TIMER and redraw the START prompt when its blink phase flips. */
 function buildTitleBlink(): Op[] {
   return [
-    label('title_blink'),
+    label(TITLE_BLINK),
     ld_a_nn(MEM.TITLE_TIMER),
     inc_r('a'),
     ld_nn_a(MEM.TITLE_TIMER),
@@ -517,10 +559,10 @@ function buildTitleBlink(): Op[] {
     ret_cc('nz'),
     ld_r_r('a', 'b'),
     and_n(u8(BLINK_BIT)),
-    jr_cc('z', ref('title_prompt_on')),
+    jr_cc('z', TITLE_PROMPT_ON),
     ...writeCenteredRow(START_PROMPT_ROW, START_BOX_OFF),
     ret(),
-    label('title_prompt_on'),
+    label(TITLE_PROMPT_ON),
     ...writeCenteredRow(START_PROMPT_ROW, START_BOX_ON),
     ret(),
   ];
@@ -532,7 +574,6 @@ function buildTitleBlink(): Op[] {
 
 export function buildProgram(): Op[] {
   const packedScenes = buildSceneData();
-  resetTileLists(); // filled in as the code below is generated, emitted last
 
   return [
     // ==== Init ====
@@ -540,9 +581,9 @@ export function buildProgram(): Op[] {
     // A = $11 at boot on a Game Boy Color (LD doesn't touch the flags CP set)
     cp_n(u8(0x11)),
     ld_r_n('a', u8(0)),
-    jr_cc('nz', ref('init_not_cgb')),
+    jr_cc('nz', INIT_NOT_CGB),
     inc_r('a'),
-    label('init_not_cgb'),
+    label(INIT_NOT_CGB),
     ld_rr_nn('sp', u16(0xfffe)),
     // WRAM starts with random contents on real hardware (and in accurate emulators):
     // zero every game variable ($C000-$C0FF), keeping the GBC flag across
@@ -561,9 +602,9 @@ export function buildProgram(): Op[] {
     // BG tiles 0-127 go to $9000 and 128+ to $8800 ($8800 addressing); 1-bit tiles expand
     ...FONT_SEGMENTS.flatMap((segment) =>
       (segment.oneBit ? expandOneBit : copyBlock)(
-        `${segment.label}_copy`,
+        `${segment.label.name}_copy`,
         u16(bgTileAddr(segment.first)),
-        ref(segment.label),
+        segment.label,
         segment.data.length,
       ),
     ),
@@ -578,7 +619,7 @@ export function buildProgram(): Op[] {
     ei(),
 
     // ==== Title Screen (entered with the LCD off) ====
-    label('title_screen'),
+    label(TITLE_SCREEN),
     ...playMusic('title'),
     ...clearScreen(),
 
@@ -586,7 +627,7 @@ export function buildProgram(): Op[] {
     ...zeroBytes(MEM.TITLE_TIMER),
 
     // Score HUD on row 0, title card, and prompt frame (the cat comes after the fade)
-    call(ref('kana_draw_hud')),
+    call(KANA_DRAW_HUD),
     ...LOGO_ROWS.flatMap((row, i) => writeCenteredRow(LOGO_TOP_ROW + i, textToTiles(row))),
     ...cgbAttributes(
       'title_logo_colors',
@@ -599,37 +640,37 @@ export function buildProgram(): Op[] {
       ),
     ),
     ...writeCenteredRow(10, textToTiles(SUBTITLE)),
-    call(ref('menu_draw')),
+    call(MENU_DRAW),
     ...fadeIn(TITLE_FADE),
-    ...catFace('cat_rest', 'neutral'),
+    ...catFace(CAT_REST, 'neutral'),
     ...placeCat(CAT_SPOTS.portrait),
 
     // Wait for all buttons to be released (debounce boot ROM START press)
-    label('title_debounce'),
+    label(TITLE_DEBOUNCE),
     ...frameWait(),
     ...runDma(),
-    call(ref('joy_read')),
+    call(JOY_READ),
     ld_a_nn(MEM.JOYPAD_CUR),
     cp_n(u8(0)),
-    jr_cc('nz', ref('title_debounce')),
+    jr_cc('nz', TITLE_DEBOUNCE),
 
     // The menu: はじめる starts a run, つづき takes a password
-    label('title_loop'),
+    label(TITLE_LOOP),
     ...frameWait(),
     ...runDma(),
-    call(ref('joy_read')),
-    call(ref('cat_tick')),
-    call(ref('menu_update')),
+    call(JOY_READ),
+    call(CAT_TICK),
+    call(MENU_UPDATE),
     or_r('a'),
-    jr_cc('z', ref('title_loop')),
+    jr_cc('z', TITLE_LOOP),
     cp_n(u8(menuPick('はじめる'))),
-    jr_cc('z', ref('title_new_game')),
+    jr_cc('z', TITLE_NEW_GAME),
     ...playSfx('confirm'),
     cp_n(u8(menuPick('つづき'))),
-    jp_cc('z', ref('password_screen')),
-    jp(ref('practice_start')),
+    jp_cc('z', PASSWORD_SCREEN),
+    jp(PRACTICE_START),
 
-    label('title_new_game'),
+    label(TITLE_NEW_GAME),
     ...playSfx('start'),
 
     // START pressed — begin a fresh run at scene 0
@@ -639,47 +680,47 @@ export function buildProgram(): Op[] {
     ld_nn_a(MEM.SCENE_ID),
 
     // ==== Scene load ====
-    label('scene_load'),
-    call(ref('scene_desc')), // everything below reads this scene's entry in scene_table
+    label(SCENE_LOAD),
+    call(SCENE_DESC), // everything below reads this scene's entry in scene_table
     ...storeByte(MEM.ROUNDS_DONE, 0),
     ...sceneWord('rounds'),
     ...storePointer('hl', MEM.ROUNDS_LO, MEM.ROUNDS_HI),
     ...sceneWord('chances'),
     ...storePointer('hl', MEM.CHANCES_LO, MEM.CHANCES_HI),
-    call(ref('scene_draw')),
+    call(SCENE_DRAW),
 
     // ==== Dialogue, with a kana round after each conversation ====
     ...sceneWord('dialogue'),
     ld_r_r('d', 'h'),
     ld_r_r('e', 'l'),
-    call(ref('dlg_open_tree')), // initialize tree and open node 0
+    call(DLG_OPEN_TREE), // initialize tree and open node 0
 
     // Process nodes until the conversation ends
-    ...engineLoop('scene_dlg_loop', 'dlg_update', MEM.DLG_STATE),
+    ...engineLoop(SCENE_DLG_LOOP, DLG_UPDATE, MEM.DLG_STATE),
     ...zeroBytes(MEM.ROUND_RAN),
-    call(ref('chance_check')), // a one-question chance after this choice?
-    call(ref('round_check')), // a kana round before the next node?
+    call(CHANCE_CHECK), // a one-question chance after this choice?
+    call(ROUND_CHECK), // a kana round before the next node?
     ld_a_nn(MEM.ROUND_RAN),
     or_r('a'),
-    jr_cc('z', ref('scene_no_round')),
+    jr_cc('z', SCENE_NO_ROUND),
     // Out of lives → game over
     ld_a_nn(MEM.KANA_LIVES),
     cp_n(u8(0)),
-    jp_cc('z', ref('game_over')),
+    jp_cc('z', GAME_OVER_SCREEN.entry),
     ld_a_nn(MEM.DLG_NODE_ID),
     cp_n(u8(END_OF_CONVERSATION)),
-    jr_cc('z', ref('scene_complete')),
-    call(ref('scene_draw')), // back from the round: the conversation resumes
-    jr(ref('scene_open_node')),
-    label('scene_no_round'),
+    jr_cc('z', SCENE_COMPLETE),
+    call(SCENE_DRAW), // back from the round: the conversation resumes
+    jr(SCENE_OPEN_NODE),
+    label(SCENE_NO_ROUND),
     ld_a_nn(MEM.DLG_NODE_ID),
     cp_n(u8(END_OF_CONVERSATION)),
-    jr_cc('z', ref('scene_complete')),
-    label('scene_open_node'),
-    call(ref('dlg_open_node')),
-    jp(ref('scene_dlg_loop')),
+    jr_cc('z', SCENE_COMPLETE),
+    label(SCENE_OPEN_NODE),
+    call(DLG_OPEN_NODE),
+    jp(SCENE_DLG_LOOP),
 
-    label('scene_complete'),
+    label(SCENE_COMPLETE),
     // ==== Scene complete — set completion flag and advance ====
     ...sceneByte('flag'),
     ld_r_r('b', 'a'),
@@ -691,32 +732,32 @@ export function buildProgram(): Op[] {
     inc_r('a'),
     ld_nn_a(MEM.SCENE_ID),
     cp_n(u8(SCENES.length)),
-    jr_cc('nc', ref('scene_last_done')),
+    jr_cc('nc', SCENE_LAST_DONE),
     // More scenes to go: the kana chart, with the password for the next
     ld_r_n('c', u8(1)),
-    call(ref('chart_show')),
-    jp(ref('scene_load')),
-    label('scene_last_done'),
+    call(CHART_SHOW),
+    jp(SCENE_LOAD),
+    label(SCENE_LAST_DONE),
 
     // ==== Bonus: the speed round ====
     ...storeByte(MEM.KANA_MODE, KanaMode.SPEED),
-    call(ref('practice_rand')),
+    call(PRACTICE_RAND),
     ld_nn_a(MEM.PRACTICE_NEXT),
-    call(ref('speed_fill')), // the missed kana first, then the round's own questions
+    call(SPEED_FILL), // the missed kana first, then the round's own questions
     ld_rr_nn('de', MEM.PRACTICE_BUF),
-    call(ref('play_round')),
+    call(PLAY_ROUND),
     ld_r_n('c', u8(0)),
-    call(ref('chart_show')), // the whole trip's kana, then the ending
+    call(CHART_SHOW), // the whole trip's kana, then the ending
 
     // ==== Game complete — ending screen, then back to the title ====
     ...buildResultScreen(ENDING),
 
     // ==== Game Over ====
-    ...buildResultScreen(GAME_OVER),
+    ...buildResultScreen(GAME_OVER_SCREEN),
 
     // ==== Subroutines ====
     // scene_draw — fade out, draw the current scene (backdrop, cast, HUD, empty box, name), fade in
-    label('scene_draw'),
+    label(SCENE_DRAW),
     ...fadeOut(),
     ...screenOff('scene_vblank'),
     ...playMusic('travel'), // (carries on if it was already playing)
@@ -728,7 +769,7 @@ export function buildProgram(): Op[] {
     ld_r_r('d', 'h'),
     ld_r_r('e', 'l'),
     ld_rr_nn('hl', u16(tilemapAddr(BACKDROP.top, 0))),
-    call(ref('draw_runs')),
+    call(DRAW_RUNS),
 
     // The cast: sprite tiles, GBC sprite palettes 1..n, who speaks when, where they stand
     ...copySceneBlock(u16(MEM.OBJ_TILES + NPC_TILE_BASE * 16), 'castTiles', 'castTilesLength'),
@@ -739,11 +780,11 @@ export function buildProgram(): Op[] {
     ...sceneWord('castPalettes'),
     pop('af'),
     ld_r_r('b', 'a'),
-    label('scene_cast_palette'),
+    label(SCENE_CAST_PALETTE),
     ldi_a_hl(),
     ldh_n_a(HW.OCPD),
     dec_r('b'),
-    jr_cc('nz', ref('scene_cast_palette')),
+    jr_cc('nz', SCENE_CAST_PALETTE),
     ...sceneWord('castTable'),
     ...storePointer('hl', MEM.NPC_TABLE_LO, MEM.NPC_TABLE_HI),
     ...storeByte(MEM.NPC_CURRENT, NPC_NONE),
@@ -763,19 +804,19 @@ export function buildProgram(): Op[] {
       ld_r_r('d', 'h'),
       ld_r_r('e', 'l'),
       ld_rr_nn('hl', u16(tilemapAddr(BACKDROP.top, 0))),
-      call(ref('draw_runs')),
+      call(DRAW_RUNS),
     ]),
-    call(ref('kana_draw_hud')), // hearts + score on row 0
-    call(ref('dlg_draw_box')),
+    call(KANA_DRAW_HUD), // hearts + score on row 0
+    call(DLG_DRAW_BOX),
     // Location name as a label in the box's top border: ┌─── えき ─┐
     ...sceneWord('nameTiles'),
     push('hl'),
     ...sceneWord('nameAddress'),
     pop('de'),
-    call(ref('draw_tiles')),
+    call(DRAW_TILES),
     ...sceneWord('fade'),
-    call(ref('fade_in')),
-    ...catFace('cat_rest', 'neutral'),
+    call(FADE_IN),
+    ...catFace(CAT_REST, 'neutral'),
     ...placeCat(CAT_SPOTS.dialogue),
     ret(),
     ...buildRoundRoutines(),
@@ -854,16 +895,16 @@ export function buildProgram(): Op[] {
       label(sceneAnimationLabel(i)),
       db(packed.animation),
     ]),
-    ...[ENDING, GAME_OVER].flatMap((screen) => [
+    ...[ENDING, GAME_OVER_SCREEN].flatMap((screen) => [
       label(resultFadeLabel(screen)),
       db(buildPaletteSet(screen.colors)),
     ]),
     // Dialogue compression dictionary: two bytes per code (text-codec.ts)
-    label('text_dict'),
+    label(TEXT_DICT),
     db(dialogueCodec().pairs.flat()),
 
     // GBC palettes every screen shares (the palette sets hold only their own)
-    label('shared_palettes'),
+    label(SHARED_PALETTES),
     db(buildSharedPalettes()),
 
     // Everything the engine loads per scene (scene-table.ts)
@@ -882,7 +923,7 @@ export function buildProgram(): Op[] {
         castTable: castLabels(i).table,
         animation: sceneAnimationLabel(i),
         colors: sceneColorsLabel(i),
-        nameTiles: tileListLabel([NAME_TAG_LEFT, ...packed.nameRow, NAME_TAG_RIGHT]),
+        nameTiles: tileList([NAME_TAG_LEFT, ...packed.nameRow, NAME_TAG_RIGHT]),
         nameAddress: u16(
           tilemapAddr(DIALOGUE_LAYOUT.boxTop, DIALOGUE_LAYOUT.nameCol(packed.nameRow.length)),
         ),
@@ -893,7 +934,7 @@ export function buildProgram(): Op[] {
       })),
     ),
     // Tile lists drawn by draw_tiles (collected while generating the code above)
-    ...buildTileLists(),
+    pool(), // tile lists (see tileList)
   ];
 }
 

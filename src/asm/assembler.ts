@@ -1,4 +1,4 @@
-import type { Op } from './types';
+import { Label, type Op, Pooled, type Target } from './types';
 import { at, hex } from './util';
 
 export const ROM_SIZE = 32 * 1024; // 32KB, single bank, no mapper
@@ -26,18 +26,21 @@ export const NINTENDO_LOGO = new Uint8Array([
 
 export interface ROMHeader {
   title: string; // Up to 11 ASCII characters
-  cgbFlag?: number; // $00 = DMG, $80 = CGB+DMG, $C0 = CGB only
+  cgbFlag?: 0x00 | 0x80 | 0xc0; // $00 = DMG, $80 = CGB+DMG, $C0 = CGB only
   cartridgeType?: number; // $00 = ROM only
   romSize?: number; // $00 = 32KB
   ramSize?: number; // $00 = none
-  destinationCode?: number; // $00 = Japan, $01 = international
-  /** Label of a VBlank interrupt handler (JP'd to from $0040); without one, VBlank just returns */
-  vblankHandler?: string;
+  destinationCode?: 0x00 | 0x01; // $00 = Japan, $01 = international
+  /** A VBlank interrupt handler (JP'd to from $0040); without one, VBlank just returns */
+  vblankHandler?: Label;
 }
 
 export interface AssembleResult {
   rom: Uint8Array;
+  /** Every label's address by name, in program order */
   symbols: Map<string, number>;
+  /** Names of labels nothing refers to (dead code, or just markers), in program order */
+  unreferenced: string[];
 }
 
 type Emitting = Extract<Op, { kind: 'inst' | 'data' }>;
@@ -45,6 +48,13 @@ type Emitting = Extract<Op, { kind: 'inst' | 'data' }>;
 interface Positioned {
   op: Emitting;
   address: number;
+}
+
+interface Layout {
+  positioned: Positioned[];
+  addresses: Map<Label, number>;
+  /** Each pooled entry's label, by Pooled.key */
+  pooled: Map<string, Label>;
 }
 
 function addr(n: number): string {
@@ -78,22 +88,57 @@ function writeHeader(rom: Uint8Array, header: ROMHeader): void {
   rom[0x014b] = 0x33; // Old licensee code: $33 = use new licensee code
 }
 
-/** Pass 1: assign addresses, record labels, and reject overlapping or out-of-range output. */
-function layout(program: readonly Op[]): {
-  positioned: Positioned[];
-  symbols: Map<string, number>;
-} {
-  const symbols = new Map<string, number>();
+/** Pass 0: replace pool() with the Pooled data the program refers to, one copy each. */
+function expandPool(program: readonly Op[]): { ops: Op[]; pooled: Map<string, Label> } {
+  const entries = new Map<string, { label: Label; bytes: Uint8Array }>();
+  const counts = new Map<string, number>();
+  for (const op of program) {
+    if (op.kind !== 'inst' || op.refs === undefined) continue;
+    for (const { target } of op.refs) {
+      if (!(target instanceof Pooled) || entries.has(target.key)) continue;
+      const n = counts.get(target.prefix) ?? 0;
+      counts.set(target.prefix, n + 1);
+      entries.set(target.key, {
+        label: new Label(`${target.prefix}_${String(n)}`),
+        bytes: target.bytes,
+      });
+    }
+  }
+
+  const pools = program.filter((op) => op.kind === 'pool').length;
+  if (pools > 1) throw new Error(`A program can have only one pool(), found ${String(pools)}`);
+  if (pools === 0 && entries.size > 0) {
+    throw new Error('The program refers to pooled data but has no pool() to store it in');
+  }
+
+  const data = [...entries.values()].flatMap(({ label, bytes }): Op[] => [
+    { kind: 'label', label },
+    { kind: 'data', bytes },
+  ]);
+  const ops =
+    pools === 0 ? [...program] : program.flatMap((op) => (op.kind === 'pool' ? data : [op]));
+  return { ops, pooled: new Map([...entries].map(([key, { label }]) => [key, label])) };
+}
+
+/** Pass 1: assign addresses, place labels, and reject overlapping or out-of-range output. */
+function layout(program: readonly Op[]): Layout {
+  const { ops, pooled } = expandPool(program);
+  const addresses = new Map<Label, number>();
+  const names = new Set<string>();
   const positioned: Positioned[] = [];
   let pc = PROGRAM_START;
 
-  for (const op of program) {
+  for (const op of ops) {
     switch (op.kind) {
       case 'label':
-        if (symbols.has(op.name)) {
-          throw new Error(`Duplicate label: "${op.name}"`);
+        if (addresses.has(op.label)) {
+          throw new Error(`Label "${op.label.name}" is placed twice`);
         }
-        symbols.set(op.name, pc);
+        if (names.has(op.label.name)) {
+          throw new Error(`Duplicate label: "${op.label.name}"`);
+        }
+        names.add(op.label.name);
+        addresses.set(op.label, pc);
         break;
       case 'org':
         pc = op.address;
@@ -103,6 +148,8 @@ function layout(program: readonly Op[]): {
         positioned.push({ op, address: pc });
         pc += op.bytes.length;
         break;
+      case 'pool':
+        throw new Error('pool() left after expandPool'); // unreachable
     }
   }
 
@@ -128,31 +175,41 @@ function layout(program: readonly Op[]): {
     }
   }
 
-  return { positioned, symbols };
+  return { positioned, addresses, pooled };
 }
 
-/** Pass 2: copy bytes and patch label references. */
-function emit(
-  rom: Uint8Array,
-  positioned: readonly Positioned[],
-  symbols: Map<string, number>,
-): void {
-  for (const { op, address } of positioned) {
+/** The address of a label or pooled entry; `at` is where it's referenced, for errors */
+function resolve({ addresses, pooled }: Layout, target: Target, at: number): number {
+  const label = target instanceof Pooled ? pooled.get(target.key) : target;
+  const address = label === undefined ? undefined : addresses.get(label);
+  if (address !== undefined) return address;
+
+  const name = label?.name ?? (target instanceof Pooled ? target.prefix : target.name);
+  const sameName = [...addresses.keys()].some((placed) => placed.name === name);
+  throw new Error(
+    `Undefined label: "${name}" (referenced at ${addr(at)})` +
+      (sameName ? '; a different Label with that name is placed (labels match by identity)' : ''),
+  );
+}
+
+/** Pass 2: copy bytes and patch references. Returns the labels referred to. */
+function emit(rom: Uint8Array, program: Layout): Set<Label> {
+  const referenced = new Set<Label>();
+  for (const { op, address } of program.positioned) {
     rom.set(op.bytes, address);
     if (op.kind !== 'inst' || op.refs === undefined) continue;
 
     for (const r of op.refs) {
-      const target = symbols.get(r.label);
-      if (target === undefined) {
-        throw new Error(`Undefined label: "${r.label}" (referenced at ${addr(address)})`);
-      }
+      const target = resolve(program, r.target, address);
+      const label = r.target instanceof Pooled ? program.pooled.get(r.target.key) : r.target;
+      if (label !== undefined) referenced.add(label);
 
       if (r.type === 'rel8') {
         // Relative offset from the END of this instruction
         const offset = target - (address + op.bytes.length);
         if (offset < -128 || offset > 127) {
           throw new Error(
-            `JR target "${r.label}" out of range: offset ${String(offset)} at ${addr(address)}`,
+            `JR target "${r.target.name}" out of range: offset ${String(offset)} at ${addr(address)}`,
           );
         }
         rom[address + r.offset] = offset & 0xff;
@@ -163,6 +220,7 @@ function emit(
       }
     }
   }
+  return referenced;
 }
 
 /** Header checksum ($014D): complement of sum of $0134-$014C */
@@ -185,7 +243,7 @@ export function globalChecksum(rom: Uint8Array): number {
 }
 
 /**
- * Two-pass assembler: resolves labels and emits a valid Game Boy ROM.
+ * Assembler: resolves labels and pooled data and emits a valid Game Boy ROM.
  *
  * The program should NOT include the entry point or header — the assembler
  * writes those automatically. Program code begins at $0150.
@@ -194,13 +252,11 @@ export function assemble(program: readonly Op[], header: ROMHeader): AssembleRes
   const rom = new Uint8Array(ROM_SIZE);
   writeHeader(rom, header);
 
-  const { positioned, symbols } = layout(program);
-  emit(rom, positioned, symbols);
+  const laidOut = layout(program);
+  const referenced = emit(rom, laidOut);
   if (header.vblankHandler !== undefined) {
-    const handler = symbols.get(header.vblankHandler);
-    if (handler === undefined) {
-      throw new Error(`Undefined VBlank handler label: "${header.vblankHandler}"`);
-    }
+    const handler = resolve(laidOut, header.vblankHandler, VBLANK_VECTOR);
+    referenced.add(header.vblankHandler);
     rom.set([0xc3, handler & 0xff, handler >> 8], VBLANK_VECTOR); // JP handler
   }
 
@@ -209,7 +265,12 @@ export function assemble(program: readonly Op[], header: ROMHeader): AssembleRes
   rom[0x014e] = (global >> 8) & 0xff;
   rom[0x014f] = global & 0xff;
 
-  return { rom, symbols };
+  const placed = [...laidOut.addresses];
+  return {
+    rom,
+    symbols: new Map(placed.map(([label, address]) => [label.name, address])),
+    unreferenced: placed.filter(([label]) => !referenced.has(label)).map(([label]) => label.name),
+  };
 }
 
 function symbolBank(address: number): number {

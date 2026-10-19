@@ -38,9 +38,49 @@ import {
   sub_r,
   xor_r,
 } from '../asm/ops';
-import { type Op, ref, u8, u16 } from '../asm/types';
+import { type Op, u8, u16, Label, Pooled } from '../asm/types';
 import type { Quad } from './fixed';
 import { SCREEN_COLS, centerStartCol, tilemapAddr, tileRow } from './tilemap';
+import {
+  SOUND_TICK,
+  SHARED_PALETTES,
+  SPRITES_OFF,
+  VBLANK_HANDLER,
+  VRAM_PUT,
+  DRAW_TILES,
+  FILL_TILES,
+  DRAW_RUNS,
+  FADE_IN,
+} from './labels';
+
+// Labels placed in this module
+const FRAME_WAIT = new Label('frame_wait');
+const FRAME_WAIT_STORE = new Label('frame_wait_store');
+const FRAME_WAIT_DONE = new Label('frame_wait_done');
+const VRAM_PUT_WAIT = new Label('vram_put_wait');
+const FILL_TILES_NEXT = new Label('fill_tiles_next');
+const CLEAR_SCREEN = new Label('clear_screen');
+const DRAW_RUNS_NEXT = new Label('draw_runs_next');
+const DRAW_RUNS_CELL = new Label('draw_runs_cell');
+const DRAW_RUNS_NC = new Label('draw_runs_nc');
+const DRAW_RUNS_SAME_ROW = new Label('draw_runs_same_row');
+const PALETTE_PUT = new Label('palette_put');
+const PALETTE_PUT_WAIT = new Label('palette_put_wait');
+const FADE_APPLY = new Label('fade_apply');
+const FADE_BGP_NC = new Label('fade_bgp_nc');
+const FADE_PALETTES = new Label('fade_palettes');
+const FADE_PALETTE = new Label('fade_palette');
+const FADE_COLOR = new Label('fade_color');
+const FADE_SRC_OK = new Label('fade_src_ok');
+const FADE_SRC_NC = new Label('fade_src_nc');
+const FADE_NEXT_NC = new Label('fade_next_nc');
+const FADE_WAIT = new Label('fade_wait');
+const FADE_WAIT_FRAME = new Label('fade_wait_frame');
+const FADE_IN_CURRENT = new Label('fade_in_current');
+const FADE_IN_STEP = new Label('fade_in_step');
+const FADE_OUT = new Label('fade_out');
+const FADE_OUT_STEP = new Label('fade_out_step');
+const FADE_BGP = new Label('fade_bgp');
 
 /** Palette numbers every screen shares (see color.ts) */
 export const PAL = { ui: 0, hud: 1 } as const;
@@ -74,7 +114,7 @@ export function screenOn(): Op[] {
 
 /** Wait for the next VBlank, counting any frame the game's work ran past (frame_wait) */
 export function frameWait(): Op[] {
-  return [call(ref('frame_wait'))];
+  return [call(FRAME_WAIT)];
 }
 
 /**
@@ -85,7 +125,7 @@ export function frameWait(): Op[] {
  */
 export function buildFrameWait(): Op[] {
   return [
-    label('vblank_handler'),
+    label(VBLANK_HANDLER),
     push('af'),
     ld_a_nn(MEM.FRAME_COUNT),
     inc_r('a'),
@@ -93,7 +133,7 @@ export function buildFrameWait(): Op[] {
     pop('af'),
     reti(),
 
-    label('frame_wait'),
+    label(FRAME_WAIT),
     halt(),
     nop(),
     push('af'),
@@ -104,21 +144,21 @@ export function buildFrameWait(): Op[] {
     ld_nn_a(MEM.LAST_FRAME),
     sub_r('c'), // VBlanks since the last wait
     cp_n(u8(2)),
-    jr_cc('c', ref('frame_wait_done')),
+    jr_cc('c', FRAME_WAIT_DONE),
     dec_r('a'),
     ld_r_r('c', 'a'),
     ld_a_nn(MEM.FRAMES_MISSED),
     add_r('c'),
-    jr_cc('nc', ref('frame_wait_store')),
+    jr_cc('nc', FRAME_WAIT_STORE),
     ld_r_n('a', u8(0xff)),
-    label('frame_wait_store'),
+    label(FRAME_WAIT_STORE),
     ld_nn_a(MEM.FRAMES_MISSED),
-    label('frame_wait_done'),
+    label(FRAME_WAIT_DONE),
     // Sound steps once per frame here rather than in the VBlank handler, so it plays
     // the same with interrupts off (the tests' emulator runs without them)
     push('de'),
     push('hl'),
-    call(ref('sound_tick')),
+    call(SOUND_TICK),
     pop('hl'),
     pop('de'),
     pop('bc'),
@@ -139,12 +179,12 @@ const STAT_BUSY = 0x02;
  */
 export function buildVramPut(): Op[] {
   return [
-    label('vram_put'),
+    label(VRAM_PUT),
     push('af'),
-    label('vram_put_wait'),
+    label(VRAM_PUT_WAIT),
     ldh_a_n(HW.STAT),
     and_n(u8(STAT_BUSY)),
-    jr_cc('nz', ref('vram_put_wait')),
+    jr_cc('nz', VRAM_PUT_WAIT),
     pop('af'),
     ldi_hl_a(),
     ret(),
@@ -153,63 +193,42 @@ export function buildVramPut(): Op[] {
 
 /** Write A to [HL+] safely while the LCD is on (see buildVramPut). */
 export function vramPut(): Op[] {
-  return [call(ref('vram_put'))];
+  return [call(VRAM_PUT)];
 }
 
 /** Ends a tile list drawn by draw_tiles (no tile has this index) */
 const TILES_END = 0xff;
 
 /**
- * Tile lists drawn by draw_tiles, stored once each in the data section. Reset at the
- * start of every build (resetTileLists) and emitted at its end (buildTileLists).
+ * A tile list for draw_tiles, ending in TILES_END. The assembler stores it in the
+ * program's pool(), once however many places draw the same tiles.
  */
-const tileLists = new Map<string, { label: string; tiles: readonly number[] }>();
-
-export function resetTileLists(): void {
-  tileLists.clear();
-}
-
-/** Label of a tile list in the data section (identical lists share one) */
-export function tileListLabel(tiles: readonly number[]): string {
-  const key = tiles.join(',');
-  let entry = tileLists.get(key);
-  if (entry === undefined) {
-    entry = { label: `tile_list_${String(tileLists.size)}`, tiles };
-    tileLists.set(key, entry);
-  }
-  return entry.label;
-}
-
-/** The tile lists, each ending in TILES_END */
-export function buildTileLists(): Op[] {
-  return [...tileLists.values()].flatMap(({ label: name, tiles }) => [
-    label(name),
-    db([...tiles, TILES_END]),
-  ]);
+export function tileList(tiles: readonly number[]): Pooled {
+  return new Pooled('tile_list', [...tiles, TILES_END]);
 }
 
 /**
  * Subroutines (drawTiles saves DE around draw_tiles, so callers only lose A and HL):
- *   draw_tiles  HL = tilemap address, DE = tile list (see tileListLabel); safe with the LCD
+ *   draw_tiles  HL = tilemap address, DE = tile list (see tileList); safe with the LCD
  *               on (each write goes through vram_put)
  *   fill_tiles  HL = tilemap address, A = tile, B = count; LCD off
  */
 export function buildDrawTiles(): Op[] {
   return [
-    label('draw_tiles'),
+    label(DRAW_TILES),
     ld_a_de(),
     inc_rr('de'),
     cp_n(u8(TILES_END)),
     ret_cc('z'),
-    call(ref('vram_put')),
-    jr(ref('draw_tiles')),
+    call(VRAM_PUT),
+    jr(DRAW_TILES),
 
-    label('fill_tiles'),
+    label(FILL_TILES),
     push('bc'),
-    label('fill_tiles_next'),
+    label(FILL_TILES_NEXT),
     ldi_hl_a(),
     dec_r('b'),
-    jr_cc('nz', ref('fill_tiles_next')),
+    jr_cc('nz', FILL_TILES_NEXT),
     pop('bc'),
     ret(),
   ];
@@ -221,8 +240,8 @@ export function drawTiles(address: number, tiles: readonly number[]): Op[] {
   return [
     push('de'),
     ld_rr_nn('hl', u16(address)),
-    ld_rr_nn('de', ref(tileListLabel(tiles))),
-    call(ref('draw_tiles')),
+    ld_rr_nn('de', tileList(tiles)),
+    call(DRAW_TILES),
     pop('de'),
   ];
 }
@@ -249,16 +268,17 @@ export type Palette = Quad<number>;
 
 /** Run `ops` only on a Game Boy Color, with VRAM bank 1 (attributes) selected. */
 export function cgbAttributes(name: string, ops: readonly Op[]): Op[] {
+  const skip = new Label(`${name}_skip`);
   return [
     ld_a_nn(MEM.IS_CGB),
     cp_n(u8(0)),
-    jp_cc('z', ref(`${name}_skip`)),
+    jp_cc('z', skip),
     ld_r_n('a', u8(1)),
     ldh_n_a(HW.VBK),
     ...ops,
     xor_r('a'),
     ldh_n_a(HW.VBK),
-    label(`${name}_skip`),
+    label(skip),
   ];
 }
 
@@ -287,7 +307,7 @@ const HUD_ROW = 0;
  */
 export function buildClearScreen(): Op[] {
   return [
-    label('clear_screen'),
+    label(CLEAR_SCREEN),
     ...zeroPages('clear_screen_map', MEM.VRAM_MAP0, 4),
     ...cgbAttributes('clear_screen_attrs', [
       ...zeroPages('clear_screen_attr', MEM.VRAM_MAP0, 4),
@@ -299,7 +319,7 @@ export function buildClearScreen(): Op[] {
 
 /** Clear the screen (tiles and, on GBC, attributes). LCD must be off. */
 export function clearScreen(): Op[] {
-  return [call(ref('clear_screen'))];
+  return [call(CLEAR_SCREEN)];
 }
 
 /**
@@ -325,9 +345,9 @@ export function encodeRuns(palettes: readonly number[]): Uint8Array {
  */
 export function buildDrawRuns(): Op[] {
   return [
-    label('draw_runs'),
+    label(DRAW_RUNS),
     ld_r_n('c', u8(SCREEN_COLS)),
-    label('draw_runs_next'),
+    label(DRAW_RUNS_NEXT),
     ld_a_de(),
     inc_rr('de'),
     cp_n(u8(0)),
@@ -335,24 +355,24 @@ export function buildDrawRuns(): Op[] {
     ld_r_r('b', 'a'), // run length
     ld_a_de(),
     inc_rr('de'), // A = tile or palette
-    label('draw_runs_cell'),
+    label(DRAW_RUNS_CELL),
     ldi_hl_a(),
     dec_r('c'),
-    jr_cc('nz', ref('draw_runs_same_row')),
+    jr_cc('nz', DRAW_RUNS_SAME_ROW),
     // End of a visible row: skip to the next tilemap row
     push('af'),
     ld_r_r('a', 'l'),
     add_n(u8(32 - SCREEN_COLS)),
     ld_r_r('l', 'a'),
-    jr_cc('nc', ref('draw_runs_nc')),
+    jr_cc('nc', DRAW_RUNS_NC),
     inc_r('h'),
-    label('draw_runs_nc'),
+    label(DRAW_RUNS_NC),
     pop('af'),
     ld_r_n('c', u8(SCREEN_COLS)),
-    label('draw_runs_same_row'),
+    label(DRAW_RUNS_SAME_ROW),
     dec_r('b'),
-    jr_cc('nz', ref('draw_runs_cell')),
-    jr(ref('draw_runs_next')),
+    jr_cc('nz', DRAW_RUNS_CELL),
+    jr(DRAW_RUNS_NEXT),
   ];
 }
 
@@ -367,51 +387,51 @@ export const FADE_STEPS = 4;
 /** Frames each fade step is shown */
 export const FADE_STEP_FRAMES = 3;
 /** BGP for each fade level (shade of color index i = max(0, i - k)) */
-const FADE_BGP = [0xe4, 0x90, 0x40, 0x00] as const;
+const FADE_BGP_SHADES = [0xe4, 0x90, 0x40, 0x00] as const;
 
 /** Fade in the palette set at `setLabel`, turning the LCD on first. */
-export function fadeIn(setLabel: string): Op[] {
-  return [ld_rr_nn('hl', ref(setLabel)), call(ref('fade_in'))];
+export function fadeIn(setLabel: Label): Op[] {
+  return [ld_rr_nn('hl', setLabel), call(FADE_IN)];
 }
 
 /** Fade the palette set currently on screen back in (e.g. after redrawing). */
 export function fadeInCurrent(): Op[] {
-  return [call(ref('fade_in_current'))];
+  return [call(FADE_IN_CURRENT)];
 }
 
 /** Fade the screen to its paper color (no-op if the LCD is off). */
 export function fadeOut(): Op[] {
-  return [call(ref('fade_out'))];
+  return [call(FADE_OUT)];
 }
 
 /** Palettes every screen shares (UI, HUD), stored once at shared_palettes (see color.ts) */
-const SHARED_PALETTES = 2;
+const SHARED_PALETTE_COUNT = 2;
 
 /** Subroutines palette_put, fade_apply, fade_palettes, fade_wait, fade_in(_current), fade_out. */
 export function buildFadeRoutines(): Op[] {
   return [
     // palette_put: write A to BCPD once palette RAM is accessible (preserves A)
-    label('palette_put'),
+    label(PALETTE_PUT),
     push('af'),
-    label('palette_put_wait'),
+    label(PALETTE_PUT_WAIT),
     ldh_a_n(HW.STAT),
     and_n(u8(STAT_BUSY)),
-    jr_cc('nz', ref('palette_put_wait')),
+    jr_cc('nz', PALETTE_PUT_WAIT),
     pop('af'),
     ldh_n_a(HW.BCPD),
     ret(),
 
     // fade_apply: show fade level B of the palette set at HL. Preserves B, HL.
-    label('fade_apply'),
+    label(FADE_APPLY),
     push('hl'),
     push('hl'),
-    ld_rr_nn('hl', ref('fade_bgp')),
+    ld_rr_nn('hl', FADE_BGP),
     ld_r_r('a', 'b'),
     add_r('l'),
     ld_r_r('l', 'a'),
-    jr_cc('nc', ref('fade_bgp_nc')),
+    jr_cc('nc', FADE_BGP_NC),
     inc_r('h'),
-    label('fade_bgp_nc'),
+    label(FADE_BGP_NC),
     ld_r_r('a', 'hl_ptr'),
     ldh_n_a(HW.BGP),
     pop('hl'), // the set (the other copy is restored on return)
@@ -419,100 +439,100 @@ export function buildFadeRoutines(): Op[] {
     ldh_n_a(HW.BCPS),
     // The UI and HUD palettes every screen shares, then the set's own
     push('hl'),
-    ld_rr_nn('hl', ref('shared_palettes')),
-    ld_r_n('d', u8(SHARED_PALETTES)),
-    call(ref('fade_palettes')),
+    ld_rr_nn('hl', SHARED_PALETTES),
+    ld_r_n('d', u8(SHARED_PALETTE_COUNT)),
+    call(FADE_PALETTES),
     pop('hl'),
     ldi_a_hl(),
     ld_r_r('d', 'a'), // D = palettes in the set
-    call(ref('fade_palettes')),
+    call(FADE_PALETTES),
     pop('hl'),
     ret(),
 
     // fade_palettes: write D palettes from HL at fade level B. Clobbers A, C, D, HL.
-    label('fade_palettes'),
-    label('fade_palette'),
+    label(FADE_PALETTES),
+    label(FADE_PALETTE),
     ld_r_n('c', u8(0)), // C = color index j
-    label('fade_color'),
+    label(FADE_COLOR),
     push('hl'),
     ld_r_r('a', 'c'),
     sub_r('b'),
-    jr_cc('nc', ref('fade_src_ok')),
+    jr_cc('nc', FADE_SRC_OK),
     xor_r('a'), // max(0, j - k)
-    label('fade_src_ok'),
+    label(FADE_SRC_OK),
     add_r('a'), // 2 bytes per color
     add_r('l'),
     ld_r_r('l', 'a'),
-    jr_cc('nc', ref('fade_src_nc')),
+    jr_cc('nc', FADE_SRC_NC),
     inc_r('h'),
-    label('fade_src_nc'),
+    label(FADE_SRC_NC),
     ldi_a_hl(),
-    call(ref('palette_put')),
+    call(PALETTE_PUT),
     ld_r_r('a', 'hl_ptr'),
-    call(ref('palette_put')),
+    call(PALETTE_PUT),
     pop('hl'),
     inc_r('c'),
     ld_r_r('a', 'c'),
     cp_n(u8(4)),
-    jr_cc('nz', ref('fade_color')),
+    jr_cc('nz', FADE_COLOR),
     ld_r_r('a', 'l'),
     add_n(u8(8)), // next palette
     ld_r_r('l', 'a'),
-    jr_cc('nc', ref('fade_next_nc')),
+    jr_cc('nc', FADE_NEXT_NC),
     inc_r('h'),
-    label('fade_next_nc'),
+    label(FADE_NEXT_NC),
     dec_r('d'),
-    jr_cc('nz', ref('fade_palette')),
+    jr_cc('nz', FADE_PALETTE),
     ret(),
 
     // fade_wait: show the current level for FADE_STEP_FRAMES frames
-    label('fade_wait'),
+    label(FADE_WAIT),
     ld_r_n('c', u8(FADE_STEP_FRAMES)),
-    label('fade_wait_frame'),
-    call(ref('frame_wait')),
+    label(FADE_WAIT_FRAME),
+    call(FRAME_WAIT),
     call(u16(0xff80)), // OAM DMA (see sprites.ts) so sprites update during fades
     dec_r('c'),
-    jr_cc('nz', ref('fade_wait_frame')),
+    jr_cc('nz', FADE_WAIT_FRAME),
     ret(),
 
     // fade_in: HL = palette set. Starts at paper, turns the LCD on, steps to full color.
-    label('fade_in_current'),
+    label(FADE_IN_CURRENT),
     ...loadPointer('hl', MEM.FADE_TABLE_LO, MEM.FADE_TABLE_HI),
-    label('fade_in'),
+    label(FADE_IN),
     ...storePointer('hl', MEM.FADE_TABLE_LO, MEM.FADE_TABLE_HI),
     ld_r_n('b', u8(FADE_STEPS - 1)),
-    call(ref('fade_apply')),
+    call(FADE_APPLY),
     ...screenOn(),
-    label('fade_in_step'),
-    call(ref('fade_wait')),
+    label(FADE_IN_STEP),
+    call(FADE_WAIT),
     dec_r('b'),
-    call(ref('fade_apply')),
+    call(FADE_APPLY),
     ld_r_r('a', 'b'),
     cp_n(u8(0)),
-    jr_cc('nz', ref('fade_in_step')),
+    jr_cc('nz', FADE_IN_STEP),
     ret(),
 
     // fade_out: step the current set to paper. HALT never wakes with the LCD
     // off (no VBlank), so do nothing in that case.
-    label('fade_out'),
+    label(FADE_OUT),
     ldh_a_n(HW.LCDC),
     and_n(u8(LCDC.LCD_ON)),
     ret_cc('z'),
-    call(ref('sprites_off')), // sprites don't fade: take them off first
+    call(SPRITES_OFF), // sprites don't fade: take them off first
     ...loadPointer('hl', MEM.FADE_TABLE_LO, MEM.FADE_TABLE_HI),
     ld_r_n('b', u8(0)),
-    label('fade_out_step'),
-    call(ref('fade_wait')),
+    label(FADE_OUT_STEP),
+    call(FADE_WAIT),
     inc_r('b'),
-    call(ref('fade_apply')),
+    call(FADE_APPLY),
     ld_r_r('a', 'b'),
     cp_n(u8(FADE_STEPS - 1)),
-    jr_cc('nz', ref('fade_out_step')),
+    jr_cc('nz', FADE_OUT_STEP),
     ret(),
   ];
 }
 
 /** Data used by the fade routines */
 export function buildFadeData(): Op[] {
-  return [label('fade_bgp'), db([...FADE_BGP])];
+  return [label(FADE_BGP), db([...FADE_BGP_SHADES])];
 }

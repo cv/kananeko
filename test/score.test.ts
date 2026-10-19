@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { MEM } from '@asm/hardware';
 import { storeByte } from '@asm/macros';
 import { call } from '@asm/ops';
-import { ref } from '@asm/types';
+import {} from '@asm/types';
 import { textToTiles } from '@game/font';
 import {
   MAX_SCORE,
@@ -14,6 +14,7 @@ import {
   buildSubScore,
 } from '@game/kana-hud';
 import { runProgram } from './helpers/run-program';
+import { SCORE_DIGITS } from '@game/labels';
 
 function scoreAfter(start: number, ops: ReturnType<typeof buildAddScore>): number {
   const mem = runProgram(
@@ -35,7 +36,7 @@ describe('score_digits', () => {
         [
           ...storeByte(MEM.KANA_SCORE_LO, score & 0xff),
           ...storeByte(MEM.KANA_SCORE_HI, score >> 8),
-          call(ref('score_digits')),
+          call(SCORE_DIGITS),
         ],
         buildScoreDigits(),
       );

@@ -91,23 +91,74 @@ export const CC = { nz: 0, z: 1, nc: 2, c: 3 } as const;
 export type CCName = keyof typeof CC;
 
 // ---------------------------------------------------------------------------
-// Label references
+// Labels and pooled data
 // ---------------------------------------------------------------------------
 
-/** A reference to a label, resolved during assembly */
-export interface LabelRef {
-  __labelRef: true;
-  name: string;
+const LABEL_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+/**
+ * A position in the program. Place it once with `label(l)` and refer to it by passing
+ * the object itself to jumps, calls, loads and `dw`. Labels match by identity, so a
+ * misspelt label is a compile error rather than an assembly one; the name is what the
+ * .sym file and error messages show, and must be unique in the program.
+ */
+export class Label {
+  readonly name: string;
+
+  constructor(name: string) {
+    if (!LABEL_NAME.test(name)) throw new Error(`Invalid label name: "${name}"`);
+    this.name = name;
+  }
+
+  toString(): string {
+    return this.name;
+  }
 }
 
-/** Create a label reference for use in instructions */
-export function ref(name: string): LabelRef {
-  return { __labelRef: true, name };
+/**
+ * Labels made on demand from a key (one per scene, sound, ...): the same key always
+ * gives the same Label, so the code defining it and the code referring to it agree.
+ */
+export function labelFamily<K>(name: (key: K) => string): (key: K) => Label {
+  const made = new Map<K, Label>();
+  return (key) => {
+    let l = made.get(key);
+    if (l === undefined) {
+      l = new Label(name(key));
+      made.set(key, l);
+    }
+    return l;
+  };
 }
 
-export function isRef(v: unknown): v is LabelRef {
-  return typeof v === 'object' && v !== null && '__labelRef' in v;
+/**
+ * Read-only bytes the assembler stores once, at the program's `pool()`, however many
+ * instructions refer to them: identical data with the same `prefix` shares one copy,
+ * labelled `<prefix>_<n>` in order of first reference.
+ */
+export class Pooled {
+  readonly prefix: string;
+  readonly bytes: Uint8Array;
+
+  constructor(prefix: string, bytes: Uint8Array | readonly number[]) {
+    if (!LABEL_NAME.test(prefix)) throw new Error(`Invalid pool prefix: "${prefix}"`);
+    for (const [i, b] of bytes.entries()) {
+      if (!Number.isInteger(b) || b < 0 || b > 0xff) {
+        throw new RangeError(`Pooled byte ${String(i)} out of range: ${String(b)}`);
+      }
+    }
+    this.prefix = prefix;
+    this.bytes = Uint8Array.from(bytes);
+  }
+
+  /** Identical data under the same prefix is stored once */
+  get key(): string {
+    return `${this.prefix}:${this.bytes.join(',')}`;
+  }
 }
+
+/** What an absolute (16-bit) operand can point at besides a fixed address */
+export type Target = Label | Pooled;
 
 // ---------------------------------------------------------------------------
 // Operations
@@ -115,16 +166,15 @@ export function isRef(v: unknown): v is LabelRef {
 
 /** An operation in the program */
 export type Op =
-  | { kind: 'inst'; bytes: number[]; refs?: OpRef[] }
-  | { kind: 'label'; name: string }
-  | { kind: 'data'; bytes: Uint8Array }
-  | { kind: 'org'; address: number };
+  | { readonly kind: 'inst'; readonly bytes: readonly number[]; readonly refs?: readonly OpRef[] }
+  | { readonly kind: 'label'; readonly label: Label }
+  | { readonly kind: 'data'; readonly bytes: Uint8Array }
+  | { readonly kind: 'org'; readonly address: number }
+  /** Where the assembler stores the program's Pooled data */
+  | { readonly kind: 'pool' };
 
-export interface OpRef {
-  /** Byte offset within the instruction where the reference sits */
-  offset: number;
-  /** Label name to resolve */
-  label: string;
-  /** rel8 = signed relative offset (JR), imm16 = absolute 16-bit LE address */
-  type: 'rel8' | 'imm16';
-}
+export type OpRef =
+  /** A signed offset to a label from the end of the instruction (JR) */
+  | { readonly type: 'rel8'; readonly offset: number; readonly target: Label }
+  /** An absolute little-endian address */
+  | { readonly type: 'imm16'; readonly offset: number; readonly target: Target };

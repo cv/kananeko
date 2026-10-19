@@ -29,7 +29,15 @@ import {
   push,
   ret,
 } from '../asm/ops';
-import { type Op, type U16, ref, u8 } from '../asm/types';
+import { type Op, type Target, type U16, u8, Label } from '../asm/types';
+import { at } from '../asm/util';
+import { SCENE_DESC } from './labels';
+
+// Labels placed in this module
+const SCENE_TABLE = new Label('scene_table');
+const SCENE_WORD = new Label('scene_word');
+const SCENE_BYTE = new Label('scene_byte');
+const COPY_BLOCK = new Label('copy_block');
 
 /** Word fields (2 bytes each), then byte fields */
 const WORDS = [
@@ -60,20 +68,18 @@ export const SCENE_FIELD: Readonly<Record<SceneWord | SceneByte, number>> = Obje
   ...BYTES.map((name, i) => [name, WORDS.length * 2 + i] as const),
 ]) as Record<SceneWord | SceneByte, number>;
 
-export type SceneEntry = Readonly<Record<SceneWord, U16 | string>> &
+export type SceneEntry = Readonly<Record<SceneWord, U16 | Target>> &
   Readonly<Record<SceneByte, number>>;
 
 /** The table: scene_table lists each entry's address; entries follow */
 export function buildSceneTable(entries: readonly SceneEntry[]): Op[] {
+  const labels = entries.map((_, i) => new Label(`scene_entry${String(i)}`));
   return [
-    label('scene_table'),
-    ...entries.map((_, i) => dw(ref(`scene_entry${String(i)}`))),
+    label(SCENE_TABLE),
+    ...labels.map((l) => dw(l)),
     ...entries.flatMap((entry, i) => [
-      label(`scene_entry${String(i)}`),
-      ...WORDS.map((name) => {
-        const value = entry[name];
-        return dw(typeof value === 'string' ? ref(value) : value);
-      }),
+      label(at(labels, i)),
+      ...WORDS.map((name) => dw(entry[name])),
       db(BYTES.map((name) => entry[name])),
     ]),
   ];
@@ -88,12 +94,12 @@ export function buildSceneTable(entries: readonly SceneEntry[]): Op[] {
  */
 export function buildSceneTableRoutines(): Op[] {
   return [
-    label('scene_desc'),
+    label(SCENE_DESC),
     ld_a_nn(MEM.SCENE_ID),
     add_r('a'),
     ld_r_r('e', 'a'),
     ld_r_n('d', u8(0)),
-    ld_rr_nn('hl', ref('scene_table')),
+    ld_rr_nn('hl', SCENE_TABLE),
     add_hl_rr('de'),
     ldi_a_hl(),
     ld_r_r('h', 'hl_ptr'),
@@ -101,7 +107,7 @@ export function buildSceneTableRoutines(): Op[] {
     ...storePointer('hl', MEM.SCENE_DESC_LO, MEM.SCENE_DESC_HI),
     ret(),
 
-    label('scene_word'),
+    label(SCENE_WORD),
     ld_r_r('e', 'a'),
     ld_r_n('d', u8(0)),
     ...loadPointer('hl', MEM.SCENE_DESC_LO, MEM.SCENE_DESC_HI),
@@ -111,7 +117,7 @@ export function buildSceneTableRoutines(): Op[] {
     ld_r_r('l', 'a'),
     ret(),
 
-    label('scene_byte'),
+    label(SCENE_BYTE),
     ld_r_r('e', 'a'),
     ld_r_n('d', u8(0)),
     ...loadPointer('hl', MEM.SCENE_DESC_LO, MEM.SCENE_DESC_HI),
@@ -119,26 +125,26 @@ export function buildSceneTableRoutines(): Op[] {
     ld_r_r('a', 'hl_ptr'),
     ret(),
 
-    label('copy_block'),
+    label(COPY_BLOCK),
     ld_a_de(),
     ldi_hl_a(),
     inc_rr('de'),
     dec_rr('bc'),
     ld_r_r('a', 'b'),
     or_r('c'),
-    jr_cc('nz', ref('copy_block')),
+    jr_cc('nz', COPY_BLOCK),
     ret(),
   ];
 }
 
 /** HL = a word field of the current scene */
 export function sceneWord(field: SceneWord): Op[] {
-  return [ld_r_n('a', u8(SCENE_FIELD[field])), call(ref('scene_word'))];
+  return [ld_r_n('a', u8(SCENE_FIELD[field])), call(SCENE_WORD)];
 }
 
 /** A = a byte field of the current scene */
 export function sceneByte(field: SceneByte): Op[] {
-  return [ld_r_n('a', u8(SCENE_FIELD[field])), call(ref('scene_byte'))];
+  return [ld_r_n('a', u8(SCENE_FIELD[field])), call(SCENE_BYTE)];
 }
 
 /**
@@ -154,6 +160,6 @@ export function copySceneBlock(dst: U16, source: SceneWord, length: SceneWord): 
     ld_r_r('c', 'l'),
     pop('de'),
     ld_rr_nn('hl', dst),
-    call(ref('copy_block')),
+    call(COPY_BLOCK),
   ];
 }

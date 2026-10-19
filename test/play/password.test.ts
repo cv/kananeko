@@ -7,8 +7,8 @@ import {
   PASSWORD_LABEL,
   PASSWORD_LENGTH,
   PASSWORD_PROMPT,
-  PASSWORD_SCREEN,
-  PASSWORD_WRONG,
+  PASSWORD_LAYOUT,
+  PASSWORD_WRONG_TEXT,
   decodePassword,
   encodePassword,
   passwordLineCol,
@@ -41,7 +41,7 @@ function openPasswordScreen(runner: GameRunner): GameRunner {
   return runner
     .waitUntil(
       () =>
-        readCentered(runner, PASSWORD_SCREEN.promptRow, PASSWORD_PROMPT) ===
+        readCentered(runner, PASSWORD_LAYOUT.promptRow, PASSWORD_PROMPT) ===
         asSeenOnScreen(PASSWORD_PROMPT),
       'the password screen',
     )
@@ -78,7 +78,7 @@ describe('Given the title screen', () => {
 
   it('opens the password screen from つづき', () => {
     const runner = openPasswordScreen(atTitle());
-    expect(readCentered(runner, PASSWORD_SCREEN.promptRow, PASSWORD_PROMPT)).toBe(
+    expect(readCentered(runner, PASSWORD_LAYOUT.promptRow, PASSWORD_PROMPT)).toBe(
       asSeenOnScreen(PASSWORD_PROMPT),
     );
   });
@@ -108,13 +108,13 @@ describe('Given a password typed in', () => {
     const wrong = 'ああああああ';
     expect(decodePassword(wrong, SCENES.length)).toBeUndefined();
     const runner = openPasswordScreen(atTitle()).typePassword(wrong).frames(2);
-    expect(readCentered(runner, PASSWORD_SCREEN.messageRow, PASSWORD_WRONG)).toBe(
-      asSeenOnScreen(PASSWORD_WRONG),
+    expect(readCentered(runner, PASSWORD_LAYOUT.messageRow, PASSWORD_WRONG_TEXT)).toBe(
+      asSeenOnScreen(PASSWORD_WRONG_TEXT),
     );
     expect(runner.sfx).toBe('wrong');
     runner.pressB().frames(2);
     expect(runner.readMem(MEM.PASS_LEN)).toBe(PASSWORD_LENGTH - 1);
-    expect(readCentered(runner, PASSWORD_SCREEN.messageRow, PASSWORD_WRONG).trim()).toBe('');
+    expect(readCentered(runner, PASSWORD_LAYOUT.messageRow, PASSWORD_WRONG_TEXT).trim()).toBe('');
   });
 
   it('goes back to the title on B with nothing typed', () => {
