@@ -11,7 +11,7 @@ import {
 } from '@game/main';
 import { SCENES, buildSceneData } from '@game/scene';
 import type { Label } from '@asm/types';
-import { rom, symbols } from './helpers/game-runner';
+import { rom, symbols, unreferenced } from './helpers/game-runner';
 
 function bytesAt(label: string | Label, length: number): Uint8Array {
   const addr = symbols.get(String(label));
@@ -29,6 +29,11 @@ describe('Given the ROM has been assembled', () => {
     expect(rom[0x0143]).toBe(0x80); // CGB + DMG
     expect(rom[0x014d]).toBe(headerChecksum(rom));
     expect(((rom[0x014e] ?? 0) << 8) | (rom[0x014f] ?? 0)).toBe(globalChecksum(rom));
+  });
+
+  it('has no dead code: every label is referred to', () => {
+    // The ending screen is reached by falling through from the last scene
+    expect(unreferenced).toEqual(['game_complete']);
   });
 
   it('starts the program with DI at $0150', () => {

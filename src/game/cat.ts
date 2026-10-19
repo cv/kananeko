@@ -8,7 +8,6 @@
  *
  * Subroutines:
  *   cat_place  B = left, C = top (screen pixels): show the cat with its current face
- *   cat_hide   take it off screen
  *   cat_react  A = face: show it for a moment, then return to the resting face
  *   cat_rest   A = face: the face it returns to (and blinks from, if neutral)
  *   cat_tick   once per frame: count down a reaction, blink
@@ -40,7 +39,6 @@ import {
   ret,
   ret_cc,
   and_n,
-  xor_r,
 } from '../asm/ops';
 import { type Op, u8, u16, Label } from '../asm/types';
 import { hi, lo } from '../asm/util';
@@ -57,8 +55,6 @@ const CAT_TILES = new Label('cat_tiles');
 const CAT_PLACE = new Label('cat_place');
 const CAT_PLACE_ROW = new Label('cat_place_row');
 const CAT_PLACE_COL = new Label('cat_place_col');
-const CAT_HIDE = new Label('cat_hide');
-const CAT_HIDE_SLOT = new Label('cat_hide_slot');
 const CAT_SET_FACE = new Label('cat_set_face');
 const CAT_SHOW_FACE = new Label('cat_show_face');
 const CAT_FACE_TILE = new Label('cat_face_tile');
@@ -184,20 +180,6 @@ export function buildCatRoutines(): Op[] {
     dec_r('e'),
     jr_cc('nz', CAT_PLACE_ROW),
     jr(CAT_SHOW_FACE),
-
-    // cat_hide
-    label(CAT_HIDE),
-    ld_rr_nn('hl', oamField(SPRITE_SLOT.cat, 'y')),
-    ld_r_n('b', u8(COLS * ROWS)),
-    xor_r('a'),
-    label(CAT_HIDE_SLOT),
-    ldi_hl_a(),
-    inc_rr('hl'),
-    inc_rr('hl'),
-    inc_rr('hl'),
-    dec_r('b'),
-    jr_cc('nz', CAT_HIDE_SLOT),
-    ret(),
 
     // cat_rest: A = resting face
     label(CAT_REST),

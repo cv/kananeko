@@ -17,9 +17,9 @@ import { SCENES, sceneRounds } from '@game/scene';
 import { DialogueState, END_OF_CONVERSATION, KanaMode, KanaState } from '@game/state';
 
 // Build the ROM once per worker — shared across all tests
-const { rom, symbols } = buildRom();
+const { rom, symbols, unreferenced } = buildRom();
 
-export { rom, symbols };
+export { rom, symbols, unreferenced };
 
 type SaveStatePayload = ReturnType<EmulatorCore['saveState']>;
 
