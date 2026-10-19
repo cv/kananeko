@@ -5,6 +5,7 @@
  * game scenarios instead of raw frame counts and hex addresses.
  */
 
+import { CHAR_MAP } from '@game/font';
 import { PASSWORD_ALPHABET } from '@game/password';
 import { MUSIC_NONE, SFX, SFX_NONE, SONGS, type SfxName, type SongName } from '@game/sound';
 import Gameboy from 'serverboy';
@@ -304,6 +305,28 @@ export class GameRunner {
   }
 
   /** Test shortcut: set the lives left by writing WRAM directly */
+  /** Mark chart entries as missed (and nothing else) */
+  setMissed(entries: readonly number[]): this {
+    const memory = this.getMemory();
+    for (let i = 0; i < 6; i++) memory[MEM.KANA_MISSED + i] = 0;
+    for (const i of entries) {
+      const address = MEM.KANA_MISSED + (i >> 3);
+      memory[address] = (memory[address] ?? 0) | (1 << (i & 7));
+    }
+    return this;
+  }
+
+  /** Whether chart entry `i` is marked missed */
+  isMissed(i: number): boolean {
+    return (this.readMem(MEM.KANA_MISSED + (i >> 3)) & (1 << (i & 7))) !== 0;
+  }
+
+  /** The current kana question's answer */
+  get kanaAnswer(): string {
+    const tile = this.readMem(MEM.KANA_SHUFFLE);
+    return Object.entries(CHAR_MAP).find(([, t]) => t === tile)?.[0] ?? '?';
+  }
+
   setLives(lives: number): this {
     this.getMemory()[MEM.KANA_LIVES] = lives;
     return this;

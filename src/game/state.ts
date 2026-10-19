@@ -30,6 +30,8 @@ export const KanaMode = {
   REDEEM: 2,
   /** One try against the clock: the bonus round before the ending */
   SPEED: 3,
+  /** One try, no score or hearts: practicing missed kana from the title menu (B quits) */
+  PRACTICE: 4,
 } as const;
 
 /** Bit of MEM.DLG_PICK set when the last choice was a bad answer */

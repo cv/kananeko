@@ -114,6 +114,7 @@ import {
 } from './scene-table';
 import { CHART_COLORS, ENDING_COLORS, GAME_OVER_COLORS, TITLE_COLORS } from './scenes/colors';
 import { buildChartData, buildChartRoutines } from './chart';
+import { buildPracticeData, buildPracticeLoop, buildPracticeRoutines } from './practice';
 import { BACKDROP } from './backdrop';
 import {
   bgTileAddr,
@@ -621,10 +622,12 @@ export function buildProgram(): Op[] {
     call(ref('menu_update')),
     or_r('a'),
     jr_cc('z', ref('title_loop')),
-    cp_n(u8(menuPick('つづき'))),
-    jr_cc('nz', ref('title_new_game')),
+    cp_n(u8(menuPick('はじめる'))),
+    jr_cc('z', ref('title_new_game')),
     ...playSfx('confirm'),
-    jp(ref('password_screen')),
+    cp_n(u8(menuPick('つづき'))),
+    jp_cc('z', ref('password_screen')),
+    jp(ref('practice_start')),
 
     label('title_new_game'),
     ...playSfx('start'),
@@ -697,7 +700,10 @@ export function buildProgram(): Op[] {
 
     // ==== Bonus: the speed round ====
     ...storeByte(MEM.KANA_MODE, KanaMode.SPEED),
-    ld_rr_nn('de', ref(SPEED_ROUND_LABEL)),
+    call(ref('practice_rand')),
+    ld_nn_a(MEM.PRACTICE_NEXT),
+    call(ref('speed_fill')), // the missed kana first, then the round's own questions
+    ld_rr_nn('de', MEM.PRACTICE_BUF),
     call(ref('play_round')),
     ld_r_n('c', u8(0)),
     call(ref('chart_show')), // the whole trip's kana, then the ending
@@ -783,6 +789,8 @@ export function buildProgram(): Op[] {
     ...buildPasswordRoutines(SCENES.length),
     ...buildPasswordScreen(TITLE_FADE),
     ...buildChartRoutines(CHART_FADE),
+    ...buildPracticeRoutines(SPEED_ROUND_LABEL),
+    ...buildPracticeLoop(),
     ...buildDrawStamps(),
     ...buildDialogueEngine(),
     ...buildTextNext(dialogueCodec().base),
@@ -807,6 +815,7 @@ export function buildProgram(): Op[] {
     ...buildSoundData(),
     ...buildPasswordData(),
     ...buildChartData(),
+    ...buildPracticeData(),
     label(CHART_FADE),
     db(buildPaletteSet(CHART_COLORS)),
     ...FONT_SEGMENTS.flatMap((segment) => [label(segment.label), db(segment.data)]),

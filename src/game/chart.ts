@@ -35,6 +35,7 @@ import {
   sla,
   srl,
   ld_hl_n,
+  cpl,
 } from '../asm/ops';
 import { HW } from '../asm/hardware';
 import { type Op, ref, u8 } from '../asm/types';
@@ -185,6 +186,27 @@ export function buildChartRoutines(fade: string): Op[] {
     pop('bc'),
     pop('hl'),
     ret(),
+
+    // chart_unmiss: the answer (KANA_SHUFFLE) was practiced right: clear its miss
+    label('chart_unmiss'),
+    push('hl'),
+    push('bc'),
+    push('de'),
+    ld_a_nn(MEM.KANA_SHUFFLE),
+    ld_rr_nn('de', ref('chart_of_tile')),
+    ld_r_r('l', 'a'),
+    ld_r_n('h', u8(0)),
+    add_hl_rr('de'),
+    ld_r_r('a', 'hl_ptr'),
+    cp_n(u8(NO_ENTRY)),
+    jr_cc('z', ref('chart_mark_done')),
+    ld_rr_nn('hl', MEM.KANA_MISSED),
+    call(ref('chart_bit')),
+    ld_r_r('a', 'b'),
+    cpl(),
+    and_r('hl_ptr'),
+    ld_r_r('hl_ptr', 'a'),
+    jr(ref('chart_mark_done')),
 
     label('chart_bit'),
     ld_r_r('b', 'a'),

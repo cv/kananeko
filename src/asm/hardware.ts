@@ -170,6 +170,10 @@ export const MEM = {
   PASS_CURSOR: u16(0xc0eb), // The kana grid's highlighted cell (0-31)
   MENU_CURSOR: u16(0xc0ec), // The title menu's highlighted item
   CHART_WAIT: u16(0xc0ed), // 1 while the kana chart waits for a button
+  PRACTICE_NEXT: u16(0xc0ee), // Where the next practice pick starts looking (a chart entry)
+  PRACTICE_QUIT: u16(0xc0ef), // Set when B leaves practice
+  PRACTICE_SEED: u16(0xc0fc), // Mixed into the practice picks' randomness
+  PRACTICE_BUF: u16(0xc200), // Questions picked for a practice or speed round, then a 0
 
   // WRAM — the kana chart (see chart.ts): a bit per kana, in CHART_KANA order
   KANA_SEEN: u16(0xc0f0), // CHART_BYTES bytes: answered right ($C0F0-$C0F5)

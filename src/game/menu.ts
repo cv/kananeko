@@ -30,7 +30,7 @@ import { centerStartCol } from './tilemap';
 import { writeCenteredRow } from './video';
 
 /** The menu's items, in order; menu_update returns an item's index + 1 when it's picked */
-export const TITLE_MENU = ['はじめる', 'つづき'] as const;
+export const TITLE_MENU = ['はじめる', 'つづき', 'れんしゅう'] as const;
 
 export type MenuItem = (typeof TITLE_MENU)[number];
 

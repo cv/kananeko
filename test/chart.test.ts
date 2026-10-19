@@ -40,6 +40,10 @@ describe('Given the chart', () => {
     }
   });
 
+  it('has no cell past the last kana', () => {
+    expect(() => chartCell(CHART_KANA.length)).toThrow();
+  });
+
   it('counts every quiz answer in the game toward some kana', () => {
     const answers = [
       ...SCENES.flatMap((_, i) =>

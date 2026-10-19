@@ -504,6 +504,16 @@ export function buildKanaEngine(): Op[] {
     // kana_await_input — Check d-pad, compare with correct position.
     // =================================================================
     label('kana_await_input'),
+    // Practice: B quits (see practice.ts)
+    ld_a_nn(MEM.KANA_MODE),
+    cp_n(u8(KanaMode.PRACTICE)),
+    jr_cc('nz', ref('practice_no_quit')),
+    ld_a_nn(MEM.JOYPAD_NEW),
+    and_n(u8(JOY.B)),
+    jr_cc('z', ref('practice_no_quit')),
+    ...storeByte(MEM.PRACTICE_QUIT, 1),
+    jp(ref('kana_all_done')),
+    label('practice_no_quit'),
     // Speed round: tick the clock; running out counts as a miss
     ld_a_nn(MEM.KANA_MODE),
     cp_n(u8(KanaMode.SPEED)),
@@ -535,6 +545,8 @@ export function buildKanaEngine(): Op[] {
     ld_a_nn(MEM.KANA_MODE),
     cp_n(u8(KanaMode.REDEEM)),
     jp_cc('z', ref('kana_redeem_win')),
+    cp_n(u8(KanaMode.PRACTICE)),
+    jp_cc('z', ref('kana_practice_win')),
     ld_a_nn(MEM.KANA_ATTEMPTS),
     cp_n(u8(0)),
     jr_cc('nz', ref('kana_score_attempt1')),
@@ -554,6 +566,8 @@ export function buildKanaEngine(): Op[] {
     ...buildSetDelta(DELTA_PLUS_10),
     jr(ref('kana_correct_done')),
 
+    label('kana_practice_win'), // practiced right: no longer a missed kana, no points
+    call(ref('chart_unmiss')),
     label('kana_score_none'), // attempt 2: +0
     ...buildClearDelta(),
 
