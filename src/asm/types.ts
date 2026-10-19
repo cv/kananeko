@@ -99,19 +99,24 @@ const LABEL_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 /**
  * A position in the program. Place it once with `label(l)` and refer to it by passing
  * the object itself to jumps, calls, loads and `dw`. Labels match by identity, so a
- * misspelt label is a compile error rather than an assembly one; the name is what the
- * .sym file and error messages show, and must be unique in the program.
+ * misspelt label is a compile error rather than an assembly one.
+ *
+ * A name is what the .sym file and error messages show, and must be unique in the
+ * program. Leave it out for a local label (a loop, a skipped block): the assembler
+ * names it after the named label before it, as `kana_update.2`.
  */
 export class Label {
-  readonly name: string;
+  readonly name: string | undefined;
 
-  constructor(name: string) {
-    if (!LABEL_NAME.test(name)) throw new Error(`Invalid label name: "${name}"`);
+  constructor(name?: string) {
+    if (name !== undefined && !LABEL_NAME.test(name)) {
+      throw new Error(`Invalid label name: "${name}"`);
+    }
     this.name = name;
   }
 
   toString(): string {
-    return this.name;
+    return this.name ?? 'a local label';
   }
 }
 

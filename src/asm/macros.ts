@@ -1,9 +1,8 @@
 /**
  * Reusable instruction sequences (macros) built on top of the raw opcodes.
  *
- * Every macro that needs labels takes an explicit `name`, which becomes the
- * label prefix. That keeps symbol names meaningful in the .sym file, avoids
- * hidden global counters, and lets the assembler reject accidental reuse.
+ * Macros that branch use local labels (`new Label()`), which the assembler names
+ * after the named label before them, so they need no names of their own.
  */
 
 import { HW } from './hardware';
@@ -37,14 +36,14 @@ import { lo } from './util';
 const VBLANK_LINE = 144;
 
 /** Busy-wait until the LCD reaches VBlank (LY == 144). */
-export function waitVBlank(name: string): Op[] {
-  const loop = new Label(name);
+export function waitVBlank(): Op[] {
+  const loop = new Label();
   return [label(loop), ldh_a_n(HW.LY), cp_n(u8(VBLANK_LINE)), jr_cc('nz', loop)];
 }
 
 /** Wait for VBlank, then switch the LCD off so VRAM can be written freely. */
-export function lcdOff(name: string): Op[] {
-  return [...waitVBlank(name), xor_r('a'), ldh_n_a(HW.LCDC)];
+export function lcdOff(): Op[] {
+  return [...waitVBlank(), xor_r('a'), ldh_n_a(HW.LCDC)];
 }
 
 /** Switch the LCD on with the given LCDC flags. */
@@ -103,10 +102,10 @@ function checkPages(macro: string, pages: number): void {
 }
 
 /** Fill `count` (1-256) bytes starting at `dst` with zero. Clobbers A, B, HL. */
-export function zeroBlock(name: string, dst: U16, count: number): Op[] {
+export function zeroBlock(dst: U16, count: number): Op[] {
   if (!Number.isInteger(count) || count < 1 || count > 256)
     throw new RangeError(`zeroBlock count must be 1-256, got ${String(count)}`);
-  const loop = new Label(name);
+  const loop = new Label();
   return [
     ld_rr_nn('hl', dst),
     xor_r('a'),
@@ -119,9 +118,9 @@ export function zeroBlock(name: string, dst: U16, count: number): Op[] {
 }
 
 /** Fill `pages` (1-255) × 256 bytes starting at `dst` with zero. Clobbers A, BC, HL. */
-export function zeroPages(name: string, dst: U16, pages: number): Op[] {
+export function zeroPages(dst: U16, pages: number): Op[] {
   checkPages('zeroPages', pages);
-  const loop = new Label(name);
+  const loop = new Label();
   return [
     ld_rr_nn('hl', dst),
     xor_r('a'),
@@ -137,10 +136,10 @@ export function zeroPages(name: string, dst: U16, pages: number): Op[] {
 }
 
 /** Copy `count` (1-256) bytes from `src` to `dst`. Clobbers A, B, DE, HL. */
-export function copyBytes(name: string, dst: U16, src: U16 | Target, count: number): Op[] {
+export function copyBytes(dst: U16, src: U16 | Target, count: number): Op[] {
   if (!Number.isInteger(count) || count < 1 || count > 256)
     throw new RangeError(`copyBytes count must be 1-256, got ${String(count)}`);
-  const loop = new Label(name);
+  const loop = new Label();
   return [
     ld_rr_nn('hl', dst),
     ld_rr_nn('de', src),
@@ -155,10 +154,10 @@ export function copyBytes(name: string, dst: U16, src: U16 | Target, count: numb
 }
 
 /** Copy exactly `count` (1-65535) bytes from `src` to `dst`. Clobbers A, BC, DE, HL. */
-export function copyBlock(name: string, dst: U16, src: U16 | Target, count: number): Op[] {
+export function copyBlock(dst: U16, src: U16 | Target, count: number): Op[] {
   if (!Number.isInteger(count) || count < 1 || count > 0xffff)
     throw new RangeError(`copyBlock count must be 1-65535, got ${String(count)}`);
-  const loop = new Label(name);
+  const loop = new Label();
   return [
     ld_rr_nn('hl', dst),
     ld_rr_nn('de', src),
@@ -178,10 +177,10 @@ export function copyBlock(name: string, dst: U16, src: U16 | Target, count: numb
  * Copy `count` (1-65535) bytes of 1bpp tile data to `dst`, writing each byte twice
  * (both bit planes), so set pixels become color 3. Clobbers A, BC, DE, HL.
  */
-export function expandOneBit(name: string, dst: U16, src: U16 | Target, count: number): Op[] {
+export function expandOneBit(dst: U16, src: U16 | Target, count: number): Op[] {
   if (!Number.isInteger(count) || count < 1 || count > 0xffff)
     throw new RangeError(`expandOneBit count must be 1-65535, got ${String(count)}`);
-  const loop = new Label(name);
+  const loop = new Label();
   return [
     ld_rr_nn('hl', dst),
     ld_rr_nn('de', src),
@@ -199,9 +198,9 @@ export function expandOneBit(name: string, dst: U16, src: U16 | Target, count: n
 }
 
 /** Copy `pages` (1-255) × 256 bytes from `src` to `dst`. Clobbers A, BC, DE, HL. */
-export function copyPages(name: string, dst: U16, src: U16 | Target, pages: number): Op[] {
+export function copyPages(dst: U16, src: U16 | Target, pages: number): Op[] {
   checkPages('copyPages', pages);
-  const loop = new Label(name);
+  const loop = new Label();
   return [
     ld_rr_nn('hl', dst),
     ld_rr_nn('de', src),
@@ -223,8 +222,6 @@ export function copyPages(name: string, dst: U16, src: U16 | Target, pages: numb
 // ---------------------------------------------------------------------------
 
 export interface SwitchOptions {
-  /** Label prefix; must be unique in the program. */
-  readonly name: string;
   /**
    * Ops that set the Z flag when case `i` matches. Defaults to `cp i` against A.
    * Not called for the last case, which is the fall-through default.
@@ -238,9 +235,9 @@ export interface SwitchOptions {
  * Compare-and-branch chain: run `cases[i]` for the first matching case,
  * falling through to the last case when none of the others match.
  */
-export function switchCases(cases: readonly (readonly Op[])[], options: SwitchOptions): Op[] {
-  const { name, compare = (i): Op[] => [cp_n(u8(i))], exit = 'jump' } = options;
-  const done = new Label(`${name}_done`);
+export function switchCases(cases: readonly (readonly Op[])[], options: SwitchOptions = {}): Op[] {
+  const { compare = (i): Op[] => [cp_n(u8(i))], exit = 'jump' } = options;
+  const done = new Label();
   const ops: Op[] = [];
 
   cases.forEach((body, i) => {
@@ -249,7 +246,7 @@ export function switchCases(cases: readonly (readonly Op[])[], options: SwitchOp
       ops.push(...body);
       return;
     }
-    const next = new Label(`${name}_case${String(i + 1)}`);
+    const next = new Label();
     // The assembler makes these JRs when the case is short enough
     ops.push(...compare(i), jp_cc('nz', next), ...body);
     if (exit !== 'none') ops.push(jp(done));

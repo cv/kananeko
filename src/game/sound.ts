@@ -367,7 +367,7 @@ export function buildSoundInit(): Op[] {
     ldh_n_a(HW.NR51), // every channel on both sides
     xor_r('a'),
     ldh_n_a(HW.NR30), // the wave DAC must be off to load the waveform
-    ...copyBytes('sound_wave_copy', u16(0xff00 + HW.WAVE_RAM), WAVE_DATA, WAVE.length),
+    ...copyBytes(u16(0xff00 + HW.WAVE_RAM), WAVE_DATA, WAVE.length),
   ];
 }
 

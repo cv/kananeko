@@ -252,7 +252,7 @@ export function buildChartRoutines(fade: Label): Op[] {
     label(CHART_SHOW),
     push('bc'),
     ...fadeOut(),
-    ...screenOff('chart_vblank'),
+    ...screenOff(),
     ...clearScreen(),
     ...writeCenteredRow(LAYOUT.titleRow, textToTiles(CHART_TITLE)),
     ...writeCenteredRow(LAYOUT.nextRow, textToTiles(CHART_NEXT)),

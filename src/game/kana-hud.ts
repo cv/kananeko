@@ -14,6 +14,7 @@
  */
 
 import { playSfx } from './sound';
+import { loop } from '../asm/flow';
 import { type Op, type TileIndex, type U16, u8, u16, Label } from '../asm/types';
 import {
   adc_n,
@@ -160,13 +161,10 @@ export function buildScoreDigits(): Op[] {
     ld_r_r('d', 'a'),
     ld_a_nn(MEM.KANA_SCORE.lo),
     ld_r_r('e', 'a'),
-    ...DIGIT_PLACES.flatMap((place, i) => {
-      const loop = new Label(`score_digit${String(place)}`);
-      const done = new Label(`${loop.name}_done`);
-      return [
-        ld_r_n('c', u8(0)),
-        label(loop),
-        // DE -= place, keeping the old value if that would go negative
+    ...DIGIT_PLACES.flatMap((place, i) => [
+      ld_r_n('c', u8(0)),
+      // C = how many times DE - place stays non-negative
+      ...loop((again, done) => [
         ld_r_r('a', 'e'),
         sub_n(lo(place)),
         ld_r_r('l', 'a'),
@@ -176,13 +174,12 @@ export function buildScoreDigits(): Op[] {
         ld_r_r('d', 'a'),
         ld_r_r('e', 'l'),
         inc_r('c'),
-        jr(loop),
-        label(done),
-        ld_r_r('a', 'c'),
-        add_n(u8(d0)),
-        ld_nn_a(scoreDigitAddr(i)),
-      ];
-    }),
+        jr(again),
+      ]),
+      ld_r_r('a', 'c'),
+      add_n(u8(d0)),
+      ld_nn_a(scoreDigitAddr(i)),
+    ]),
     ld_r_r('a', 'e'),
     add_n(u8(d0)),
     ld_nn_a(scoreDigitAddr(DIGIT_PLACES.length)),
@@ -391,7 +388,7 @@ export function buildDrawHudOps(): Op[] {
     ld_a_nn(MEM.DELTA_TYPE),
     ...switchCases(
       DELTA_TYPES.map((type) => [...buildDrawTilesAt(0, DELTA_COL, DELTA_TILE_RUNS[type]), ret()]),
-      { name: 'delta_type', compare: (i) => [cp_n(u8(at(DELTA_TYPES, i)))], exit: 'none' },
+      { compare: (i) => [cp_n(u8(at(DELTA_TYPES, i)))], exit: 'none' },
     ),
 
     // Clear delta area (timer expired or type=0)

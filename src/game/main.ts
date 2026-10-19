@@ -295,7 +295,7 @@ export function castLabels(sceneIndex: number): { tiles: Label; palettes: Label;
 const SPEED_ROUND_LABEL = new Label('speed_round');
 const TITLE_FADE = new Label('title_fade');
 const CHART_FADE = new Label('chart_fade');
-const resultFadeLabel = labelFamily((screen: ResultScreen) => `${screen.entry.name}_fade`);
+const resultFadeLabel = labelFamily((screen: ResultScreen) => `${screen.entry.toString()}_fade`);
 const SCENE_DLG_LOOP = new Label('scene_dlg_loop');
 
 /** Reset score, delta flash, streak, and lives (plus any extra bytes to zero) for a new run. */
@@ -462,10 +462,10 @@ const GAME_OVER_SCREEN: ResultScreen = {
 const STAMP_ROW_WIDTH = SCENES.length * 3 - 1;
 
 /** Draw the icon of every scene whose SCENE_FLAGS bit is set (LCD off) */
-function drawClearedStamps(name: string, row: number): Op[] {
+function drawClearedStamps(row: number): Op[] {
   const startCol = centerStartCol(STAMP_ROW_WIDTH);
   return SCENES.flatMap((scene, i) => {
-    const skip = new Label(`${name}_stamp${String(i)}_skip`);
+    const skip = new Label();
     return [
       ld_a_nn(MEM.SCENE_FLAGS),
       and_n(u8(1 << i)),
@@ -479,20 +479,19 @@ function drawClearedStamps(name: string, row: number): Op[] {
 
 /** Subroutine draw_stamps: the result screens' row of cleared-scene stamps (LCD off) */
 function buildDrawStamps(): Op[] {
-  return [label(DRAW_STAMPS), ...drawClearedStamps('draw_stamps', ENDING_ROWS.stamps), ret()];
+  return [label(DRAW_STAMPS), ...drawClearedStamps(ENDING_ROWS.stamps), ret()];
 }
 
 /** End-of-run screen: cat, title, cleared-scene stamps, final score; START returns to the title. */
 function buildResultScreen(screen: ResultScreen): Op[] {
   const { entry } = screen;
-  const { name } = entry;
-  const loop = new Label(`${name}_loop`);
+  const loop = new Label();
   const labelTiles = textToTiles(ENDING_SCORE_LABEL);
   const scoreCol = centerStartCol(labelTiles.length + SCORE_DIGIT_COUNT);
   return [
     label(entry),
     ...fadeOut(),
-    ...screenOff(`${name}_vblank`),
+    ...screenOff(),
     ...playMusic(screen.song),
     ...clearScreen(),
     ...zeroBytes(MEM.TITLE_TIMER), // prompt starts visible
@@ -533,7 +532,7 @@ function buildResultScreen(screen: ResultScreen): Op[] {
 
     ...resetRunState(MEM.SCENE_FLAGS),
     ...fadeOut(),
-    ...screenOff(`${name}_to_title`),
+    ...screenOff(),
     jp(TITLE_SCREEN),
   ];
 }
@@ -590,8 +589,8 @@ export function buildProgram(): Op[] {
     // WRAM and HRAM start with random contents on real hardware (and in accurate
     // emulators): zero the buffers' page and every variable, keeping the GBC flag across
     push('af'),
-    ...zeroPages('init_wram', u16(BUFFERS.start), 1),
-    ...zeroBlock('init_hram', u16(VARIABLES.start), VARIABLES.end - VARIABLES.start),
+    ...zeroPages(u16(BUFFERS.start), 1),
+    ...zeroBlock(u16(VARIABLES.start), VARIABLES.end - VARIABLES.start),
     pop('af'),
     ld_nn_a(MEM.IS_CGB),
 
@@ -601,11 +600,10 @@ export function buildProgram(): Op[] {
     ...resetRunState(MEM.KANA_STATE, MEM.SCENE_ID, MEM.SCENE_FLAGS, MEM.GAME_MODE, MEM.TITLE_TIMER),
 
     // Copy all tile data to VRAM with the LCD off
-    ...screenOff('init_vblank'),
+    ...screenOff(),
     // BG tiles 0-127 go to $9000 and 128+ to $8800 ($8800 addressing); 1-bit tiles expand
     ...FONT_SEGMENTS.flatMap((segment) =>
       (segment.oneBit ? expandOneBit : copyBlock)(
-        `${segment.label.name}_copy`,
         u16(bgTileAddr(segment.first)),
         segment.label,
         segment.data.length,
@@ -633,7 +631,6 @@ export function buildProgram(): Op[] {
     call(KANA_DRAW_HUD),
     ...LOGO_ROWS.flatMap((row, i) => writeCenteredRow(LOGO_TOP_ROW + i, textToTiles(row))),
     ...cgbAttributes(
-      'title_logo_colors',
       fillAttributes(
         LOGO_TOP_ROW,
         centerStartCol(LOGO_WIDTH),
@@ -762,7 +759,7 @@ export function buildProgram(): Op[] {
     // scene_draw — fade out, draw the current scene (backdrop, cast, HUD, empty box, name), fade in
     label(SCENE_DRAW),
     ...fadeOut(),
-    ...screenOff('scene_vblank'),
+    ...screenOff(),
     ...playMusic('travel'), // (carries on if it was already playing)
     ...clearScreen(),
 
@@ -802,7 +799,7 @@ export function buildProgram(): Op[] {
     ...zeroBytes(MEM.ANIM_TIMER, MEM.ANIM_FRAME),
 
     // GBC colors of the backdrop
-    ...cgbAttributes('scene_colors', [
+    ...cgbAttributes([
       ...sceneWord('colors'),
       ld_r_r('d', 'h'),
       ld_r_r('e', 'l'),

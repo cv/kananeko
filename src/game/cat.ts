@@ -119,12 +119,7 @@ export function catFace(routine: typeof CAT_REACT, face: CatFace): Op[] {
 /** At boot: copy the cat's tiles to sprite memory and set its GBC palette */
 export function buildCatInit(): Op[] {
   return [
-    ...copyBlock(
-      'cat_tile_copy',
-      u16(MEM.OBJ_TILES + CAT_SPRITE_BASE * 16),
-      CAT_TILES,
-      buildCatTiles().length,
-    ),
+    ...copyBlock(u16(MEM.OBJ_TILES + CAT_SPRITE_BASE * 16), CAT_TILES, buildCatTiles().length),
     ld_r_n('a', u8(0x80 | (CAT_OBJ_PALETTE * 8))), // auto-increment from palette 7
     ldh_n_a(HW.OCPS),
     ...CAT_PALETTE.flatMap((color) => [

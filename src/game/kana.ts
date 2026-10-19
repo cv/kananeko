@@ -355,8 +355,8 @@ export function buildKanaData(questions: readonly KanaQuestion[]): Uint8Array {
 const WORD_INNER_ADDR = tilemapAddr(WORD_ROW, WORD_INNER_COL);
 
 /** HL += A (clobbers A) */
-function addAToHL(name: string): Op[] {
-  const done = new Label(name);
+function addAToHL(): Op[] {
+  const done = new Label();
   return [add_r('l'), ld_r_r('l', 'a'), jr_cc('nc', done), inc_r('h'), label(done)];
 }
 
@@ -370,7 +370,7 @@ function enterFeedback(state: (typeof KanaState)['ADVANCE_FEEDBACK' | 'RETRY_FEE
 
 /** Map the newly pressed d-pad direction to its index in A, or RET if none was pressed. */
 function readDirection(gotAnswer: Label): Op[] {
-  const checks = DPAD_BY_DIRECTION.map((_, i) => new Label(`kana_chk_dir${String(i)}`));
+  const checks = DPAD_BY_DIRECTION.map(() => new Label());
   const check = (i: number): Label => at(checks, i);
   return [
     ld_a_nn(MEM.JOYPAD_NEW),
@@ -427,7 +427,7 @@ export function buildKanaEngine(): Op[] {
     or_r('a'),
     jr_cc('nz', KANA_NEXT_QUESTION),
     ...fadeOut(),
-    ...screenOff('kana_vblank'),
+    ...screenOff(),
     ...clearScreen(),
     call(KANA_DRAW_HUD),
     ...buildRoundFrame(),
@@ -454,7 +454,7 @@ export function buildKanaEngine(): Op[] {
     sub_r('c'),
     srl('a'),
     ld_rr_nn('hl', u16(WORD_INNER_ADDR)),
-    ...addAToHL('kana_word_centered'),
+    ...addAToHL(),
     ...storePointer('hl', MEM.KANA_BLANK), // word start, for now
 
     // Copy the word's tiles
@@ -471,7 +471,7 @@ export function buildKanaEngine(): Op[] {
     ld_r_r('b', 'a'),
     ...loadPointer('hl', MEM.KANA_BLANK),
     ld_r_r('a', 'b'),
-    ...addAToHL('kana_blank_found'),
+    ...addAToHL(),
     ...storePointer('hl', MEM.KANA_BLANK),
     ld_r_n('a', u8(BLANK_TILE)),
     ...vramPut(),
@@ -487,9 +487,7 @@ export function buildKanaEngine(): Op[] {
     and_n(u8(3)),
     ld_nn_a(MEM.KANA_CORRECT_POS),
     ld_a_nn(MEM.KANA_CORRECT_POS),
-    ...switchCases(ANSWER_LAYOUTS.map(buildAnswerLayout), {
-      name: 'kana_layout',
-    }),
+    ...switchCases(ANSWER_LAYOUTS.map(buildAnswerLayout)),
 
     // A fresh screen fades in, with the cat beside it
     ld_a_nn(MEM.KANA_Q_IDX),

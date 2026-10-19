@@ -76,8 +76,8 @@ const OBJ_PALETTE: Palette = [PAPER, ...HUES.sakura, INK];
 /** Clear the shadow OAM, install the DMA routine, and set sprite palettes. */
 export function buildSpriteInit(): Op[] {
   return [
-    ...zeroPages('sprite_clear', SHADOW_OAM, 1),
-    ...copyBytes('sprite_tile_copy', MEM.OBJ_TILES, SPRITE_TILES, SPRITE_TILE_BYTES),
+    ...zeroPages(SHADOW_OAM, 1),
+    ...copyBytes(MEM.OBJ_TILES, SPRITE_TILES, SPRITE_TILE_BYTES),
     ld_rr_nn('hl', DMA_HRAM),
     ld_rr_nn('de', DMA_ROUTINE),
     ld_r_n('b', u8(DMA_ROUTINE_BYTES.length)),
@@ -111,7 +111,7 @@ const SPRITE_TILE_BYTES = SPRITE_GLYPHS.length * 16;
 
 /** Subroutine sprites_off: take every sprite off screen (before a fade or screen change) */
 export function buildSpriteRoutines(): Op[] {
-  return [label(SPRITES_OFF), ...zeroPages('sprites_off_clear', SHADOW_OAM, 1), jp(DMA_HRAM)];
+  return [label(SPRITES_OFF), ...zeroPages(SHADOW_OAM, 1), jp(DMA_HRAM)];
 }
 
 /** Copy the shadow OAM to OAM. Call right after HALT (VBlank). */

@@ -55,6 +55,8 @@ interface Positioned {
 interface Layout {
   positioned: Positioned[];
   addresses: Map<Label, number>;
+  /** What the .sym file and errors call each placed label (local ones named here) */
+  names: Map<Label, string>;
   /** Each pooled entry's label, by Pooled.key */
   pooled: Map<string, Label>;
 }
@@ -178,20 +180,30 @@ function layout(program: readonly Op[]): Layout {
   const { pooled } = expanded;
   const ops = chooseJumps(expanded.ops);
   const addresses = new Map<Label, number>();
-  const names = new Set<string>();
+  const names = new Map<Label, string>();
+  const named = new Set<string>();
   const positioned: Positioned[] = [];
   let pc = PROGRAM_START;
+  // Local labels are named after the last named label: <name>.1, <name>.2, ...
+  let scope = 'local';
+  let locals = 0;
 
   for (const op of ops) {
     switch (op.kind) {
       case 'label':
         if (addresses.has(op.label)) {
-          throw new Error(`Label "${op.label.name}" is placed twice`);
+          throw new Error(`Label "${names.get(op.label) ?? ''}" is placed twice`);
         }
-        if (names.has(op.label.name)) {
-          throw new Error(`Duplicate label: "${op.label.name}"`);
+        if (op.label.name === undefined) {
+          locals++;
+          names.set(op.label, `${scope}.${String(locals)}`);
+        } else {
+          if (named.has(op.label.name)) throw new Error(`Duplicate label: "${op.label.name}"`);
+          named.add(op.label.name);
+          names.set(op.label, op.label.name);
+          scope = op.label.name;
+          locals = 0;
         }
-        names.add(op.label.name);
         addresses.set(op.label, pc);
         break;
       case 'org':
@@ -230,7 +242,7 @@ function layout(program: readonly Op[]): Layout {
     }
   }
 
-  return { positioned, addresses, pooled };
+  return { positioned, addresses, names, pooled };
 }
 
 /** The address of a label or pooled entry; `at` is where it's referenced, for errors */
@@ -239,8 +251,11 @@ function resolve({ addresses, pooled }: Layout, target: Target, at: number): num
   const address = label === undefined ? undefined : addresses.get(label);
   if (address !== undefined) return address;
 
-  const name = label?.name ?? (target instanceof Pooled ? target.prefix : target.name);
-  const sameName = [...addresses.keys()].some((placed) => placed.name === name);
+  const name = target instanceof Pooled ? target.prefix : target.toString();
+  const sameName =
+    target instanceof Label &&
+    target.name !== undefined &&
+    [...addresses.keys()].some((placed) => placed.name === target.name);
   throw new Error(
     `Undefined label: "${name}" (referenced at ${addr(at)})` +
       (sameName ? '; a different Label with that name is placed (labels match by identity)' : ''),
@@ -264,7 +279,7 @@ function emit(rom: Uint8Array, program: Layout): Set<Label> {
         const offset = target - (address + op.bytes.length);
         if (offset < -128 || offset > 127) {
           throw new Error(
-            `JR target "${r.target.name}" out of range: offset ${String(offset)} at ${addr(address)}`,
+            `JR target "${program.names.get(r.target) ?? r.target.toString()}" out of range: offset ${String(offset)} at ${addr(address)}`,
           );
         }
         rom[address + r.offset] = offset & 0xff;
@@ -321,10 +336,13 @@ export function assemble(program: readonly Op[], header: ROMHeader): AssembleRes
   rom[0x014f] = global & 0xff;
 
   const placed = [...laidOut.addresses];
+  const nameOf = (label: Label): string => laidOut.names.get(label) ?? label.toString();
   return {
     rom,
-    symbols: new Map(placed.map(([label, address]) => [label.name, address])),
-    unreferenced: placed.filter(([label]) => !referenced.has(label)).map(([label]) => label.name),
+    symbols: new Map(placed.map(([label, address]) => [nameOf(label), address])),
+    unreferenced: placed
+      .filter(([label]) => !referenced.has(label))
+      .map(([label]) => nameOf(label)),
     programBytes: laidOut.positioned.reduce((sum, { op }) => sum + op.bytes.length, 0),
   };
 }

@@ -96,6 +96,34 @@ describe('jump relaxation', () => {
   });
 });
 
+describe('local labels', () => {
+  it('are named after the named label before them', () => {
+    const first = new Label();
+    const second = new Label();
+    const early = new Label();
+    const { symbols, unreferenced } = build([
+      label(early),
+      nop(),
+      label(START),
+      label(first),
+      nop(),
+      label(second),
+      jr(first),
+      jr(second),
+      jr(early),
+    ]);
+    expect([...symbols.keys()]).toEqual(['local.1', 'start', 'start.1', 'start.2']);
+    expect(unreferenced).toEqual(['start']);
+  });
+
+  it('say which local label is out of range', () => {
+    const far = new Label();
+    expect(() => build([label(START), jr(far), db(new Uint8Array(200)), label(far)])).toThrow(
+      /JR target "start.1" out of range/,
+    );
+  });
+});
+
 describe('label families', () => {
   it('give the same Label for the same key', () => {
     const scene = labelFamily((i: number) => `scene${String(i)}`);

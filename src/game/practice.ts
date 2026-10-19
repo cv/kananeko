@@ -314,7 +314,7 @@ export function buildPracticeLoop(): Op[] {
     or_r('a'),
     jr_cc('z', PRACTICE_LOOP),
     ...fadeOut(),
-    ...screenOff('practice_to_title'),
+    ...screenOff(),
     jp(TITLE_SCREEN),
   ];
 }

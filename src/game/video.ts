@@ -99,8 +99,8 @@ export function bgTileAddr(index: number): number {
 }
 
 /** Wait for VBlank and turn the LCD off. `name` labels the wait loop. */
-export function screenOff(name: string): Op[] {
-  return lcdOff(name);
+export function screenOff(): Op[] {
+  return lcdOff();
 }
 
 /** Turn the LCD on with the game's standard flags. */
@@ -268,8 +268,8 @@ export type Palette = Quad<number>;
 // ---------------------------------------------------------------------------
 
 /** Run `ops` only on a Game Boy Color, with VRAM bank 1 (attributes) selected. */
-export function cgbAttributes(name: string, ops: readonly Op[]): Op[] {
-  const skip = new Label(`${name}_skip`);
+export function cgbAttributes(ops: readonly Op[]): Op[] {
+  const skip = new Label();
   return [
     ld_a_nn(MEM.IS_CGB),
     cp_n(u8(0)),
@@ -309,9 +309,9 @@ const HUD_ROW = 0;
 export function buildClearScreen(): Op[] {
   return [
     label(CLEAR_SCREEN),
-    ...zeroPages('clear_screen_map', MEM.VRAM_MAP0, 4),
-    ...cgbAttributes('clear_screen_attrs', [
-      ...zeroPages('clear_screen_attr', MEM.VRAM_MAP0, 4),
+    ...zeroPages(MEM.VRAM_MAP0, 4),
+    ...cgbAttributes([
+      ...zeroPages(MEM.VRAM_MAP0, 4),
       ...fillAttributes(HUD_ROW, 0, 1, SCREEN_COLS, PAL.hud),
     ]),
     ret(),

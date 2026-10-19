@@ -193,18 +193,17 @@ const TWO_CHOICE_SWAPPED = [1, 0] as const;
 // ---------------------------------------------------------------------------
 
 /** HL = text position of the display row whose DLG_ORDER entry equals B */
-function buildLoadChoicePositionForLogicalChoice(name: string): Op[] {
+function buildLoadChoicePositionForLogicalChoice(): Op[] {
   return switchCases(
     CHOICE_TEXT_POSITIONS.map((position) => [ld_rr_nn('hl', u16(tilemapAddr(position)))]),
-    { name, compare: (row) => [ld_a_nn(MEM.DLG_ORDER.at(row)), cp_r('b')] },
+    { compare: (row) => [ld_a_nn(MEM.DLG_ORDER.at(row)), cp_r('b')] },
   );
 }
 
 /** A = DLG_ORDER[A]: map a display row (cursor) to its logical choice */
-function buildLoadLogicalChoiceFromCursor(name: string): Op[] {
+function buildLoadLogicalChoiceFromCursor(): Op[] {
   return switchCases(
     Array.from({ length: MEM.DLG_ORDER.size }, (_, row) => [ld_a_nn(MEM.DLG_ORDER.at(row))]),
-    { name },
   );
 }
 
@@ -251,9 +250,7 @@ function buildInitChoiceOrder(): Op[] {
     jr_cc('c', DLG_ORDER_THREE_DISPATCH),
     sub_n(u8(THREE_CHOICE_ORDERS.length)),
     label(DLG_ORDER_THREE_DISPATCH),
-    ...switchCases(THREE_CHOICE_ORDERS.map(writeChoiceOrder), {
-      name: 'dlg_order_perm',
-    }),
+    ...switchCases(THREE_CHOICE_ORDERS.map(writeChoiceOrder)),
 
     label(done),
   ];
@@ -510,7 +507,7 @@ export function buildDialogueEngine(): Op[] {
 
     label(DLG_DRAW_CHOICE_LOOP),
     // HL = text position of the display row showing logical choice B
-    ...buildLoadChoicePositionForLogicalChoice('dlg_choice_pos'),
+    ...buildLoadChoicePositionForLogicalChoice(),
 
     // Copy the choice's tiles to [HL] until the text terminator
     label(DLG_CHOICE_CHAR),
@@ -620,7 +617,7 @@ export function buildDialogueEngine(): Op[] {
 
     // Read next_node = table_base[logical_choice]
     ld_a_nn(MEM.DLG_CURSOR),
-    ...buildLoadLogicalChoiceFromCursor('dlg_choice_logical'),
+    ...buildLoadLogicalChoiceFromCursor(),
     ld_r_r('c', 'a'), // C = logical choice
     ld_a_nn(MEM.DLG_NODE_ID),
     ld_nn_a(MEM.DLG_FROM_NODE),

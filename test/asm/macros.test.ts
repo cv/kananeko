@@ -96,11 +96,11 @@ describe('countDownOrReturn', () => {
 describe('block operations', () => {
   it('copies whole pages and zeroes them again', () => {
     const source = Array.from({ length: 256 }, (_, i) => (i * 7 + 1) & 0xff);
-    const copy = runProgram([...copyPages('copy', at(0), SOURCE, 1)], [label(SOURCE), db(source)]);
+    const copy = runProgram([...copyPages(at(0), SOURCE, 1)], [label(SOURCE), db(source)]);
     expect(Array.from(copy.slice(SCRATCH, SCRATCH + 256))).toEqual(source);
 
     const zeroed = runProgram(
-      [...copyPages('copy', at(0), SOURCE, 1), ...zeroPages('zero', at(0), 1)],
+      [...copyPages(at(0), SOURCE, 1), ...zeroPages(at(0), 1)],
       [label(SOURCE), db(source)],
     );
     expect(zeroed.slice(SCRATCH, SCRATCH + 256).every((b) => b === 0)).toBe(true);
@@ -109,19 +109,19 @@ describe('block operations', () => {
   it('zeroes a block of up to 256 bytes', () => {
     const source = Array.from({ length: 256 }, () => 0xee);
     const memory = runProgram(
-      [...copyPages('copy', at(0), SOURCE, 1), ...zeroBlock('zero', at(1), 254)],
+      [...copyPages(at(0), SOURCE, 1), ...zeroBlock(at(1), 254)],
       [label(SOURCE), db(source)],
     );
     expect(memory[SCRATCH]).toBe(0xee);
     expect(memory.slice(SCRATCH + 1, SCRATCH + 255).every((b) => b === 0)).toBe(true);
     expect(memory[SCRATCH + 255]).toBe(0xee);
-    expect(() => zeroBlock('x', at(0), 0)).toThrow(RangeError);
-    expect(() => zeroBlock('x', at(0), 257)).toThrow(RangeError);
+    expect(() => zeroBlock(at(0), 0)).toThrow(RangeError);
+    expect(() => zeroBlock(at(0), 257)).toThrow(RangeError);
   });
 
   it.each([0, 256, 1.5])('rejects %s pages (B = 0 would mean 256 pages)', (pages) => {
-    expect(() => zeroPages('x', at(0), pages)).toThrow(RangeError);
-    expect(() => copyPages('x', at(0), SRC, pages)).toThrow(RangeError);
+    expect(() => zeroPages(at(0), pages)).toThrow(RangeError);
+    expect(() => copyPages(at(0), SRC, pages)).toThrow(RangeError);
   });
 });
 
@@ -129,7 +129,7 @@ describe('copyBytes', () => {
   it('copies an exact number of bytes, including a full 256', () => {
     const source = Array.from({ length: 256 }, (_, i) => (255 - i) & 0xff);
     const mem = runProgram(
-      [...copyBytes('cb', at(0), SRC, 256), ...copyBytes('cb3', at(0x200), SRC, 3)],
+      [...copyBytes(at(0), SRC, 256), ...copyBytes(at(0x200), SRC, 3)],
       [label(SRC), db(source)],
     );
     expect(Array.from(mem.slice(SCRATCH, SCRATCH + 256))).toEqual(source);
@@ -137,36 +137,30 @@ describe('copyBytes', () => {
   });
 
   it('rejects counts outside 1-256', () => {
-    expect(() => copyBytes('x', at(0), SRC, 0)).toThrow(RangeError);
-    expect(() => copyBytes('x', at(0), SRC, 257)).toThrow(RangeError);
+    expect(() => copyBytes(at(0), SRC, 0)).toThrow(RangeError);
+    expect(() => copyBytes(at(0), SRC, 257)).toThrow(RangeError);
   });
 });
 
 describe('copyBlock', () => {
   it('copies exactly the requested number of bytes, past 256', () => {
     const source = Array.from({ length: 300 }, (_, i) => (i * 3 + 1) & 0xff);
-    const mem = runProgram(
-      [...copyBlock('blk', at(0), SRC, 300)],
-      [label(SRC), db(source), db([0xee])],
-    );
+    const mem = runProgram([...copyBlock(at(0), SRC, 300)], [label(SRC), db(source), db([0xee])]);
     expect(Array.from(mem.slice(SCRATCH, SCRATCH + 300))).toEqual(source);
     expect(mem[SCRATCH + 300]).not.toBe(0xee);
-    expect(() => copyBlock('x', at(0), SRC, 0)).toThrow(RangeError);
+    expect(() => copyBlock(at(0), SRC, 0)).toThrow(RangeError);
   });
 });
 
 describe('expandOneBit', () => {
   it('writes every byte twice, filling both bit planes', () => {
     const source = [0x81, 0x7e, 0x00, 0xff];
-    const mem = runProgram(
-      [...expandOneBit('one', at(0), SRC, source.length)],
-      [label(SRC), db(source)],
-    );
+    const mem = runProgram([...expandOneBit(at(0), SRC, source.length)], [label(SRC), db(source)]);
     expect(Array.from(mem.slice(SCRATCH, SCRATCH + 8))).toEqual([
       0x81, 0x81, 0x7e, 0x7e, 0x00, 0x00, 0xff, 0xff,
     ]);
-    expect(() => expandOneBit('x', at(0), SRC, 0)).toThrow(RangeError);
-    expect(() => expandOneBit('x', at(0), SRC, 0x10000)).toThrow(RangeError);
+    expect(() => expandOneBit(at(0), SRC, 0)).toThrow(RangeError);
+    expect(() => expandOneBit(at(0), SRC, 0x10000)).toThrow(RangeError);
   });
 });
 
@@ -192,7 +186,6 @@ describe('switchCases', () => {
           add_r('b'),
           ld_nn_a(at(1)),
         ]),
-        { name: 'sw' },
       ),
     ]);
     expect(mem[SCRATCH]).toBe(expected);
@@ -207,7 +200,6 @@ describe('switchCases', () => {
       ...switchCases(
         marks.map((m) => [...storeByte(at(0), m), ret()]),
         {
-          name: 'pick',
           // Match when B equals the case index
           compare: (i) => [ld_r_n('a', u8(i)), cp_r('b')],
           exit: 'none',
@@ -219,7 +211,7 @@ describe('switchCases', () => {
   });
 
   it('produces no done label when bodies exit on their own', () => {
-    const ops = switchCases([[ret()], [ret()]], { name: 'x', exit: 'none' });
+    const ops = switchCases([[ret()], [ret()]], { exit: 'none' });
     expect(ops.some((o) => o.kind === 'label' && o.label.name === 'x_done')).toBe(false);
   });
 });

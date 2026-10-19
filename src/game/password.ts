@@ -405,7 +405,7 @@ export function buildPasswordScreen(fade: Label): Op[] {
   return [
     label(PASSWORD_SCREEN),
     ...fadeOut(),
-    ...screenOff('password_vblank'),
+    ...screenOff(),
     ...clearScreen(),
     ...zeroBytes(MEM.PASS_LEN, MEM.PASS_CURSOR),
     ...writeCenteredRow(promptRow, textToTiles(PASSWORD_PROMPT)),
@@ -505,7 +505,7 @@ export function buildPasswordScreen(fade: Label): Op[] {
     label(PASSWORD_BACK),
     ...playSfx('cursor'),
     ...fadeOut(),
-    ...screenOff('password_to_title'),
+    ...screenOff(),
     jp(TITLE_SCREEN),
 
     // pass_draw_slots: the kana entered so far, then a dash for each still to come
