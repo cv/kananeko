@@ -1,0 +1,211 @@
+/** The sound driver: notes, the sequence notation, and voices stepping in the emulator. */
+
+import { describe, expect, it } from 'vitest';
+import { MEM } from '@asm/hardware';
+import {
+  call,
+  db,
+  dec_r,
+  jr_cc,
+  label,
+  ld_a_nn,
+  ld_nn_a,
+  ld_r_n,
+  ld_r_r,
+  ld_rr_nn,
+} from '@asm/ops';
+import { type Op, ref, u8, u16 } from '@asm/types';
+import {
+  NOTE_NAMES,
+  SEQ,
+  SFX,
+  SFX_VOICE,
+  buildSoundData,
+  buildSoundDriver,
+  buildSoundInit,
+  encodeSequence,
+  noteFrequency,
+  notePeriods,
+  sfxId,
+  voiceField,
+} from '@game/sound';
+import { SCRATCH, runProgram } from './helpers/run-program';
+
+describe('Given the note table', () => {
+  it('tunes A4 to 440 Hz on the pulse channels', () => {
+    const period = notePeriods()[NOTE_NAMES.indexOf('a4')] ?? 0;
+    expect(131072 / (2048 - period)).toBeCloseTo(440, -1);
+  });
+
+  it('rises with every note and fits in 11 bits', () => {
+    const periods = notePeriods();
+    periods.forEach((p, i) => {
+      expect(p).toBeGreaterThan(0);
+      expect(p).toBeLessThan(2048);
+      if (i > 0) expect(p).toBeGreaterThan(periods[i - 1] ?? 0);
+    });
+  });
+
+  it('spans c3 to b7, an octave being twice the frequency', () => {
+    expect(NOTE_NAMES[0]).toBe('c3');
+    expect(NOTE_NAMES.at(-1)).toBe('b7');
+    expect(noteFrequency(NOTE_NAMES.indexOf('a5'))).toBeCloseTo(880);
+  });
+});
+
+describe('Given a sequence in the notation', () => {
+  it('encodes the duty, envelope, length and notes, and stops at the end', () => {
+    expect(encodeSequence('w2 vC2 l4 c6 e6')).toEqual([
+      SEQ.DUTY,
+      0x80,
+      SEQ.ENVELOPE,
+      0xc2,
+      SEQ.LENGTH | 4,
+      36,
+      40,
+      SEQ.END,
+    ]);
+  });
+
+  it('lets a note or rest set the length, and loops instead of stopping', () => {
+    expect(encodeSequence('v20 l6 c3:12 r loop')).toEqual([
+      SEQ.ENVELOPE,
+      0x20,
+      SEQ.LENGTH | 6,
+      SEQ.LENGTH | 12,
+      0,
+      SEQ.REST,
+      SEQ.LOOP,
+    ]);
+  });
+
+  it.each([
+    ['a note before any length', 'v20 c4'],
+    ['a note before any envelope', 'l4 c4'],
+    ['an unknown step', 'v20 l4 h4'],
+    ['a length too long', 'v20 l64 c4'],
+    ['no note at all', 'v20 l4'],
+    ['a note out of range', 'v20 l4 c8'],
+  ])('rejects %s', (_, source) => {
+    expect(() => encodeSequence(source)).toThrow();
+  });
+
+  it('encodes every sound effect, each setting its own duty, envelope and length', () => {
+    for (const { sequence } of Object.values(SFX)) {
+      const bytes = encodeSequence(sequence);
+      expect(bytes).toContain(SEQ.DUTY);
+      expect(bytes.at(-1)).toBe(SEQ.END);
+    }
+  });
+
+  it('ranks the letter blip below every other effect', () => {
+    const others = Object.entries(SFX).filter(([name]) => name !== 'blip');
+    for (const [, effect] of others) expect(effect.priority).toBeGreaterThan(SFX.blip.priority);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The driver, running in the emulator
+// ---------------------------------------------------------------------------
+
+const VOICE_STATE_BYTES = 8;
+
+let tickLoops = 0;
+
+/** Step the sound `count` (1-255) frames */
+function ticks(count: number): Op[] {
+  const loop = `ticks_${String(tickLoops++)}`;
+  return [
+    ld_r_n('a', u8(count)),
+    ld_nn_a(u16(SCRATCH)),
+    label(loop),
+    call(ref('sound_tick')),
+    ld_a_nn(u16(SCRATCH)),
+    dec_r('a'),
+    ld_nn_a(u16(SCRATCH)),
+    jr_cc('nz', ref(loop)),
+  ];
+}
+
+/** Run `setup`, then step the sound `count` frames, and return the address space */
+function runSound(setup: readonly Op[], count: number, data: readonly Op[] = []): Uint8Array {
+  return runProgram(
+    [...buildSoundInit(), ...setup, ...ticks(count)],
+    [...buildSoundDriver(), ...buildSoundData(), ...data],
+  );
+}
+
+const play = (name: keyof typeof SFX): Op[] => [
+  ld_r_n('a', u8(sfxId(name))),
+  call(ref('sfx_play')),
+];
+
+/** Point voice 0 (pulse channel 2) at a sequence labelled `seq` */
+const startVoice0: Op[] = [
+  ld_rr_nn('hl', ref('seq')),
+  ...(
+    [
+      ['PTR_LO', 'l'],
+      ['START_LO', 'l'],
+      ['START_HI', 'h'],
+      ['PTR_HI', 'h'],
+    ] as const
+  ).flatMap(([field, reg]) => [ld_r_r('a', reg), ld_nn_a(voiceField(0, field))]),
+  ld_r_n('a', u8(1)),
+  ld_nn_a(voiceField(0, 'TIMER')),
+];
+
+const voice = (memory: Uint8Array, v: number): number[] =>
+  Array.from(memory.slice(voiceField(v, 'PTR_LO'), voiceField(v, 'PTR_LO') + VOICE_STATE_BYTES));
+
+describe('Given a sound effect starts', () => {
+  it('plays its first note on the next frame: duty, envelope and length set', () => {
+    const memory = runSound(play('confirm'), 1);
+    expect(memory[MEM.SFX_ID]).toBe(sfxId('confirm'));
+    expect(memory[voiceField(SFX_VOICE, 'TIMER')]).toBe(3);
+    expect(memory[voiceField(SFX_VOICE, 'LENGTH')]).toBe(3);
+    expect(memory[voiceField(SFX_VOICE, 'ENVELOPE')]).toBe(0xb1);
+    expect(memory[voiceField(SFX_VOICE, 'DUTY')]).toBe(0x80);
+    expect(memory[0xff12]).toBe(0xb1); // NR12: channel 1's envelope
+  });
+
+  it('goes quiet once its last note has had its length', () => {
+    // confirm: two notes of 3 frames each, then the end
+    expect(runSound(play('confirm'), 6)[voiceField(SFX_VOICE, 'PTR_HI')]).not.toBe(0);
+    expect(runSound(play('confirm'), 7)[voiceField(SFX_VOICE, 'PTR_HI')]).toBe(0);
+  });
+
+  it('is not cut off by a less important effect', () => {
+    const memory = runSound([...play('heartDown'), ...play('blip')], 2);
+    expect(memory[MEM.SFX_ID]).toBe(sfxId('heartDown'));
+  });
+
+  it('gives way to an equally or more important one', () => {
+    const memory = runSound([...play('cursor'), ...play('confirm')], 2);
+    expect(memory[MEM.SFX_ID]).toBe(sfxId('confirm'));
+  });
+
+  it('lets anything play once it has finished', () => {
+    // heartDown: 5 + 5 + 12 frames, plus the frame its first note waits for
+    const memory = runSound([...play('heartDown'), ...ticks(23), ...play('blip')], 1);
+    expect(memory[MEM.SFX_ID]).toBe(sfxId('blip'));
+  });
+});
+
+describe('Given a looping sequence', () => {
+  const seq = [label('seq'), db(encodeSequence('w1 v70 l2 c4 r loop'))];
+
+  it('starts over after its last step, holding each for its length', () => {
+    // c4 (2 frames), rest (2 frames), then c4 again: frame 5 restarts the loop
+    const memory = runSound(startVoice0, 5, seq);
+    const state = voice(memory, 0);
+    expect(state[1]).not.toBe(0); // still playing
+    expect(state[2]).toBe(2); // a fresh note's full length
+    expect(memory[0xff17]).toBe(0x70); // NR22: the note's envelope is back after the rest
+  });
+
+  it('silences the channel during a rest', () => {
+    const memory = runSound(startVoice0, 3, seq);
+    expect(memory[0xff17]).toBe(0); // NR22: volume 0
+  });
+});

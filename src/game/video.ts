@@ -114,6 +114,13 @@ export function buildFrameWait(): Op[] {
     label('frame_wait_store'),
     ld_nn_a(MEM.FRAMES_MISSED),
     label('frame_wait_done'),
+    // Sound steps once per frame here rather than in the VBlank handler, so it plays
+    // the same with interrupts off (the tests' emulator runs without them)
+    push('de'),
+    push('hl'),
+    call(ref('sound_tick')),
+    pop('hl'),
+    pop('de'),
     pop('bc'),
     pop('af'),
     ret(),

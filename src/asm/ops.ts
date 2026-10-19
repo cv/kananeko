@@ -147,6 +147,16 @@ export function ldh_a_n(n: IoRegOffset): Op {
   return inst([0xf0, n]);
 }
 
+/** LDH (C), A: store A into $FF00+C */
+export function ldh_c_a(): Op {
+  return inst([0xe2]);
+}
+
+/** LDH A, (C): load A from $FF00+C */
+export function ldh_a_c(): Op {
+  return inst([0xf2]);
+}
+
 /** LD (nn), A */
 export function ld_nn_a(addr: U16): Op {
   return instImm16(0xea, addr);

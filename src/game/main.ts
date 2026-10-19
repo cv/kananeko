@@ -85,6 +85,7 @@ import {
 } from './kana-hud';
 import { centerStartCol, tilemapAddr } from './tilemap';
 import { SCENES, SPEED_ROUND, buildSceneData, dialogueCodec } from './scene';
+import { buildSoundData, buildSoundDriver, buildSoundInit, playSfx } from './sound';
 import { BAD_PICK, END_OF_CONVERSATION, KanaMode, MAX_LIVES } from './state';
 import { REDEEM_KEY } from './rounds';
 import { type ColorScheme, buildPaletteSet, buildSharedPalettes, paletteOf } from './color';
@@ -446,6 +447,7 @@ function buildResultScreen(screen: ResultScreen): Op[] {
     ld_a_nn(MEM.JOYPAD_NEW),
     and_n(u8(JOY.START)),
     jr_cc('z', ref(`${name}_loop`)),
+    ...playSfx('confirm'),
 
     ...resetRunState(MEM.SCENE_FLAGS),
     ...fadeOut(),
@@ -530,6 +532,7 @@ export function buildProgram(): Op[] {
 
     ...buildSpriteInit(),
     ...buildCatInit(),
+    ...buildSoundInit(),
 
     // Enable the VBlank interrupt so HALT wakes once per frame (fades and game loops);
     // its handler counts frames (see buildFrameWait).
@@ -583,6 +586,7 @@ export function buildProgram(): Op[] {
     ld_a_nn(MEM.JOYPAD_NEW),
     and_n(u8(JOY.START)),
     jr_cc('z', ref('title_loop')),
+    ...playSfx('start'),
 
     // START pressed — begin a fresh run at scene 0
     ...resetRunState(MEM.SCENE_FLAGS),
@@ -735,6 +739,7 @@ export function buildProgram(): Op[] {
     ...buildScoreDigits(),
     ...buildVramPut(),
     ...buildFrameWait(),
+    ...buildSoundDriver(),
     ...buildDrawTiles(),
     ...buildFadeRoutines(),
     ...buildClearScreen(),
@@ -746,6 +751,7 @@ export function buildProgram(): Op[] {
     ...buildSpriteData(),
     ...buildCatData(),
     ...buildFadeData(),
+    ...buildSoundData(),
     ...FONT_SEGMENTS.flatMap((segment) => [label(segment.label), db(segment.data)]),
 
     label(SPEED_ROUND_LABEL),

@@ -10,6 +10,7 @@
  * any other choice is "bad" (-5 score, -1 life, conversation ends at 0 lives).
  */
 
+import { playSfx } from './sound';
 import { MEM, HW, JOY } from '../asm/hardware';
 import {
   countDownOrReturn,
@@ -404,6 +405,11 @@ export function buildDialogueEngine(): Op[] {
     ld_r_r('a', 'b'),
     ...vramPut(),
     ...storePointer('hl', MEM.DLG_VRAM_LO, MEM.DLG_VRAM_HI),
+    // A soft blip for each letter (not for spaces)
+    ld_r_r('a', 'b'),
+    or_r('a'),
+    ret_cc('z'),
+    ...playSfx('blip'),
     ret(),
 
     // --- Text finished: read choice count and transition ---
@@ -542,11 +548,13 @@ export function buildDialogueEngine(): Op[] {
 
     label('dlg_cursor_save'),
     ld_nn_a(MEM.DLG_CURSOR),
+    ...playSfx('cursor'),
     call(ref('dlg_draw_cursor')),
     ret(),
 
     // --- Confirm choice ---
     label('dlg_confirm_choice'),
+    ...playSfx('confirm'),
     ...zeroBytes(oamField(SPRITE_SLOT.cursor, 'y')), // hide the cursor
     ld_a_nn(MEM.DLG_CURSOR),
     ld_nn_a(MEM.DLG_RESULT),

@@ -25,7 +25,13 @@ export const HW = {
   DIV: ioReg(0x04), // Divider register (free-running counter, pseudo-RNG source)
 
   // Sound
+  NR10: ioReg(0x10), // Channel 1 (pulse with sweep): registers $FF10-$FF14
+  NR21: ioReg(0x16), // Channel 2 (pulse): registers $FF16-$FF19 ($FF15 is unused)
+  NR30: ioReg(0x1a), // Channel 3 (wave): registers $FF1A-$FF1E; bit 7 = DAC on
+  NR50: ioReg(0x24), // Master volume (left/right)
+  NR51: ioReg(0x25), // Which channels play on which side
   NR52: ioReg(0x26), // Sound on/off
+  WAVE_RAM: ioReg(0x30), // Channel 3's 32 4-bit samples ($FF30-$FF3F)
 
   // Interrupts
   IF: ioReg(0x0f), // Interrupt flag
@@ -150,6 +156,12 @@ export const MEM = {
   // WRAM — dialogue text decompression (see text_next in dialogue.ts)
   TEXT_SP: u16(0xc092), // right halves of codes waiting on TEXT_STACK
   TEXT_STACK: u16(0xc0a0), // TEXT_STACK_SIZE bytes ($C0A0-$C0AF)
+
+  // WRAM — sound (see sound.ts)
+  SND_VOICES: u16(0xc0c0), // SOUND_VOICES x VOICE_SIZE bytes ($C0C0-$C0D7)
+  SFX_ID: u16(0xc0d8), // The sound effect playing last (SFX_NONE before any)
+  SFX_PRIO: u16(0xc0d9), // Its priority: a lower one can't cut it off
+  MUSIC_ID: u16(0xc0da), // The song playing (see music_play)
 
   // WRAM — frame budget (see frame_wait in video.ts)
   FRAME_COUNT: u16(0xc094), // VBlanks so far (the VBlank handler counts them)

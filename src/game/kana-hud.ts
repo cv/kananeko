@@ -13,6 +13,7 @@
  *   buildSetDelta  — set delta type + timer after score changes
  */
 
+import { playSfx } from './sound';
 import { type Op, type TileIndex, type U16, ref, u8, u16 } from '../asm/types';
 import {
   adc_n,
@@ -24,6 +25,7 @@ import {
   dec_r,
   inc_r,
   jp_cc,
+  jp,
   jr,
   jr_cc,
   label,
@@ -321,8 +323,22 @@ export function buildDrawHudOps(): Op[] {
     ld_r_r('b', 'a'),
     label('hud_delta_known'),
 
+    // A heart won or lost: its sound, then the redraw (checked before the delta,
+    // which usually changes on the same frame and would redraw the hearts silently)
+    ld_a_nn(MEM.KANA_LIVES),
+    ld_r_r('c', 'a'),
+    ld_a_nn(MEM.HUD_SHOWN_LIVES),
+    cp_r('c'),
+    jr_cc('z', ref('hud_lives_same')),
+    jr_cc('c', ref('hud_heart_up')),
+    ...playSfx('heartDown'),
+    jp(ref('hud_redraw')),
+    label('hud_heart_up'),
+    ...playSfx('heartUp'),
+    jp(ref('hud_redraw')),
+    label('hud_lives_same'),
     ...redrawIfChanged(MEM.HUD_SHOWN_DELTA, 'b'),
-    ...redrawIfChanged(MEM.HUD_SHOWN_LIVES, MEM.KANA_LIVES),
+
     ...redrawIfChanged(MEM.HUD_SHOWN_SCORE_LO, MEM.KANA_SCORE_LO),
     ...redrawIfChanged(MEM.HUD_SHOWN_SCORE_HI, MEM.KANA_SCORE_HI),
     ret(), // nothing changed

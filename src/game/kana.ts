@@ -20,6 +20,7 @@
  *   0x00 sentinel (word_length = 0)
  */
 
+import { playSfx } from './sound';
 import { HW, JOY, MEM } from '../asm/hardware';
 import {
   countDownOrReturn,
@@ -514,6 +515,7 @@ export function buildKanaEngine(): Op[] {
     ld_a_nn(MEM.KANA_CLOCK_SECS),
     dec_r('a'),
     ld_nn_a(MEM.KANA_CLOCK_SECS),
+    ...playSfx('tick'),
     call(ref('kana_draw_clock')),
     ld_a_nn(MEM.KANA_CLOCK_SECS),
     or_r('a'),
@@ -554,6 +556,7 @@ export function buildKanaEngine(): Op[] {
     ...buildClearDelta(),
 
     label('kana_correct_done'),
+    ...playSfx('correct'), // (a streak's fanfare outranks it)
     ...showMessage(KANA_MESSAGES.correct),
     ...showFace('happy'),
     call(ref('kana_reveal')),
@@ -562,6 +565,7 @@ export function buildKanaEngine(): Op[] {
 
     // === WRONG ===
     label('kana_wrong'),
+    ...playSfx('wrong'),
     ...zeroBytes(MEM.KANA_STREAK),
     ld_a_nn(MEM.KANA_MODE),
     cp_n(u8(KanaMode.NORMAL)),
@@ -599,6 +603,7 @@ export function buildKanaEngine(): Op[] {
 
     // === Streak: bonus points and a cheer instead of the usual message ===
     label('kana_streak'),
+    ...playSfx('streak'),
     ...zeroBytes(MEM.KANA_STREAK),
     ...buildAddScore(STREAK_BONUS),
     ...buildSetDelta(DELTA_PLUS_150),

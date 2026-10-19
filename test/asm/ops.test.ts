@@ -28,6 +28,8 @@ const ENCODINGS: [string, Op, number[]][] = [
   ['LD ($C000),A', op.ld_nn_a(u16(0xc000)), [0xea, 0x00, 0xc0]],
   ['LD A,($C123)', op.ld_a_nn(u16(0xc123)), [0xfa, 0x23, 0xc1]],
   ['LDH ($40),A', op.ldh_n_a(ioReg(0x40)), [0xe0, 0x40]],
+  ['LDH (C),A', op.ldh_c_a(), [0xe2]],
+  ['LDH A,(C)', op.ldh_a_c(), [0xf2]],
   ['LDH A,($44)', op.ldh_a_n(ioReg(0x44)), [0xf0, 0x44]],
   // 16-bit loads
   ['LD BC,$1234', op.ld_rr_nn('bc', u16(0x1234)), [0x01, 0x34, 0x12]],

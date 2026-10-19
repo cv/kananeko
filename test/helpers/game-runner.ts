@@ -5,6 +5,7 @@
  * game scenarios instead of raw frame counts and hex addresses.
  */
 
+import { SFX, SFX_NONE, type SfxName } from '@game/sound';
 import Gameboy from 'serverboy';
 import { MEM } from '@asm/hardware';
 import { CAT_FACES, type CatFace, faceTile } from '@game/cat';
@@ -35,6 +36,8 @@ export interface GameRunnerSnapshot {
   readonly state: SaveStatePayload;
   readonly frames: number;
 }
+
+const SFX_ORDER = Object.keys(SFX) as SfxName[];
 
 function patchRomForServerboy(sourceRom: Uint8Array): Buffer {
   const patchedRom = Buffer.from(sourceRom);
@@ -151,6 +154,12 @@ export class GameRunner {
   }
 
   /** Read a WRAM byte by its MEM constant */
+  /** The sound effect playing last ('none' before any) */
+  get sfx(): SfxName | 'none' {
+    const id = this.readMem(MEM.SFX_ID);
+    return id === SFX_NONE ? 'none' : (SFX_ORDER[id - 1] ?? 'none');
+  }
+
   readMem(addr: number): number {
     const value = this.gb.getMemory()[addr];
     if (value === undefined) throw new RangeError(`Address out of range: ${String(addr)}`);
