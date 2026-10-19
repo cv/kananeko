@@ -108,7 +108,7 @@ describe('text_next', () => {
     const mem = runProgram(
       [
         ld_rr_nn('hl', LINE),
-        ...storePointer('hl', MEM.DLG_STR_LO, MEM.DLG_STR_HI),
+        ...storePointer('hl', MEM.DLG_STR),
         ...zeroBytes(MEM.TEXT_SP),
         ld_rr_nn('hl', u16(SCRATCH)),
         label(NEXT),

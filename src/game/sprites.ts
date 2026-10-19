@@ -34,9 +34,9 @@ const DMA_ROUTINE = new Label('dma_routine');
 const SPRITE_TILES = new Label('sprite_tiles');
 
 /** Shadow OAM: 40 sprites x 4 bytes, page-aligned for DMA (see SHADOW_OAM_REGION) */
-export const SHADOW_OAM = MEM.SHADOW_OAM;
+export const SHADOW_OAM = MEM.SHADOW_OAM.address;
 /** HRAM address the DMA routine is copied to (the CPU can only run from HRAM during DMA) */
-const DMA_HRAM = MEM.OAM_DMA;
+const DMA_HRAM = MEM.OAM_DMA.address;
 /** OAM coordinates are offset from the screen's top-left corner */
 export const OAM_Y_OFFSET = 16;
 export const OAM_X_OFFSET = 8;

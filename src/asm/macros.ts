@@ -29,6 +29,7 @@ import {
   ret_cc,
   xor_r,
 } from './ops';
+import type { ByteValue, WordVar } from './ram';
 import { Label, type Op, type Target, type U16, u8, u16 } from './types';
 import { lo } from './util';
 
@@ -52,7 +53,7 @@ export function lcdOn(flags: number): Op[] {
 }
 
 /** Store an immediate byte to memory (clobbers A). */
-export function storeByte(addr: U16, value: number): Op[] {
+export function storeByte<A extends U16>(addr: A, value: ByteValue<A>): Op[] {
   return [ld_r_n('a', u8(value)), ld_nn_a(addr)];
 }
 
@@ -79,15 +80,15 @@ const PAIR_HALVES = {
 } as const satisfies Record<PointerPair, { low: string; high: string }>;
 
 /** Load a register pair from a lo/hi byte pair in memory (clobbers A). */
-export function loadPointer(rr: PointerPair, loAddr: U16, hiAddr: U16): Op[] {
+export function loadPointer(rr: PointerPair, src: WordVar): Op[] {
   const { low, high } = PAIR_HALVES[rr];
-  return [ld_a_nn(loAddr), ld_r_r(low, 'a'), ld_a_nn(hiAddr), ld_r_r(high, 'a')];
+  return [ld_a_nn(src.lo), ld_r_r(low, 'a'), ld_a_nn(src.hi), ld_r_r(high, 'a')];
 }
 
-/** Store a register pair into a lo/hi byte pair in memory (clobbers A). */
-export function storePointer(rr: PointerPair, loAddr: U16, hiAddr: U16): Op[] {
+/** Store a register pair into a word variable (clobbers A). */
+export function storePointer(rr: PointerPair, dst: WordVar): Op[] {
   const { low, high } = PAIR_HALVES[rr];
-  return [ld_r_r('a', low), ld_nn_a(loAddr), ld_r_r('a', high), ld_nn_a(hiAddr)];
+  return [ld_r_r('a', low), ld_nn_a(dst.lo), ld_r_r('a', high), ld_nn_a(dst.hi)];
 }
 
 // ---------------------------------------------------------------------------

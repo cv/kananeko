@@ -113,13 +113,13 @@ function gameEncode({ scene, lives, score }: Progress): string {
     [
       ...storeByte(MEM.SCENE_ID, scene),
       ...storeByte(MEM.KANA_LIVES, lives),
-      ...storeByte(MEM.KANA_SCORE_LO, score & 0xff),
-      ...storeByte(MEM.KANA_SCORE_HI, score >> 8),
+      ...storeByte(MEM.KANA_SCORE.lo, score & 0xff),
+      ...storeByte(MEM.KANA_SCORE.hi, score >> 8),
       call(PASS_ENCODE),
     ],
     ROUTINES,
   );
-  return Array.from(memory.slice(MEM.PASS_CHARS, MEM.PASS_CHARS + PASSWORD_LENGTH))
+  return Array.from(memory.slice(MEM.PASS_CHARS.address, MEM.PASS_CHARS.address + PASSWORD_LENGTH))
     .map((i) => PASSWORD_ALPHABET[i] ?? '?')
     .join('');
 }
@@ -128,7 +128,7 @@ function gameDecode(password: string): { valid: boolean; memory: Uint8Array } {
   const memory = runProgram(
     [
       ...Array.from(password).flatMap((kana, i) =>
-        storeByte(u16(MEM.PASS_CHARS + i), PASSWORD_ALPHABET.indexOf(kana)),
+        storeByte(MEM.PASS_CHARS.at(i), PASSWORD_ALPHABET.indexOf(kana)),
       ),
       call(PASS_DECODE),
       ld_nn_a(u16(SCRATCH)),
@@ -160,7 +160,7 @@ describe("Given the game's password routines", () => {
       expect(valid).toBe(true);
       expect(memory[MEM.SCENE_ID]).toBe(scene);
       expect(memory[MEM.KANA_LIVES]).toBe(2);
-      expect((memory[MEM.KANA_SCORE_HI] ?? 0) * 256 + (memory[MEM.KANA_SCORE_LO] ?? 0)).toBe(score);
+      expect((memory[MEM.KANA_SCORE.hi] ?? 0) * 256 + (memory[MEM.KANA_SCORE.lo] ?? 0)).toBe(score);
       expect(memory[MEM.SCENE_FLAGS]).toBe((1 << scene) - 1);
     },
   );

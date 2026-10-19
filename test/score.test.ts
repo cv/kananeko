@@ -19,13 +19,13 @@ import { SCORE_DIGITS } from '@game/labels';
 function scoreAfter(start: number, ops: ReturnType<typeof buildAddScore>): number {
   const mem = runProgram(
     [
-      ...storeByte(MEM.KANA_SCORE_LO, start & 0xff),
-      ...storeByte(MEM.KANA_SCORE_HI, start >> 8),
+      ...storeByte(MEM.KANA_SCORE.lo, start & 0xff),
+      ...storeByte(MEM.KANA_SCORE.hi, start >> 8),
       ...ops,
     ],
     buildScoreRoutines(),
   );
-  return (mem[MEM.KANA_SCORE_LO] ?? 0) | ((mem[MEM.KANA_SCORE_HI] ?? 0) << 8);
+  return (mem[MEM.KANA_SCORE.lo] ?? 0) | ((mem[MEM.KANA_SCORE.hi] ?? 0) << 8);
 }
 
 describe('score_digits', () => {
@@ -34,13 +34,13 @@ describe('score_digits', () => {
     (score) => {
       const mem = runProgram(
         [
-          ...storeByte(MEM.KANA_SCORE_LO, score & 0xff),
-          ...storeByte(MEM.KANA_SCORE_HI, score >> 8),
+          ...storeByte(MEM.KANA_SCORE.lo, score & 0xff),
+          ...storeByte(MEM.KANA_SCORE.hi, score >> 8),
           call(SCORE_DIGITS),
         ],
         buildScoreDigits(),
       );
-      expect(Array.from(mem.slice(MEM.SCORE_DIGITS, MEM.SCORE_DIGITS + 5))).toEqual(
+      expect(Array.from(mem.slice(MEM.SCORE_DIGITS.address, MEM.SCORE_DIGITS.address + 5))).toEqual(
         textToTiles(String(score).padStart(5, '0')),
       );
     },

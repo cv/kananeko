@@ -491,16 +491,16 @@ export function buildFadeRoutines(): Op[] {
     ld_r_n('c', u8(FADE_STEP_FRAMES)),
     label(FADE_WAIT_FRAME),
     call(FRAME_WAIT),
-    call(MEM.OAM_DMA), // see sprites.ts: so sprites update during fades
+    call(MEM.OAM_DMA.address), // see sprites.ts: so sprites update during fades
     dec_r('c'),
     jr_cc('nz', FADE_WAIT_FRAME),
     ret(),
 
     // fade_in: HL = palette set. Starts at paper, turns the LCD on, steps to full color.
     label(FADE_IN_CURRENT),
-    ...loadPointer('hl', MEM.FADE_TABLE_LO, MEM.FADE_TABLE_HI),
+    ...loadPointer('hl', MEM.FADE_TABLE),
     label(FADE_IN),
-    ...storePointer('hl', MEM.FADE_TABLE_LO, MEM.FADE_TABLE_HI),
+    ...storePointer('hl', MEM.FADE_TABLE),
     ld_r_n('b', u8(FADE_STEPS - 1)),
     call(FADE_APPLY),
     ...screenOn(),
@@ -520,7 +520,7 @@ export function buildFadeRoutines(): Op[] {
     and_n(u8(LCDC.LCD_ON)),
     ret_cc('z'),
     call(SPRITES_OFF), // sprites don't fade: take them off first
-    ...loadPointer('hl', MEM.FADE_TABLE_LO, MEM.FADE_TABLE_HI),
+    ...loadPointer('hl', MEM.FADE_TABLE),
     ld_r_n('b', u8(0)),
     label(FADE_OUT_STEP),
     call(FADE_WAIT),

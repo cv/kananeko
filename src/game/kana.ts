@@ -251,12 +251,6 @@ const DPAD_BY_DIRECTION = [JOY.UP, JOY.DOWN, JOY.LEFT, JOY.RIGHT] as const;
 type ShuffleSlot = 0 | 1 | 2 | 3;
 type AnswerLayout = Quad<ShuffleSlot>;
 
-const SHUFFLE_MEM = [
-  MEM.KANA_SHUFFLE,
-  MEM.KANA_SHUFFLE1,
-  MEM.KANA_SHUFFLE2,
-  MEM.KANA_SHUFFLE3,
-] as const;
 const ANSWER_SLOT_ORDER = [0, 1, 2, 3] as const;
 const ANSWER_LAYOUTS = [
   [0, 1, 2, 3],
@@ -321,7 +315,7 @@ function buildAnswerLayout(layout: AnswerLayout): Op[] {
   return ANSWER_SLOT_ORDER.flatMap((optionIndex) => {
     const position = OPTION_POSITIONS[optionIndex];
     const shuffleSlot = layout[optionIndex];
-    return [ld_a_nn(SHUFFLE_MEM[shuffleSlot]), ...buildDrawTileAt(position, 'from_a')];
+    return [ld_a_nn(MEM.KANA_SHUFFLE.at(shuffleSlot)), ...buildDrawTileAt(position, 'from_a')];
   });
 }
 
@@ -402,7 +396,7 @@ export function buildKanaEngine(): Op[] {
     // =================================================================
     label(KANA_START),
     ...playMusic('quiz'),
-    ...storePointer('de', MEM.KANA_DATA_LO, MEM.KANA_DATA_HI),
+    ...storePointer('de', MEM.KANA_DATA),
 
     // Score persists across scenes — initialized at game start only.
     // Restock 1 life so the player can attempt kana even after dying in dialogue.
@@ -422,7 +416,7 @@ export function buildKanaEngine(): Op[] {
     // =================================================================
     label(KANA_LOAD_QUESTION),
     // Out of questions? End the round with the last question still on screen.
-    ...loadPointer('hl', MEM.KANA_DATA_LO, MEM.KANA_DATA_HI),
+    ...loadPointer('hl', MEM.KANA_DATA),
     ld_r_r('a', 'hl_ptr'),
     cp_n(u8(0)),
     jp_cc('z', KANA_ALL_DONE),
@@ -440,7 +434,7 @@ export function buildKanaEngine(): Op[] {
     label(KANA_NEXT_QUESTION),
     ...drawTiles(WORD_INNER_ADDR, Array<number>(WORD_BOX.innerWidth).fill(0)), // empty word box
 
-    ...loadPointer('de', MEM.KANA_DATA_LO, MEM.KANA_DATA_HI),
+    ...loadPointer('de', MEM.KANA_DATA),
 
     // Read word_length; 0 = end of the question list
     ld_a_de(),
@@ -461,7 +455,7 @@ export function buildKanaEngine(): Op[] {
     srl('a'),
     ld_rr_nn('hl', u16(WORD_INNER_ADDR)),
     ...addAToHL('kana_word_centered'),
-    ...storePointer('hl', MEM.KANA_BLANK_LO, MEM.KANA_BLANK_HI), // word start, for now
+    ...storePointer('hl', MEM.KANA_BLANK), // word start, for now
 
     // Copy the word's tiles
     label(KANA_DRAW_WORD),
@@ -475,18 +469,18 @@ export function buildKanaEngine(): Op[] {
     ld_a_de(),
     inc_rr('de'),
     ld_r_r('b', 'a'),
-    ...loadPointer('hl', MEM.KANA_BLANK_LO, MEM.KANA_BLANK_HI),
+    ...loadPointer('hl', MEM.KANA_BLANK),
     ld_r_r('a', 'b'),
     ...addAToHL('kana_blank_found'),
-    ...storePointer('hl', MEM.KANA_BLANK_LO, MEM.KANA_BLANK_HI),
+    ...storePointer('hl', MEM.KANA_BLANK),
     ld_r_n('a', u8(BLANK_TILE)),
     ...vramPut(),
 
     // Copy [correct, d1, d2, d3] into the KANA_SHUFFLE buffer
-    ld_rr_nn('hl', MEM.KANA_SHUFFLE),
-    ...SHUFFLE_MEM.flatMap(() => [ld_a_de(), inc_rr('de'), ldi_hl_a()]),
+    ld_rr_nn('hl', MEM.KANA_SHUFFLE.address),
+    ...ANSWER_SLOT_ORDER.flatMap(() => [ld_a_de(), inc_rr('de'), ldi_hl_a()]),
 
-    ...storePointer('de', MEM.KANA_DATA_LO, MEM.KANA_DATA_HI),
+    ...storePointer('de', MEM.KANA_DATA),
 
     // === RANDOMIZE: DIV & 3 picks the direction that holds the correct answer ===
     ldh_a_n(HW.DIV),
@@ -733,8 +727,8 @@ export function buildKanaEngine(): Op[] {
     // kana_reveal — Put the correct kana into the word's blank cell.
     // =================================================================
     label(KANA_REVEAL),
-    ...loadPointer('hl', MEM.KANA_BLANK_LO, MEM.KANA_BLANK_HI),
-    ld_a_nn(MEM.KANA_SHUFFLE), // shuffle slot 0 always holds the correct tile
+    ...loadPointer('hl', MEM.KANA_BLANK),
+    ld_a_nn(MEM.KANA_SHUFFLE.at(0)), // shuffle slot 0 always holds the correct tile
     ...vramPut(),
     ret(),
 

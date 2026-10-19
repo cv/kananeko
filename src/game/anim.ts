@@ -74,7 +74,7 @@ export function packAnimation(animation: TileAnimation | undefined, art: SceneAr
 export function buildAnimRoutines(): Op[] {
   return [
     label(ANIM_TICK),
-    ...loadPointer('hl', MEM.ANIM_LO, MEM.ANIM_HI),
+    ...loadPointer('hl', MEM.ANIM),
     ldi_a_hl(),
     ld_r_r('e', 'a'), // DE = tile's VRAM address
     ldi_a_hl(),

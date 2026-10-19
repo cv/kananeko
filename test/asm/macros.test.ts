@@ -16,6 +16,7 @@ import {
   zeroPages,
 } from '@asm/macros';
 import { add_r, call, cp_r, db, label, ld_a_nn, ld_nn_a, ld_r_n, ld_r_r, ret } from '@asm/ops';
+import { allocate, word } from '@asm/ram';
 import { type Op, u8, u16, Label } from '@asm/types';
 import { SCRATCH, runProgram } from '../helpers/run-program';
 
@@ -26,6 +27,9 @@ const SRC = new Label('src');
 const PICK = new Label('pick');
 
 const at = (offset: number): ReturnType<typeof u16> => u16(SCRATCH + offset);
+
+/** Words in the scratch area: W0 at SCRATCH, W2 two bytes on */
+const { W0, W2 } = allocate('scratch', SCRATCH, 4, { W0: word(), W2: word() }).vars;
 
 describe('storeByte / zeroBytes', () => {
   it('writes immediates and zeroes', () => {
@@ -44,8 +48,8 @@ describe('loadPointer / storePointer', () => {
     const mem = runProgram([
       ...storeByte(at(0), 0xcd),
       ...storeByte(at(1), 0xab),
-      ...loadPointer(rr, at(0), at(1)),
-      ...storePointer(rr, at(2), at(3)),
+      ...loadPointer(rr, W0),
+      ...storePointer(rr, W2),
     ]);
     expect([mem[SCRATCH + 2], mem[SCRATCH + 3]]).toEqual([0xcd, 0xab]);
   });
@@ -54,7 +58,7 @@ describe('loadPointer / storePointer', () => {
     const mem = runProgram([
       ...storeByte(at(0), 0x11),
       ...storeByte(at(1), 0x22),
-      ...loadPointer('de', at(0), at(1)),
+      ...loadPointer('de', W0),
       ld_r_r('a', 'e'),
       ld_nn_a(at(2)),
       ld_r_r('a', 'd'),

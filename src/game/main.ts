@@ -303,8 +303,8 @@ function resetRunState(...alsoZero: U16[]): Op[] {
   return [
     ...zeroBytes(
       ...alsoZero,
-      MEM.KANA_SCORE_LO,
-      MEM.KANA_SCORE_HI,
+      MEM.KANA_SCORE.lo,
+      MEM.KANA_SCORE.hi,
       MEM.DELTA_TYPE,
       MEM.DELTA_TIMER,
       MEM.KANA_STREAK,
@@ -377,7 +377,7 @@ function buildRoundRoutines(): Op[] {
     ret(),
 
     label(ROUND_CHECK),
-    ...loadPointer('hl', MEM.ROUNDS_LO, MEM.ROUNDS_HI),
+    ...loadPointer('hl', MEM.ROUNDS),
     ld_a_nn(MEM.DLG_NODE_ID),
     ld_r_r('d', 'a'),
     call(TABLE_FIND),
@@ -413,7 +413,7 @@ function buildRoundRoutines(): Op[] {
     ld_r_n('a', u8(KanaMode.SAY_IT)),
     label(CHANCE_FIND),
     ld_nn_a(MEM.KANA_MODE),
-    ...loadPointer('hl', MEM.CHANCES_LO, MEM.CHANCES_HI),
+    ...loadPointer('hl', MEM.CHANCES),
     call(TABLE_FIND),
     ret_cc('z'),
 
@@ -687,9 +687,9 @@ export function buildProgram(): Op[] {
     call(SCENE_DESC), // everything below reads this scene's entry in scene_table
     ...storeByte(MEM.ROUNDS_DONE, 0),
     ...sceneWord('rounds'),
-    ...storePointer('hl', MEM.ROUNDS_LO, MEM.ROUNDS_HI),
+    ...storePointer('hl', MEM.ROUNDS),
     ...sceneWord('chances'),
-    ...storePointer('hl', MEM.CHANCES_LO, MEM.CHANCES_HI),
+    ...storePointer('hl', MEM.CHANCES),
     call(SCENE_DRAW),
 
     // ==== Dialogue, with a kana round after each conversation ====
@@ -747,7 +747,7 @@ export function buildProgram(): Op[] {
     call(PRACTICE_RAND),
     ld_nn_a(MEM.PRACTICE_NEXT),
     call(SPEED_FILL), // the missed kana first, then the round's own questions
-    ld_rr_nn('de', MEM.PRACTICE_BUF),
+    ld_rr_nn('de', MEM.PRACTICE_BUF.address),
     call(PLAY_ROUND),
     ld_r_n('c', u8(0)),
     call(CHART_SHOW), // the whole trip's kana, then the ending
@@ -789,7 +789,7 @@ export function buildProgram(): Op[] {
     dec_r('b'),
     jr_cc('nz', SCENE_CAST_PALETTE),
     ...sceneWord('castTable'),
-    ...storePointer('hl', MEM.NPC_TABLE_LO, MEM.NPC_TABLE_HI),
+    ...storePointer('hl', MEM.NPC_TABLE),
     ...storeByte(MEM.NPC_CURRENT, NPC_NONE),
     ...sceneByte('stageX'),
     ld_nn_a(MEM.NPC_X),
@@ -798,7 +798,7 @@ export function buildProgram(): Op[] {
 
     // The animated tile
     ...sceneWord('animation'),
-    ...storePointer('hl', MEM.ANIM_LO, MEM.ANIM_HI),
+    ...storePointer('hl', MEM.ANIM),
     ...zeroBytes(MEM.ANIM_TIMER, MEM.ANIM_FRAME),
 
     // GBC colors of the backdrop

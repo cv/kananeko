@@ -5,14 +5,15 @@
  */
 
 import { HW_MEM } from '../asm/hardware';
-import { allocate, checkRegions, same } from '../asm/ram';
+import { allocate, buffer, byte, byteOf, checkRegions, same, word } from '../asm/ram';
+import { DialogueState, KanaMode, KanaState } from './state';
 import { type U16, u16 } from '../asm/types';
 
 /** Bytes per sound voice: see VOICE in sound.ts */
 const VOICE_BYTES = 8;
 
 /** The OAM DMA routine, copied to the start of HRAM at boot (see sprites.ts) */
-export const DMA_REGION = allocate('HRAM DMA routine', 0xff80, 10, { OAM_DMA: 10 });
+export const DMA_REGION = allocate('HRAM DMA routine', 0xff80, 10, { OAM_DMA: buffer(10) });
 
 /**
  * Engine state in HRAM, after the DMA routine and up to IE at $FFFF: LDH reaches it
@@ -21,153 +22,136 @@ export const DMA_REGION = allocate('HRAM DMA routine', 0xff80, 10, { OAM_DMA: 10
  */
 export const VARIABLES = allocate('HRAM variables', DMA_REGION.end, 0xffff - DMA_REGION.end, {
   // Joypad
-  JOYPAD_CUR: 1, // Current frame button state
-  JOYPAD_PREV: 1, // Previous frame button state
-  JOYPAD_NEW: 1, // Newly pressed this frame (edge-detected)
+  JOYPAD_CUR: byte(), // Current frame button state
+  JOYPAD_PREV: byte(), // Previous frame button state
+  JOYPAD_NEW: byte(), // Newly pressed this frame (edge-detected)
 
   // Dialogue engine
-  DLG_STATE: 1, // 0=idle, 1=printing, 2=wait-for-input, 3=choosing
-  DLG_CHAR_IDX: 1, // Index into current string being revealed
-  DLG_DELAY: 1, // Frame counter for character reveal delay
-  DLG_CHOICE_CNT: 1, // Number of response choices (0-3)
-  DLG_CURSOR: 1, // Currently highlighted choice index
-  DLG_STR_LO: 1, // Pointer to current dialogue string (lo byte)
-  DLG_STR_HI: 1, // Pointer to current dialogue string (hi byte)
-  DLG_VRAM_LO: 1, // Current VRAM write position (lo byte)
-  DLG_VRAM_HI: 1, // Current VRAM write position (hi byte)
-  DLG_RESULT: 1, // Chosen response index after selection
-  DLG_NODE_ID: 1, // Current node index in dialogue tree (0xFF = done)
-  DLG_TREE_LO: 1, // Base pointer to current tree data (lo)
-  DLG_TREE_HI: 1, // Base pointer to current tree data (hi)
-  DLG_META0_LO: 1, // ROM ptr to the choices' next_node table (lo)
-  DLG_META0_HI: 1, // ROM ptr to the choices' next_node table (hi)
-  DLG_ORDER0: 1, // Display row 0 → logical choice index
-  DLG_ORDER1: 1, // Display row 1 → logical choice index
-  DLG_ORDER2: 1, // Display row 2 → logical choice index
-  DLG_BOUNCE: 1, // Frame counter driving the choice cursor's bounce
+  DLG_STATE: byteOf(DialogueState), // 0=idle, 1=printing, 2=wait-for-input, 3=choosing
+  DLG_CHAR_IDX: byte(), // Index into current string being revealed
+  DLG_DELAY: byte(), // Frame counter for character reveal delay
+  DLG_CHOICE_CNT: byte(), // Number of response choices (0-3)
+  DLG_CURSOR: byte(), // Currently highlighted choice index
+  DLG_STR: word(), // Pointer to current dialogue string
+  DLG_VRAM: word(), // Current VRAM write position
+  DLG_RESULT: byte(), // Chosen response index after selection
+  DLG_NODE_ID: byte(), // Current node index in dialogue tree (0xFF = done)
+  DLG_TREE: word(), // Base pointer to current tree data
+  DLG_META0: word(), // ROM ptr to the choices' next_node table
+  DLG_ORDER: buffer(3), // display row → logical choice index
+  DLG_BOUNCE: byte(), // Frame counter driving the choice cursor's bounce
 
   // Kana mini-game
-  KANA_STATE: 1, // 0=idle, 2=awaiting, 3=correct feedback, 4=wrong feedback
-  KANA_CORRECT_POS: 1, // Which d-pad direction has the correct answer (0-3)
-  KANA_ANSWER: 1, // Player's answer direction (0-3)
-  KANA_SCORE_LO: 1, // 16-bit score (low byte)
-  KANA_SCORE_HI: 1, // 16-bit score (high byte)
-  KANA_Q_IDX: 1, // Current question index
-  KANA_LIVES: 1, // Lives remaining (3,2,1,0)
-  KANA_ATTEMPTS: 1, // Attempts on current question (0,1,2)
-  KANA_SHUFFLE: 1, // shuffle buffer[0] (correct tile)
-  KANA_SHUFFLE1: 1, // shuffle buffer[1]
-  KANA_SHUFFLE2: 1, // shuffle buffer[2]
-  KANA_SHUFFLE3: 1, // shuffle buffer[3]
+  KANA_STATE: byteOf(KanaState), // 0=idle, 2=awaiting, 3=correct feedback, 4=wrong feedback
+  KANA_CORRECT_POS: byte(), // Which d-pad direction has the correct answer (0-3)
+  KANA_ANSWER: byte(), // Player's answer direction (0-3)
+  KANA_SCORE: word(), // 16-bit score
+  KANA_Q_IDX: byte(), // Current question index
+  KANA_LIVES: byte(), // Lives remaining (3,2,1,0)
+  KANA_ATTEMPTS: byte(), // Attempts on current question (0,1,2)
+  KANA_SHUFFLE: buffer(4), // the answers' tiles, shuffled onto the d-pad: [0] is the correct one
   // The kana round never runs alongside dialogue, so it borrows these dialogue bytes:
-  KANA_DATA_LO: same('DLG_STR_LO'), // pointer to the next question in ROM (lo)
-  KANA_DATA_HI: same('DLG_STR_HI'), // pointer to the next question in ROM (hi)
+  KANA_DATA: same('DLG_STR'), // pointer to the next question in ROM
   KANA_FEEDBACK_TIMER: same('DLG_DELAY'), // frames left in the feedback pause
 
   // HUD delta flash
-  DELTA_TYPE: 1, // 0=none, 1=+100, 2=+10, 3=-5, 4=-100
-  DELTA_TIMER: 1, // Frames remaining for flash display
+  DELTA_TYPE: byte(), // 0=none, 1=+100, 2=+10, 3=-5, 4=-100
+  DELTA_TIMER: byte(), // Frames remaining for flash display
 
   // Scene system
-  SCENE_ID: 1, // Current scene index (0-4, 0xFF = title)
-  SCENE_FLAGS: 1, // Per-scene completion bitfield
-  GAME_MODE: 1, // 0=title, 1=dialogue, 2=kana, 3=transition
-  TITLE_TIMER: 1, // Title-screen animation timer (1 tick per frame)
-  KANA_BLANK_LO: 1, // VRAM address of the blanked kana in the word (lo)
-  KANA_BLANK_HI: 1, // VRAM address of the blanked kana in the word (hi)
-  FADE_TABLE_LO: 1, // Palette set on screen (lo)
-  FADE_TABLE_HI: 1, // Palette set on screen (hi)
+  SCENE_ID: byte(), // Current scene index (0-4, 0xFF = title)
+  SCENE_FLAGS: byte(), // Per-scene completion bitfield
+  GAME_MODE: byte(), // 0=title, 1=dialogue, 2=kana, 3=transition
+  TITLE_TIMER: byte(), // Title-screen animation timer (1 tick per frame)
+  KANA_BLANK: word(), // VRAM address of the blanked kana in the word
+  FADE_TABLE: word(), // Palette set on screen
 
   // What the HUD currently shows, so it only redraws on change
-  HUD_SHOWN_LIVES: 1,
-  HUD_SHOWN_SCORE_LO: 1,
-  HUD_SHOWN_SCORE_HI: 1,
-  HUD_SHOWN_DELTA: 1, // delta type on screen (0 = cleared)
+  HUD_SHOWN_LIVES: byte(),
+  HUD_SHOWN_SCORE: word(),
+  HUD_SHOWN_DELTA: byte(), // delta type on screen (0 = cleared)
 
   // Hardware and the scene's NPC and tile animation
-  IS_CGB: 1, // 1 on a Game Boy Color (A = $11 at boot), else 0
-  NPC_TABLE_LO: 1, // Current scene's NPC segment table (lo)
-  NPC_TABLE_HI: 1, // Current scene's NPC segment table (hi)
-  NPC_CURRENT: 1, // NPC on screen ($FF = none)
-  NPC_TIMER: 1, // Frame counter for the NPC's idle bob
-  ANIM_LO: 1, // Current scene's tile animation (lo)
-  ANIM_HI: 1, // Current scene's tile animation (hi)
-  ANIM_TIMER: 1, // Frame counter for the tile animation
-  ANIM_FRAME: 1, // Animation frame on screen
-  NPC_X: 1, // Speaker's OAM x (left half)
-  NPC_Y: 1, // Speaker's OAM y (top half, before the bob)
+  IS_CGB: byte(), // 1 on a Game Boy Color (A = $11 at boot), else 0
+  NPC_TABLE: word(), // Current scene's NPC segment table
+  NPC_CURRENT: byte(), // NPC on screen ($FF = none)
+  NPC_TIMER: byte(), // Frame counter for the NPC's idle bob
+  ANIM: word(), // Current scene's tile animation
+  ANIM_TIMER: byte(), // Frame counter for the tile animation
+  ANIM_FRAME: byte(), // Animation frame on screen
+  NPC_X: byte(), // Speaker's OAM x (left half)
+  NPC_Y: byte(), // Speaker's OAM y (top half, before the bob)
 
   // Kana rounds of the current scene (see rounds.ts)
-  ROUNDS_LO: 1, // pointer to the scene's rounds data (lo)
-  ROUNDS_HI: 1, // pointer to the scene's rounds data (hi)
-  ROUNDS_DONE: 1, // bit i set = round i already played
-  ROUND_RAN: 1, // a round ran since the last dialogue choice (the scene needs redrawing)
-  CHANCES_LO: 1, // pointer to the scene's chances table (lo)
-  CHANCES_HI: 1, // pointer to the scene's chances table (hi)
-  KANA_MODE: 1, // KanaMode of the running round
-  DLG_FROM_NODE: 1, // node the last choice was made at
-  DLG_PICK: 1, // last choice: logical index, bit 7 = bad answer
-  KANA_STREAK: 1, // first-try answers in a row toward the next streak bonus
-  SCORE_DIGITS: 5, // SCORE_DIGIT_COUNT digit tiles of the score, most significant first
-  KANA_PROMPT: 1, // nonzero = the current question asks for katakana (see MATCH_FLAG)
-  KANA_CLOCK_FRAMES: 1, // speed round: frames left in the current second
-  KANA_CLOCK_SECS: 1, // speed round: seconds left to answer
+  ROUNDS: word(), // pointer to the scene's rounds data
+  ROUNDS_DONE: byte(), // bit i set = round i already played
+  ROUND_RAN: byte(), // a round ran since the last dialogue choice (the scene needs redrawing)
+  CHANCES: word(), // pointer to the scene's chances table
+  KANA_MODE: byteOf(KanaMode), // KanaMode of the running round
+  DLG_FROM_NODE: byte(), // node the last choice was made at
+  DLG_PICK: byte(), // last choice: logical index, bit 7 = bad answer
+  KANA_STREAK: byte(), // first-try answers in a row toward the next streak bonus
+  SCORE_DIGITS: buffer(5), // SCORE_DIGIT_COUNT digit tiles of the score, most significant first
+  KANA_PROMPT: byte(), // nonzero = the current question asks for katakana (see MATCH_FLAG)
+  KANA_CLOCK_FRAMES: byte(), // speed round: frames left in the current second
+  KANA_CLOCK_SECS: byte(), // speed round: seconds left to answer
 
   // The mascot sprite (see cat.ts)
-  CAT_X: 1, // OAM x of the cat's left column while placing it
-  CAT_COL: 1, // columns left in the row being placed
-  CAT_FACE: 1, // face showing (index into CAT_FACES)
-  CAT_REST: 1, // face it returns to after a reaction
-  CAT_TIMER: 1, // frames left in a reaction
-  CAT_BLINK: 1, // blink cycle counter
+  CAT_X: byte(), // OAM x of the cat's left column while placing it
+  CAT_COL: byte(), // columns left in the row being placed
+  CAT_FACE: byte(), // face showing (index into CAT_FACES)
+  CAT_REST: byte(), // face it returns to after a reaction
+  CAT_TIMER: byte(), // frames left in a reaction
+  CAT_BLINK: byte(), // blink cycle counter
 
   // The current scene's entry in scene_table (see scene-table.ts)
-  SCENE_DESC_LO: 1,
-  SCENE_DESC_HI: 1,
+  SCENE_DESC: word(),
 
   // Frame budget (see frame_wait in video.ts)
-  FRAME_COUNT: 1, // VBlanks so far (the VBlank handler counts them)
-  LAST_FRAME: 1, // FRAME_COUNT when the game last finished a frame's work
-  FRAMES_MISSED: 1, // VBlanks the game's work ran past (saturates at 255)
+  FRAME_COUNT: byte(), // VBlanks so far (the VBlank handler counts them)
+  LAST_FRAME: byte(), // FRAME_COUNT when the game last finished a frame's work
+  FRAMES_MISSED: byte(), // VBlanks the game's work ran past (saturates at 255)
 
   // Dialogue text decompression (see text_next in dialogue.ts)
-  TEXT_SP: 1, // right halves of codes waiting on TEXT_STACK
+  TEXT_SP: byte(), // right halves of codes waiting on TEXT_STACK
 
   // Sound (see sound.ts)
-  SFX_ID: 1, // The sound effect playing last (SFX_NONE before any)
-  SFX_PRIO: 1, // Its priority: a lower one can't cut it off
-  MUSIC_ID: 1, // The song playing (see music_play)
+  SFX_ID: byte(), // The sound effect playing last (SFX_NONE before any)
+  SFX_PRIO: byte(), // Its priority: a lower one can't cut it off
+  MUSIC_ID: byte(), // The song playing (see music_play)
 
   // Passwords and the title menu (see password.ts, menu.ts)
-  PASS_ACC: 4, // check, scene << 2 | lives, score hi, score lo
-  PASS_LEN: 1, // Kana entered so far
-  PASS_CURSOR: 1, // The kana grid's highlighted cell (0-31)
-  MENU_CURSOR: 1, // The title menu's highlighted item
+  PASS_ACC: buffer(4), // check, scene << 2 | lives, score hi, score lo
+  PASS_LEN: byte(), // Kana entered so far
+  PASS_CURSOR: byte(), // The kana grid's highlighted cell (0-31)
+  MENU_CURSOR: byte(), // The title menu's highlighted item
 
   // The kana chart and practice (see chart.ts, practice.ts)
-  CHART_WAIT: 1, // 1 while the kana chart waits for a button
-  PRACTICE_NEXT: 1, // Where the next practice pick starts looking (a chart entry)
-  PRACTICE_QUIT: 1, // Set when B leaves practice
-  PRACTICE_SEED: 1, // Mixed into the practice picks' randomness
+  CHART_WAIT: byte(), // 1 while the kana chart waits for a button
+  PRACTICE_NEXT: byte(), // Where the next practice pick starts looking (a chart entry)
+  PRACTICE_QUIT: byte(), // Set when B leaves practice
+  PRACTICE_SEED: byte(), // Mixed into the practice picks' randomness
 });
 
 /** Buffers in WRAM page $C0, walked with HL; boot zeroes the whole page */
 export const BUFFERS = allocate('WRAM buffers', 0xc000, 0x100, {
-  TEXT_STACK: 16, // TEXT_STACK_SIZE bytes (see text_next in dialogue.ts)
-  SND_VOICES: 3 * VOICE_BYTES, // SOUND_VOICES × VOICE_SIZE bytes (see sound.ts)
-  PASS_CHARS: 6, // PASSWORD_LENGTH kana, as PASSWORD_ALPHABET indices
-  KANA_SEEN: 6, // CHART_BYTES bytes, a bit per kana in CHART_KANA order: answered right
-  KANA_MISSED: 6, // CHART_BYTES bytes: answered wrong
+  TEXT_STACK: buffer(16), // TEXT_STACK_SIZE bytes (see text_next in dialogue.ts)
+  SND_VOICES: buffer(3 * VOICE_BYTES), // SOUND_VOICES × VOICE_SIZE bytes (see sound.ts)
+  PASS_CHARS: buffer(6), // PASSWORD_LENGTH kana, as PASSWORD_ALPHABET indices
+  KANA_SEEN: buffer(6), // CHART_BYTES bytes, a bit per kana in CHART_KANA order: answered right
+  KANA_MISSED: buffer(6), // CHART_BYTES bytes: answered wrong
 });
 
 /** The shadow copy of OAM that sprites.ts DMAs each frame: DMA needs it page-aligned */
-export const SHADOW_OAM_REGION = allocate('shadow OAM', 0xc100, 0xa0, { SHADOW_OAM: 0xa0 });
+export const SHADOW_OAM_REGION = allocate('shadow OAM', 0xc100, 0xa0, { SHADOW_OAM: buffer(0xa0) });
 
 /** Questions picked for a practice or speed round, then a 0 */
-export const PRACTICE_REGION = allocate('practice buffer', 0xc200, 0x100, { PRACTICE_BUF: 0x100 });
+export const PRACTICE_REGION = allocate('practice buffer', 0xc200, 0x100, {
+  PRACTICE_BUF: buffer(0x100),
+});
 
 /** The stack grows down from the top of this region (SP starts at STACK_TOP) */
-export const STACK_REGION = allocate('stack', 0xc300, 0x100, { STACK: 0x100 });
+export const STACK_REGION = allocate('stack', 0xc300, 0x100, { STACK: buffer(0x100) });
 export const STACK_TOP: U16 = u16(STACK_REGION.limit);
 
 export const RAM_REGIONS = [
@@ -183,11 +167,11 @@ checkRegions(RAM_REGIONS);
 /** Hardware addresses and the game's variables */
 export const MEM = {
   ...HW_MEM,
-  ...DMA_REGION.addresses,
-  ...VARIABLES.addresses,
-  ...BUFFERS.addresses,
-  ...SHADOW_OAM_REGION.addresses,
-  ...PRACTICE_REGION.addresses,
+  ...DMA_REGION.vars,
+  ...VARIABLES.vars,
+  ...BUFFERS.vars,
+  ...SHADOW_OAM_REGION.vars,
+  ...PRACTICE_REGION.vars,
 };
 
 /** Every variable's address by name, for the .sym file */

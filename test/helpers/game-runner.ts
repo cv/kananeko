@@ -256,9 +256,9 @@ export class GameRunner {
 
   get dlgChoiceOrder(): [number, number, number] {
     return [
-      this.readMem(MEM.DLG_ORDER0),
-      this.readMem(MEM.DLG_ORDER1),
-      this.readMem(MEM.DLG_ORDER2),
+      this.readMem(MEM.DLG_ORDER.at(0)),
+      this.readMem(MEM.DLG_ORDER.at(1)),
+      this.readMem(MEM.DLG_ORDER.at(2)),
     ];
   }
 
@@ -267,7 +267,7 @@ export class GameRunner {
   }
 
   get kanaScore(): number {
-    return this.readMem(MEM.KANA_SCORE_LO) | (this.readMem(MEM.KANA_SCORE_HI) << 8);
+    return this.readMem(MEM.KANA_SCORE.lo) | (this.readMem(MEM.KANA_SCORE.hi) << 8);
   }
 
   get kanaLives(): number {
@@ -309,9 +309,9 @@ export class GameRunner {
   /** Mark chart entries as missed (and nothing else) */
   setMissed(entries: readonly number[]): this {
     const memory = this.getMemory();
-    for (let i = 0; i < 6; i++) memory[MEM.KANA_MISSED + i] = 0;
+    for (let i = 0; i < 6; i++) memory[MEM.KANA_MISSED.at(i)] = 0;
     for (const i of entries) {
-      const address = MEM.KANA_MISSED + (i >> 3);
+      const address = MEM.KANA_MISSED.address + (i >> 3);
       memory[address] = (memory[address] ?? 0) | (1 << (i & 7));
     }
     return this;
@@ -319,12 +319,12 @@ export class GameRunner {
 
   /** Whether chart entry `i` is marked missed */
   isMissed(i: number): boolean {
-    return (this.readMem(MEM.KANA_MISSED + (i >> 3)) & (1 << (i & 7))) !== 0;
+    return (this.readMem(MEM.KANA_MISSED.address + (i >> 3)) & (1 << (i & 7))) !== 0;
   }
 
   /** The current kana question's answer */
   get kanaAnswer(): string {
-    const tile = this.readMem(MEM.KANA_SHUFFLE);
+    const tile = this.readMem(MEM.KANA_SHUFFLE.at(0));
     return Object.entries(CHAR_MAP).find(([, t]) => t === tile)?.[0] ?? '?';
   }
 

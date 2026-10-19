@@ -164,7 +164,7 @@ export function buildPracticeRoutines(speedRound: Label): Op[] {
     ld_r_r('a', 'c'),
     push('hl'),
     push('de'), // chart_bit uses DE (D counts the entries left to look at)
-    ld_rr_nn('hl', MEM.KANA_MISSED),
+    ld_rr_nn('hl', MEM.KANA_MISSED.address),
     call(CHART_BIT),
     ld_r_r('a', 'hl_ptr'),
     pop('de'),
@@ -218,7 +218,7 @@ export function buildPracticeRoutines(speedRound: Label): Op[] {
     ret(),
 
     label(PRACTICE_FILL),
-    ld_rr_nn('hl', MEM.PRACTICE_BUF),
+    ld_rr_nn('hl', MEM.PRACTICE_BUF.address),
     ld_r_n('b', u8(PRACTICE_ROUND)),
     label(PRACTICE_FILL_NEXT),
     push('bc'),
@@ -234,7 +234,7 @@ export function buildPracticeRoutines(speedRound: Label): Op[] {
 
     label(SPEED_FILL),
     // C = the missed kana, at most the round's length
-    ld_rr_nn('hl', MEM.KANA_MISSED),
+    ld_rr_nn('hl', MEM.KANA_MISSED.address),
     ld_r_n('c', u8(0)),
     ld_r_n('d', u8(6)),
     label(SPEED_COUNT_BYTE),
@@ -255,7 +255,7 @@ export function buildPracticeRoutines(speedRound: Label): Op[] {
     ld_r_n('c', u8(speedLength)),
     label(SPEED_COUNT_OK),
     // The missed ones first
-    ld_rr_nn('hl', MEM.PRACTICE_BUF),
+    ld_rr_nn('hl', MEM.PRACTICE_BUF.address),
     ld_r_r('a', 'c'),
     or_r('a'),
     jr_cc('z', SPEED_FILL_REST),
@@ -295,8 +295,8 @@ export function buildPracticeLoop(): Op[] {
   return [
     label(PRACTICE_START),
     ...zeroBytes(
-      MEM.KANA_SCORE_LO,
-      MEM.KANA_SCORE_HI,
+      MEM.KANA_SCORE.lo,
+      MEM.KANA_SCORE.hi,
       MEM.DELTA_TYPE,
       MEM.DELTA_TIMER,
       MEM.KANA_STREAK,
@@ -308,7 +308,7 @@ export function buildPracticeLoop(): Op[] {
     label(PRACTICE_LOOP),
     call(PRACTICE_FILL),
     ...storeByte(MEM.KANA_MODE, KanaMode.PRACTICE),
-    ld_rr_nn('de', MEM.PRACTICE_BUF),
+    ld_rr_nn('de', MEM.PRACTICE_BUF.address),
     call(PLAY_ROUND),
     ld_a_nn(MEM.PRACTICE_QUIT),
     or_r('a'),

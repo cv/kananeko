@@ -347,7 +347,7 @@ export const SFX_VOICE = 2;
 
 /** WRAM address of a voice's field */
 export function voiceField(voice: number, field: keyof typeof VOICE): U16 {
-  return u16(MEM.SND_VOICES + voice * VOICE_SIZE + VOICE[field]);
+  return MEM.SND_VOICES.at(voice * VOICE_SIZE + VOICE[field]);
 }
 
 /** Channel 3's waveform: a soft, rounded triangle (32 4-bit samples) */

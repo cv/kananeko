@@ -98,7 +98,7 @@ export function buildNpcRoutines(): Op[] {
     oamField(SPRITE_SLOT.npc + i, f);
   return [
     label(NPC_SELECT),
-    ...loadPointer('hl', MEM.NPC_TABLE_LO, MEM.NPC_TABLE_HI),
+    ...loadPointer('hl', MEM.NPC_TABLE),
     ld_a_nn(MEM.DLG_NODE_ID),
     ld_r_r('b', 'a'),
     ld_r_n('c', u8(NONE)),

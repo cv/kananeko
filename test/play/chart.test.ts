@@ -40,7 +40,7 @@ function redness(runner: GameRunner, row: number, col: number): number {
 }
 
 const kanaTileName = (runner: GameRunner): string => {
-  const tile = runner.readMem(MEM.KANA_SHUFFLE);
+  const tile = runner.readMem(MEM.KANA_SHUFFLE.at(0));
   return Object.entries(CHAR_MAP).find(([, t]) => t === tile)?.[0] ?? '?';
 };
 
@@ -59,7 +59,7 @@ describe('Given the first scene is cleared', () => {
     let seen = 0;
     Array.from(CHART_KANA).forEach((kana, i) => {
       const { row, col } = chartCell(i);
-      const expected = bit(runner, MEM.KANA_SEEN, i) ? kana : '─';
+      const expected = bit(runner, MEM.KANA_SEEN.address, i) ? kana : '─';
       if (expected === kana) seen++;
       expect(readText(runner, row, col, 1), kana).toBe(asSeenOnScreen(expected));
     });
@@ -85,9 +85,9 @@ describe('Given a kana answered wrong', () => {
     const runner = runnerAt(checkpoint.kanaStart(0)).resetStreak();
     runner.waitForKanaInput();
     const index = chartIndexOf(kanaTileName(runner));
-    expect(bit(runner, MEM.KANA_MISSED, index)).toBe(false);
+    expect(bit(runner, MEM.KANA_MISSED.address, index)).toBe(false);
     runner.answerKanaWrong();
-    expect(bit(runner, MEM.KANA_MISSED, index)).toBe(true);
+    expect(bit(runner, MEM.KANA_MISSED.address, index)).toBe(true);
   });
 
   it('draws it in red on the chart (Game Boy Color)', () => {
@@ -98,7 +98,7 @@ describe('Given a kana answered wrong', () => {
     runner.waitUntil(() => runner.chartWaiting, 'the chart').frames(SETTLE);
     expect(runner.readMem(MEM.IS_CGB)).toBe(1);
     const seenOnly = Array.from(CHART_KANA).findIndex(
-      (_, i) => bit(runner, MEM.KANA_SEEN, i) && !bit(runner, MEM.KANA_MISSED, i),
+      (_, i) => bit(runner, MEM.KANA_SEEN.address, i) && !bit(runner, MEM.KANA_MISSED.address, i),
     );
     const at = (i: number): number => redness(runner, chartCell(i).row, chartCell(i).col);
     expect(at(missed)).toBeGreaterThan(at(seenOnly) + 50);

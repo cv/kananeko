@@ -1,6 +1,8 @@
 /** The game's RAM map agrees with the engines that use it. */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
+import { storeByte } from '@asm/macros';
+import type { ByteVar, ValuesOf } from '@asm/ram';
 import { CHART_BYTES } from '@game/chart';
 import { buildKanaData } from '@game/kana';
 import { SCORE_DIGIT_COUNT } from '@game/kana-hud';
@@ -17,6 +19,7 @@ import {
   ramSymbols,
 } from '@game/ram';
 import { SPEED_ROUND } from '@game/scene';
+import { DialogueState, type KanaMode, type KanaState } from '@game/state';
 import { SOUND_VOICES, VOICE_SIZE } from '@game/sound';
 import { DMA_ROUTINE_BYTES } from '@game/sprites';
 import { TEXT_STACK_SIZE } from '@game/text-codec';
@@ -61,11 +64,18 @@ describe('the RAM map', () => {
   it('shares bytes only between the dialogue and kana engines', () => {
     const shared = VARIABLES.variables.filter((v) => v.sharesWith !== undefined);
     expect(shared.map((v) => `${v.name}=${v.sharesWith ?? ''}`)).toEqual([
-      'KANA_DATA_LO=DLG_STR_LO',
-      'KANA_DATA_HI=DLG_STR_HI',
+      'KANA_DATA=DLG_STR',
       'KANA_FEEDBACK_TIMER=DLG_DELAY',
     ]);
-    expect(MEM.KANA_DATA_LO).toBe(MEM.DLG_STR_LO);
+    expect(MEM.KANA_DATA.lo).toBe(MEM.DLG_STR.lo);
+  });
+
+  it('types each engine state byte with its own values', () => {
+    expectTypeOf(MEM.DLG_STATE).toEqualTypeOf<ByteVar<ValuesOf<typeof DialogueState>>>();
+    expectTypeOf(MEM.KANA_STATE).toEqualTypeOf<ByteVar<ValuesOf<typeof KanaState>>>();
+    expectTypeOf(MEM.KANA_MODE).toEqualTypeOf<ByteVar<ValuesOf<typeof KanaMode>>>();
+    // @ts-expect-error a dialogue state isn't a kana state
+    storeByte(MEM.KANA_STATE, DialogueState.PRINTING);
   });
 
   it('lists every variable for the .sym file', () => {

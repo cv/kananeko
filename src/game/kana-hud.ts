@@ -146,7 +146,7 @@ const DIGIT_PLACES = [10_000, 1000, 100, 10] as const;
 export const SCORE_DIGIT_COUNT = DIGIT_PLACES.length + 1;
 
 function scoreDigitAddr(i: number): U16 {
-  return u16(MEM.SCORE_DIGITS + i);
+  return MEM.SCORE_DIGITS.at(i);
 }
 
 /**
@@ -156,9 +156,9 @@ function scoreDigitAddr(i: number): U16 {
 export function buildScoreDigits(): Op[] {
   return [
     label(SCORE_DIGITS),
-    ld_a_nn(MEM.KANA_SCORE_HI),
+    ld_a_nn(MEM.KANA_SCORE.hi),
     ld_r_r('d', 'a'),
-    ld_a_nn(MEM.KANA_SCORE_LO),
+    ld_a_nn(MEM.KANA_SCORE.lo),
     ld_r_r('e', 'a'),
     ...DIGIT_PLACES.flatMap((place, i) => {
       const loop = new Label(`score_digit${String(place)}`);
@@ -206,36 +206,36 @@ export function buildScoreRoutines(): Op[] {
   return [
     label(SCORE_ADD),
     ld_r_r('b', 'a'),
-    ld_a_nn(MEM.KANA_SCORE_LO),
+    ld_a_nn(MEM.KANA_SCORE.lo),
     add_r('b'),
-    ld_nn_a(MEM.KANA_SCORE_LO),
-    ld_a_nn(MEM.KANA_SCORE_HI),
+    ld_nn_a(MEM.KANA_SCORE.lo),
+    ld_a_nn(MEM.KANA_SCORE.hi),
     adc_n(u8(0)),
-    ld_nn_a(MEM.KANA_SCORE_HI),
+    ld_nn_a(MEM.KANA_SCORE.hi),
     // Cap: HI > hi(MAX) or (HI == hi(MAX) and LO > lo(MAX))
     cp_n(hi(MAX_SCORE)),
     ret_cc('c'),
     jr_cc('nz', SCORE_CAP),
-    ld_a_nn(MEM.KANA_SCORE_LO),
+    ld_a_nn(MEM.KANA_SCORE.lo),
     cp_n(u8(lo(MAX_SCORE) + 1)),
     ret_cc('c'),
     label(SCORE_CAP),
     ld_r_n('a', lo(MAX_SCORE)),
-    ld_nn_a(MEM.KANA_SCORE_LO),
+    ld_nn_a(MEM.KANA_SCORE.lo),
     ld_r_n('a', hi(MAX_SCORE)),
-    ld_nn_a(MEM.KANA_SCORE_HI),
+    ld_nn_a(MEM.KANA_SCORE.hi),
     ret(),
 
     label(SCORE_SUB),
     ld_r_r('b', 'a'),
-    ld_a_nn(MEM.KANA_SCORE_LO),
+    ld_a_nn(MEM.KANA_SCORE.lo),
     sub_r('b'),
-    ld_nn_a(MEM.KANA_SCORE_LO),
-    ld_a_nn(MEM.KANA_SCORE_HI),
+    ld_nn_a(MEM.KANA_SCORE.lo),
+    ld_a_nn(MEM.KANA_SCORE.hi),
     sbc_n(u8(0)),
-    ld_nn_a(MEM.KANA_SCORE_HI),
+    ld_nn_a(MEM.KANA_SCORE.hi),
     ret_cc('nc'),
-    ...zeroBytes(MEM.KANA_SCORE_LO, MEM.KANA_SCORE_HI), // went below zero
+    ...zeroBytes(MEM.KANA_SCORE.lo, MEM.KANA_SCORE.hi), // went below zero
     ret(),
   ];
 }
@@ -352,8 +352,8 @@ export function buildDrawHudOps(): Op[] {
     label(HUD_LIVES_SAME),
     ...redrawIfChanged(MEM.HUD_SHOWN_DELTA, 'b'),
 
-    ...redrawIfChanged(MEM.HUD_SHOWN_SCORE_LO, MEM.KANA_SCORE_LO),
-    ...redrawIfChanged(MEM.HUD_SHOWN_SCORE_HI, MEM.KANA_SCORE_HI),
+    ...redrawIfChanged(MEM.HUD_SHOWN_SCORE.lo, MEM.KANA_SCORE.lo),
+    ...redrawIfChanged(MEM.HUD_SHOWN_SCORE.hi, MEM.KANA_SCORE.hi),
     ret(), // nothing changed
 
     // === kana_draw_hud: full HUD redraw; safe with the LCD on or off ===
@@ -370,10 +370,10 @@ export function buildDrawHudOps(): Op[] {
     ld_nn_a(MEM.HUD_SHOWN_DELTA),
     ld_a_nn(MEM.KANA_LIVES),
     ld_nn_a(MEM.HUD_SHOWN_LIVES),
-    ld_a_nn(MEM.KANA_SCORE_LO),
-    ld_nn_a(MEM.HUD_SHOWN_SCORE_LO),
-    ld_a_nn(MEM.KANA_SCORE_HI),
-    ld_nn_a(MEM.HUD_SHOWN_SCORE_HI),
+    ld_a_nn(MEM.KANA_SCORE.lo),
+    ld_nn_a(MEM.HUD_SHOWN_SCORE.lo),
+    ld_a_nn(MEM.KANA_SCORE.hi),
+    ld_nn_a(MEM.HUD_SHOWN_SCORE.hi),
 
     // --- Hearts at cols 1-3 ---
     ...Array.from({ length: MAX_LIVES }, (_, i) => buildHeart(i + 1)).flat(),

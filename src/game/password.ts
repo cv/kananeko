@@ -184,7 +184,7 @@ export function decodePassword(password: string, sceneCount: number): Progress |
 // The game's routines
 // ---------------------------------------------------------------------------
 
-const acc = (i: number): U16 => u16(MEM.PASS_ACC + i);
+const acc = (i: number): U16 => MEM.PASS_ACC.at(i);
 
 /**
  * pass_encode  SCENE_ID, KANA_LIVES and the score → PASS_CHARS
@@ -214,7 +214,7 @@ export function buildPasswordRoutines(sceneCount: number): Op[] {
 
     // pass_xor: apply (or undo) the masks
     label(PASS_XOR),
-    ld_rr_nn('hl', MEM.PASS_ACC),
+    ld_rr_nn('hl', MEM.PASS_ACC.address),
     ...MASKS.flatMap((mask) => [ld_r_r('a', 'hl_ptr'), xor_n(u8(mask)), ldi_hl_a()]),
     ret(),
 
@@ -238,16 +238,16 @@ export function buildPasswordRoutines(sceneCount: number): Op[] {
     add_r('a'),
     or_r('b'),
     ld_nn_a(acc(1)),
-    ld_a_nn(MEM.KANA_SCORE_HI),
+    ld_a_nn(MEM.KANA_SCORE.hi),
     ld_nn_a(acc(2)),
-    ld_a_nn(MEM.KANA_SCORE_LO),
+    ld_a_nn(MEM.KANA_SCORE.lo),
     ld_nn_a(acc(3)),
     call(PASS_CHECK),
     ld_nn_a(acc(0)),
     call(PASS_XOR),
     // The 30 bits sit at the bottom: shift the top 2 (zeros) out, then take 5 a kana
     ...[0, 1].flatMap(() => [xor_r('a'), call(PASS_SHIFT)]),
-    ld_rr_nn('de', MEM.PASS_CHARS),
+    ld_rr_nn('de', MEM.PASS_CHARS.address),
     ld_r_n('b', u8(PASSWORD_LENGTH)),
     label(PASS_ENCODE_KANA),
     ld_r_n('c', u8(0)),
@@ -265,7 +265,7 @@ export function buildPasswordRoutines(sceneCount: number): Op[] {
 
     label(PASS_DECODE),
     ...zeroBytes(acc(0), acc(1), acc(2), acc(3)),
-    ld_rr_nn('de', MEM.PASS_CHARS),
+    ld_rr_nn('de', MEM.PASS_CHARS.address),
     ld_r_n('b', u8(PASSWORD_LENGTH)),
     label(PASS_DECODE_KANA),
     ld_a_de(),
@@ -326,15 +326,15 @@ export function buildPasswordRoutines(sceneCount: number): Op[] {
     dec_r('a'),
     ld_nn_a(MEM.SCENE_FLAGS),
     ld_a_nn(acc(2)),
-    ld_nn_a(MEM.KANA_SCORE_HI),
+    ld_nn_a(MEM.KANA_SCORE.hi),
     ld_a_nn(acc(3)),
-    ld_nn_a(MEM.KANA_SCORE_LO),
+    ld_nn_a(MEM.KANA_SCORE.lo),
     ...zeroBytes(MEM.DELTA_TYPE, MEM.DELTA_TIMER, MEM.KANA_STREAK),
     ret(),
 
     // pass_draw: HL = tilemap address
     label(PASS_DRAW),
-    ld_rr_nn('de', MEM.PASS_CHARS),
+    ld_rr_nn('de', MEM.PASS_CHARS.address),
     ld_r_n('b', u8(PASSWORD_LENGTH)),
     label(PASS_DRAW_KANA),
     ld_a_de(),
@@ -462,7 +462,7 @@ export function buildPasswordScreen(fade: Label): Op[] {
     jp_cc('nc', PASSWORD_LOOP), // full (and wrong): B to fix it
     ld_r_r('e', 'a'),
     ld_r_n('d', u8(0)),
-    ld_rr_nn('hl', MEM.PASS_CHARS),
+    ld_rr_nn('hl', MEM.PASS_CHARS.address),
     add_hl_rr('de'),
     ld_a_nn(MEM.PASS_CURSOR),
     ld_r_r('hl_ptr', 'a'),
@@ -511,7 +511,7 @@ export function buildPasswordScreen(fade: Label): Op[] {
     // pass_draw_slots: the kana entered so far, then a dash for each still to come
     label(PASS_DRAW_SLOTS),
     ld_rr_nn('hl', u16(tilemapAddr(slotsRow, slotsCol))),
-    ld_rr_nn('de', MEM.PASS_CHARS),
+    ld_rr_nn('de', MEM.PASS_CHARS.address),
     ld_a_nn(MEM.PASS_LEN),
     ld_r_r('c', 'a'),
     ld_r_n('b', u8(PASSWORD_LENGTH)),
