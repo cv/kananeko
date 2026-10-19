@@ -127,6 +127,49 @@ export class Label {
   }
 }
 
+/** A register, a pair, or F (the flags) */
+export type RegName = 'a' | 'f' | 'b' | 'c' | 'd' | 'e' | 'h' | 'l' | 'af' | 'bc' | 'de' | 'hl';
+
+/**
+ * What a routine promises about registers, checked by the assembler against its code
+ * (see analysis.ts): it changes only `out` and `clobbers` (and F, unless
+ * `keepsFlags`), and callers mustn't still need a clobbered register after calling it.
+ */
+export interface RoutineContract {
+  /** Registers it reads as arguments */
+  readonly in?: readonly RegName[];
+  /** Registers it returns results in (F if a flag is a result) */
+  readonly out?: readonly RegName[];
+  /** Registers it changes that aren't results */
+  readonly clobbers?: readonly RegName[];
+  /** It leaves F as it found it */
+  readonly keepsFlags?: boolean;
+  /** For code outside the program (e.g. copied to HRAM): stack bytes it uses */
+  readonly depth?: number;
+}
+
+/** A label that's called: a subroutine with a register contract */
+export class Routine extends Label {
+  readonly contract: RoutineContract;
+
+  constructor(name: string, contract: RoutineContract) {
+    super(name);
+    this.contract = contract;
+  }
+}
+
+/** A routine outside the program's own code (e.g. copied to HRAM at boot), at a fixed address */
+export interface ExternalRoutine {
+  readonly name: string;
+  readonly address: U16;
+  readonly contract: RoutineContract;
+}
+
+/** A subroutine's label, with what it promises about registers */
+export function routine(name: string, contract: RoutineContract = {}): Routine {
+  return new Routine(name, contract);
+}
+
 /**
  * Labels made on demand from a key (one per scene, sound, ...): the same key always
  * gives the same Label, so the code defining it and the code referring to it agree.
@@ -181,6 +224,8 @@ export interface InstOp {
   readonly kind: 'inst';
   readonly bytes: readonly number[];
   readonly refs?: readonly OpRef[];
+  /** For a call or jump to a fixed address: the contract of the code there */
+  readonly callee?: RoutineContract & { readonly name: string };
 }
 
 /** An operation in the program */

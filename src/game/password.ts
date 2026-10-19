@@ -40,7 +40,7 @@ import {
   xor,
 } from '../asm/sm83';
 import { HW } from '../asm/hardware';
-import { type Op, type U16, s8, u16, Label } from '../asm/types';
+import { type Op, type U16, s8, u16, Label, routine } from '../asm/types';
 import { hi, lo } from '../asm/util';
 import { storeByte, zeroBytes } from '../asm/macros';
 import { requireTile, textToTiles } from './font';
@@ -70,9 +70,9 @@ import {
 } from './labels';
 
 // Labels placed in this module
-const PASS_CHECK = new Label('pass_check');
-const PASS_XOR = new Label('pass_xor');
-const PASS_SHIFT = new Label('pass_shift');
+const PASS_CHECK = routine('pass_check', { out: ['a'], clobbers: ['b'] });
+const PASS_XOR = routine('pass_xor', { clobbers: ['a', 'hl'] });
+const PASS_SHIFT = routine('pass_shift', { clobbers: ['hl'] });
 const PASS_ENCODE_KANA = new Label('pass_encode_kana');
 const PASS_DECODE_KANA = new Label('pass_decode_kana');
 const PASS_SCORE_OK = new Label('pass_score_ok');
@@ -80,7 +80,7 @@ const PASS_BAD = new Label('pass_bad');
 const PASS_APPLY_FLAGS = new Label('pass_apply_flags');
 const PASS_APPLY_FLAGS_DONE = new Label('pass_apply_flags_done');
 const PASS_DRAW_KANA = new Label('pass_draw_kana');
-const PASS_TILE = new Label('pass_tile');
+const PASS_TILE = routine('pass_tile', { clobbers: ['a'] });
 const PASS_ALPHABET = new Label('pass_alphabet');
 const PASSWORD_LOOP = new Label('password_loop');
 const PASSWORD_MOVE = new Label('password_move');
@@ -88,10 +88,10 @@ const PASSWORD_ADD = new Label('password_add');
 const PASSWORD_WRONG = new Label('password_wrong');
 const PASSWORD_DELETE = new Label('password_delete');
 const PASSWORD_BACK = new Label('password_back');
-const PASS_DRAW_SLOTS = new Label('pass_draw_slots');
+const PASS_DRAW_SLOTS = routine('pass_draw_slots', { clobbers: ['a', 'bc', 'de', 'hl'] });
 const PASS_SLOT = new Label('pass_slot');
 const PASS_SLOT_DRAW = new Label('pass_slot_draw');
-const PASS_CURSOR = new Label('pass_cursor');
+const PASS_CURSOR = routine('pass_cursor', { clobbers: ['a'] });
 
 /** 32 kana, leaving out the easily confused ones (ぬ/め, わ/れ/ね, る/ろ, は/ほ, さ/ち/き...) */
 export const PASSWORD_ALPHABET = 'あいうえおかくけこしすせそたてとなのひふへまみむもやゆよらりをん';

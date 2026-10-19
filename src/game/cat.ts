@@ -17,7 +17,7 @@ import { HW } from '../asm/hardware';
 import { MEM } from './ram';
 import { copyBlock, storeByte, zeroBytes } from '../asm/macros';
 import { add, call, cp, dec, inc, jp, jr, label, ld, ldh, db, or, ret, and } from '../asm/sm83';
-import { type Op, u16, Label } from '../asm/types';
+import { type Op, u16, Label, routine } from '../asm/types';
 import { hi, lo } from '../asm/util';
 import { sliceArt } from './art';
 import { CAT_FACES, type CatFace, catArt } from './cat-art';
@@ -29,7 +29,7 @@ import { CAT_REST, CAT_REACT, CAT_TICK } from './labels';
 
 // Labels placed in this module
 const CAT_TILES = new Label('cat_tiles');
-const CAT_PLACE = new Label('cat_place');
+const CAT_PLACE = routine('cat_place', { clobbers: ['a', 'bc', 'de', 'hl'] });
 const CAT_PLACE_ROW = new Label('cat_place_row');
 const CAT_PLACE_COL = new Label('cat_place_col');
 const CAT_SET_FACE = new Label('cat_set_face');

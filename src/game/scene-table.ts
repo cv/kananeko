@@ -8,15 +8,15 @@
 import { MEM } from './ram';
 import { loadPointer, storePointer } from '../asm/macros';
 import { add, call, db, dec, dw, inc, jr, label, ld, or, pop, push, ret } from '../asm/sm83';
-import { type Op, type Target, type U16, Label } from '../asm/types';
+import { type Op, type Target, type U16, Label, routine } from '../asm/types';
 import { at } from '../asm/util';
 import { SCENE_DESC } from './labels';
 
 // Labels placed in this module
 const SCENE_TABLE = new Label('scene_table');
-const SCENE_WORD = new Label('scene_word');
-const SCENE_BYTE = new Label('scene_byte');
-const COPY_BLOCK = new Label('copy_block');
+const SCENE_WORD = routine('scene_word', { out: ['hl'], clobbers: ['a', 'de'] });
+const SCENE_BYTE = routine('scene_byte', { out: ['a'], clobbers: ['de', 'hl'] });
+const COPY_BLOCK = routine('copy_block', { clobbers: ['a', 'bc', 'de', 'hl'] });
 
 /** Word fields (2 bytes each), then byte fields */
 const WORDS = [

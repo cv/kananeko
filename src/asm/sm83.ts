@@ -18,6 +18,7 @@
 import * as op from './ops';
 import {
   type CCName,
+  type ExternalRoutine,
   type Imm,
   type IoRegOffset,
   Label,
@@ -211,17 +212,29 @@ export function jr(a: CCName | Label, b?: Label): Op {
   return b === undefined ? op.jr(a as Label) : op.jr_cc(a as CCName, b);
 }
 
+function isExternal(x: unknown): x is ExternalRoutine {
+  return typeof x === 'object' && x !== null && 'address' in x && 'contract' in x;
+}
+
+/** The instruction, carrying the contract of the external routine it reaches */
+function toExternal(instruction: Op, target: ExternalRoutine): Op {
+  if (instruction.kind !== 'inst') throw new Error('external routines are reached by instructions');
+  return { ...instruction, callee: { name: target.name, ...target.contract } };
+}
+
 /** JP nn or JP cc,nn; to a label, a JR when it's in range */
-export function jp(target: U16 | Label): Op;
+export function jp(target: U16 | Label | ExternalRoutine): Op;
 export function jp(cc: CCName, target: U16 | Label): Op;
-export function jp(a: CCName | U16 | Label, b?: U16 | Label): Op {
+export function jp(a: CCName | U16 | Label | ExternalRoutine, b?: U16 | Label): Op {
+  if (isExternal(a)) return toExternal(op.jp(a.address), a);
   return b === undefined ? op.jp(a as U16 | Label) : op.jp_cc(a as CCName, b);
 }
 
 /** CALL nn or CALL cc,nn */
-export function call(target: U16 | Label): Op;
+export function call(target: U16 | Label | ExternalRoutine): Op;
 export function call(cc: CCName, target: U16 | Label): Op;
-export function call(a: CCName | U16 | Label, b?: U16 | Label): Op {
+export function call(a: CCName | U16 | Label | ExternalRoutine, b?: U16 | Label): Op {
+  if (isExternal(a)) return toExternal(op.call(a.address), a);
   return b === undefined ? op.call(a as U16 | Label) : op.call_cc(a as CCName, b);
 }
 

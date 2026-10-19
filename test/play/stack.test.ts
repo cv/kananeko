@@ -3,9 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { STACK_REGION, STACK_TOP } from '@game/ram';
 import { STACK_CANARY, checkpoint, runnerAt } from '../helpers/checkpoints';
-
-/** Leave room for paths the playthrough doesn't take (menus, passwords, practice) */
-const MARGIN = 2;
+import { stackDepth } from '../helpers/game-runner';
 
 describe('Given the player plays through the whole game', () => {
   it('keeps the stack well inside its region', () => {
@@ -14,8 +12,14 @@ describe('Given the player plays through the whole game', () => {
     while (lowest < STACK_TOP && memory[lowest] === STACK_CANARY) lowest++;
     const deepest = STACK_TOP - lowest;
     expect(deepest).toBeGreaterThan(0);
-    expect(deepest * MARGIN, `the stack went ${String(deepest)} bytes deep`).toBeLessThanOrEqual(
-      STACK_REGION.limit - STACK_REGION.start,
+    // The assembler's bound covers every path, so the playthrough can't go deeper
+    expect(deepest, `the stack went ${String(deepest)} bytes deep`).toBeLessThanOrEqual(
+      stackDepth ?? 0,
     );
+  });
+
+  it('fits the deepest the stack can ever go in its region', () => {
+    expect(stackDepth).toBeGreaterThan(0);
+    expect(stackDepth).toBeLessThanOrEqual(STACK_REGION.limit - STACK_REGION.start);
   });
 });

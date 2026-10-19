@@ -110,11 +110,12 @@ Game code is TypeScript that returns lists of instructions. A routine reads like
 import { ifThen } from '../asm/flow';
 import { storeByte } from '../asm/macros';
 import { cp, dec, label, ld, ret } from '../asm/sm83';
-import { Label, type Op } from '../asm/types';
+import { type Op, routine } from '../asm/types';
 import { MEM } from './ram';
 import { KanaState } from './state';
 
-export const LOSE_LIFE = new Label('lose_life'); // shared labels live in labels.ts
+// A routine says which registers it changes; the assembler checks the code and its callers
+export const LOSE_LIFE = routine('lose_life', { clobbers: ['a'] });
 
 function buildLoseLife(): Op[] {
   return [
@@ -133,6 +134,13 @@ function buildLoseLife(): Op[] {
 - **Instructions** (`src/asm/sm83.ts`): one function per mnemonic. Forms the CPU doesn't have, like `ld('b', [MEM.X])`, are type errors, and immediates are range-checked.
 - **Variables** (`src/game/ram.ts`): declared as `byte()`, `byteOf(SomeEnum)`, `word()` or `buffer(n)`, and laid out by the allocator. A `byteOf` byte only takes that enum's values. A word has `.lo` and `.hi`, and a buffer has `.address` and a bounds-checked `.at(i)`.
 - **Labels** are objects, so a misspelt one is a compile error. `new Label()` without a name is a local label, named after the label before it in the `.sym` file. `ifThen`, `ifElse`, `repeat` and `loop` (`src/asm/flow.ts`) make their own labels.
+- **Routines** are labels with a register contract: `routine('name', { out: ['a'], clobbers: ['bc'] })`. The build follows each routine through its jumps, calls and PUSH/POP pairs, and fails in these cases:
+  - the routine changes a register its contract doesn't allow;
+  - a caller still needs a register the routine clobbers;
+  - the VBlank handler doesn't restore what it uses.
+
+  It also works out the deepest the stack can go. `npm run contracts` suggests contracts from what the code does.
+
 - **Jumps**: `jp` becomes a 2-byte `JR` wherever it reaches, and loads from HRAM become `LDH`.
 
 ## 🤓 Nerd notes

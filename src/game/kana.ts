@@ -48,7 +48,7 @@ import {
   srl,
   sub,
 } from '../asm/sm83';
-import { type Op, type TileIndex, u16, Label } from '../asm/types';
+import { type Op, type TileIndex, u16, Label, routine } from '../asm/types';
 import { at } from '../asm/util';
 import type { NonEmpty, Quad, Triple, TupleIndex } from './fixed';
 import { requireTile, requireTiles, textToTiles } from './font';
@@ -94,7 +94,7 @@ const KANA_LOAD_QUESTION = new Label('kana_load_question');
 const KANA_NEXT_QUESTION = new Label('kana_next_question');
 const KANA_DRAW_WORD = new Label('kana_draw_word');
 const KANA_QUESTION_SHOWN = new Label('kana_question_shown');
-const KANA_DRAW_CLOCK = new Label('kana_draw_clock');
+const KANA_DRAW_CLOCK = routine('kana_draw_clock', { clobbers: ['a', 'hl'] });
 const KANA_AWAIT_INPUT = new Label('kana_await_input');
 const PRACTICE_NO_QUIT = new Label('practice_no_quit');
 const KANA_CLOCK_DONE = new Label('kana_clock_done');
@@ -110,10 +110,10 @@ const KANA_REDEEM_FULL = new Label('kana_redeem_full');
 const KANA_CHANCE_MISS = new Label('kana_chance_miss');
 const KANA_CORRECT_FB = new Label('kana_correct_fb');
 const KANA_WRONG_FB = new Label('kana_wrong_fb');
-const KANA_SHOW_PROMPT = new Label('kana_show_prompt');
+const KANA_SHOW_PROMPT = routine('kana_show_prompt', { clobbers: ['a', 'hl'] });
 const KANA_SHOW_KATAKANA = new Label('kana_show_katakana');
 const KANA_SHOW_HURRY = new Label('kana_show_hurry');
-const KANA_REVEAL = new Label('kana_reveal');
+const KANA_REVEAL = routine('kana_reveal', { clobbers: ['a', 'hl'], keepsFlags: true });
 const KANA_ALL_DONE = new Label('kana_all_done');
 
 // ---------------------------------------------------------------------------

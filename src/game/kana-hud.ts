@@ -15,7 +15,7 @@
 
 import { playSfx } from './sound';
 import { loop } from '../asm/flow';
-import { type Op, type TileIndex, type U16, u16, Label } from '../asm/types';
+import { type Op, type TileIndex, type U16, u16, Label, routine } from '../asm/types';
 import { adc, add, call, cp, dec, inc, jp, jr, label, ld, ret, sbc, sub } from '../asm/sm83';
 import { MEM } from './ram';
 import { switchCases, zeroBytes } from '../asm/macros';
@@ -29,9 +29,9 @@ import { vramPut } from './video';
 import { SCORE_DIGITS, HUD_UPDATE, KANA_DRAW_HUD } from './labels';
 
 // Labels placed in this module
-const SCORE_ADD = new Label('score_add');
+const SCORE_ADD = routine('score_add', { clobbers: ['a', 'b'] });
 const SCORE_CAP = new Label('score_cap');
-const SCORE_SUB = new Label('score_sub');
+const SCORE_SUB = routine('score_sub', { clobbers: ['a', 'b'] });
 const HUD_DELTA_TICKED = new Label('hud_delta_ticked');
 const HUD_DELTA_KNOWN = new Label('hud_delta_known');
 const HUD_HEART_UP = new Label('hud_heart_up');

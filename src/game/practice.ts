@@ -33,7 +33,7 @@ import {
   srl,
   sub,
 } from '../asm/sm83';
-import { type Op, Label } from '../asm/types';
+import { type Op, Label, routine } from '../asm/types';
 import { at } from '../asm/util';
 import { storeByte, zeroBytes } from '../asm/macros';
 import { CHART_KANA } from './chart';
@@ -54,15 +54,15 @@ import {
 // Labels placed in this module
 const PRACTICE_TABLE = new Label('practice_table');
 const PRACTICE_MOD = new Label('practice_mod');
-const PRACTICE_PICK = new Label('practice_pick');
+const PRACTICE_PICK = routine('practice_pick', { clobbers: ['a', 'd', 'bc'] });
 const PRACTICE_SCAN = new Label('practice_scan');
 const PRACTICE_SCAN_NEXT = new Label('practice_scan_next');
 const PRACTICE_FOUND = new Label('practice_found');
 const PRACTICE_NEXT_OK = new Label('practice_next_ok');
-const PRACTICE_COPY = new Label('practice_copy');
-const QUESTION_COPY = new Label('question_copy');
+const PRACTICE_COPY = routine('practice_copy', { out: ['hl'], clobbers: ['a', 'b', 'de'] });
+const QUESTION_COPY = routine('question_copy', { out: ['hl'], clobbers: ['a', 'b', 'de'] });
 const QUESTION_COPY_BYTE = new Label('question_copy_byte');
-const PRACTICE_FILL = new Label('practice_fill');
+const PRACTICE_FILL = routine('practice_fill', { clobbers: ['a', 'b', 'de', 'hl'] });
 const PRACTICE_FILL_NEXT = new Label('practice_fill_next');
 const SPEED_COUNT_BYTE = new Label('speed_count_byte');
 const SPEED_COUNT_BIT = new Label('speed_count_bit');

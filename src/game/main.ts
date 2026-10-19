@@ -40,7 +40,7 @@ import {
   pool,
   xor,
 } from '../asm/sm83';
-import { type Op, type U16, u16, Label, labelFamily } from '../asm/types';
+import { type Op, type U16, u16, Label, labelFamily, routine } from '../asm/types';
 import { SCENE_TILE_BASE } from './backdrop';
 import { buildSpriteData, buildSpriteInit, buildSpriteRoutines, runDma } from './sprites';
 import {
@@ -162,17 +162,17 @@ import {
 } from './labels';
 
 // Labels placed in this module
-const TABLE_FIND = new Label('table_find');
+const TABLE_FIND = routine('table_find', { out: ['c', 'f'], clobbers: ['a', 'b', 'de', 'hl'] });
 const TABLE_SCAN = new Label('table_scan');
 const TABLE_ABSENT = new Label('table_absent');
 const TABLE_FOUND = new Label('table_found');
-const ROUND_CHECK = new Label('round_check');
-const CHANCE_CHECK = new Label('chance_check');
+const ROUND_CHECK = routine('round_check', { clobbers: ['a', 'bc', 'de', 'hl'] });
+const CHANCE_CHECK = routine('chance_check', { clobbers: ['a', 'bc', 'de', 'hl'] });
 const CHANCE_NOT_BAD = new Label('chance_not_bad');
 const CHANCE_FIND = new Label('chance_find');
-const DRAW_STAMPS = new Label('draw_stamps');
-const DRAW_START_BOX = new Label('draw_start_box');
-const TITLE_BLINK = new Label('title_blink');
+const DRAW_STAMPS = routine('draw_stamps', { clobbers: ['a', 'hl'] });
+const DRAW_START_BOX = routine('draw_start_box', { clobbers: ['a', 'hl'] });
+const TITLE_BLINK = routine('title_blink', { clobbers: ['a', 'b', 'hl'] });
 const TITLE_PROMPT_ON = new Label('title_prompt_on');
 const INIT_NOT_CGB = new Label('init_not_cgb');
 const TITLE_DEBOUNCE = new Label('title_debounce');
@@ -182,7 +182,7 @@ const SCENE_NO_ROUND = new Label('scene_no_round');
 const SCENE_OPEN_NODE = new Label('scene_open_node');
 const SCENE_COMPLETE = new Label('scene_complete');
 const SCENE_LAST_DONE = new Label('scene_last_done');
-const SCENE_DRAW = new Label('scene_draw');
+const SCENE_DRAW = routine('scene_draw', { clobbers: ['a', 'bc', 'de', 'hl'] });
 const SCENE_CAST_PALETTE = new Label('scene_cast_palette');
 
 export const ROM_HEADER: ROMHeader = {
@@ -927,5 +927,5 @@ export function buildProgram(): Op[] {
 
 /** Assemble the complete game ROM. */
 export function buildRom(): AssembleResult {
-  return assemble(buildProgram(), ROM_HEADER);
+  return assemble(buildProgram(), ROM_HEADER, { contracts: 'strict' });
 }

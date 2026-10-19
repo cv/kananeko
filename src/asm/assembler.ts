@@ -1,3 +1,4 @@
+import { analyze } from './analysis';
 import { Label, type Op, Pooled, type Target } from './types';
 import { at, hex } from './util';
 
@@ -43,6 +44,19 @@ export interface AssembleResult {
   unreferenced: string[];
   /** Bytes of code and data the program occupies (excluding the header) */
   programBytes: number;
+  /**
+   * With \`contracts: 'strict'\`: the most stack the program can use, the main program's
+   * deepest point plus an interrupt arriving there
+   */
+  stackDepth?: number;
+}
+
+export interface AssembleOptions {
+  /**
+   * 'strict' checks every routine's register contract (see Routine) and the program's
+   * control flow, and throws on any problem
+   */
+  readonly contracts?: 'strict' | 'off';
 }
 
 type Emitting = Extract<Op, { kind: 'inst' | 'data' }>;
@@ -57,6 +71,8 @@ interface Layout {
   addresses: Map<Label, number>;
   /** What the .sym file and errors call each placed label (local ones named here) */
   names: Map<Label, string>;
+  /** The program with pool() expanded and jumps chosen */
+  ops: Op[];
   /** Each pooled entry's label, by Pooled.key */
   pooled: Map<string, Label>;
 }
@@ -242,7 +258,7 @@ function layout(program: readonly Op[]): Layout {
     }
   }
 
-  return { positioned, addresses, names, pooled };
+  return { positioned, addresses, names, pooled, ops };
 }
 
 /** The address of a label or pooled entry; `at` is where it's referenced, for errors */
@@ -312,18 +328,50 @@ export function globalChecksum(rom: Uint8Array): number {
   return sum;
 }
 
+/** The laid-out program and its interrupt handlers, for analysis tools (scripts/contracts.ts) */
+export function assembleForAnalysis(
+  program: readonly Op[],
+  header: ROMHeader,
+): { ops: Op[]; names: Map<Label, string>; interrupts: Label[] } {
+  const { ops, names } = layout(program);
+  return {
+    ops,
+    names,
+    interrupts: header.vblankHandler === undefined ? [] : [header.vblankHandler],
+  };
+}
+
 /**
  * Assembler: resolves labels and pooled data and emits a valid Game Boy ROM.
  *
  * The program should NOT include the entry point or header — the assembler
  * writes those automatically. Program code begins at $0150.
  */
-export function assemble(program: readonly Op[], header: ROMHeader): AssembleResult {
+export function assemble(
+  program: readonly Op[],
+  header: ROMHeader,
+  options: AssembleOptions = {},
+): AssembleResult {
   const rom = new Uint8Array(ROM_SIZE);
   writeHeader(rom, header);
 
   const laidOut = layout(program);
   const referenced = emit(rom, laidOut);
+  let stackDepth: number | undefined;
+  if (options.contracts === 'strict') {
+    const interrupts = header.vblankHandler === undefined ? [] : [header.vblankHandler];
+    const analysis = analyze(laidOut.ops, laidOut.names, interrupts);
+    if (analysis.violations.length > 0) {
+      throw new Error(
+        `The program breaks its register contracts:\n  ${analysis.violations.join('\n  ')}`,
+      );
+    }
+    const handlerDepth = Math.max(
+      0,
+      ...interrupts.map((l) => analysis.summaries.get(l)?.depth ?? 0),
+    );
+    stackDepth = analysis.mainDepth + (interrupts.length > 0 ? 2 + handlerDepth : 0);
+  }
   if (header.vblankHandler !== undefined) {
     const handler = resolve(laidOut, header.vblankHandler, VBLANK_VECTOR);
     referenced.add(header.vblankHandler);
@@ -344,6 +392,7 @@ export function assemble(program: readonly Op[], header: ROMHeader): AssembleRes
       .filter(([label]) => !referenced.has(label))
       .map(([label]) => nameOf(label)),
     programBytes: laidOut.positioned.reduce((sum, { op }) => sum + op.bytes.length, 0),
+    ...(stackDepth === undefined ? {} : { stackDepth }),
   };
 }
 

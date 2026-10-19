@@ -27,7 +27,7 @@ import {
   sub,
   xor,
 } from '../asm/sm83';
-import { type Op, u16, Label, Pooled } from '../asm/types';
+import { type Op, u16, Label, Pooled, routine } from '../asm/types';
 import type { Quad } from './fixed';
 import { SCREEN_COLS, centerStartCol, tilemapAddr, tileRow } from './tilemap';
 import {
@@ -40,34 +40,35 @@ import {
   FILL_TILES,
   DRAW_RUNS,
   FADE_IN,
+  OAM_DMA,
 } from './labels';
 
 // Labels placed in this module
-const FRAME_WAIT = new Label('frame_wait');
+const FRAME_WAIT = routine('frame_wait', { keepsFlags: true });
 const FRAME_WAIT_STORE = new Label('frame_wait_store');
 const FRAME_WAIT_DONE = new Label('frame_wait_done');
 const VRAM_PUT_WAIT = new Label('vram_put_wait');
 const FILL_TILES_NEXT = new Label('fill_tiles_next');
-const CLEAR_SCREEN = new Label('clear_screen');
+const CLEAR_SCREEN = routine('clear_screen', { clobbers: ['a', 'bc', 'hl'] });
 const DRAW_RUNS_NEXT = new Label('draw_runs_next');
 const DRAW_RUNS_CELL = new Label('draw_runs_cell');
 const DRAW_RUNS_NC = new Label('draw_runs_nc');
 const DRAW_RUNS_SAME_ROW = new Label('draw_runs_same_row');
-const PALETTE_PUT = new Label('palette_put');
+const PALETTE_PUT = routine('palette_put', { keepsFlags: true });
 const PALETTE_PUT_WAIT = new Label('palette_put_wait');
-const FADE_APPLY = new Label('fade_apply');
+const FADE_APPLY = routine('fade_apply', { clobbers: ['a', 'c', 'd'] });
 const FADE_BGP_NC = new Label('fade_bgp_nc');
-const FADE_PALETTES = new Label('fade_palettes');
+const FADE_PALETTES = routine('fade_palettes', { clobbers: ['a', 'c', 'd', 'hl'] });
 const FADE_PALETTE = new Label('fade_palette');
 const FADE_COLOR = new Label('fade_color');
 const FADE_SRC_OK = new Label('fade_src_ok');
 const FADE_SRC_NC = new Label('fade_src_nc');
 const FADE_NEXT_NC = new Label('fade_next_nc');
-const FADE_WAIT = new Label('fade_wait');
+const FADE_WAIT = routine('fade_wait', { clobbers: ['a', 'c'] });
 const FADE_WAIT_FRAME = new Label('fade_wait_frame');
-const FADE_IN_CURRENT = new Label('fade_in_current');
+const FADE_IN_CURRENT = routine('fade_in_current', { clobbers: ['a', 'd', 'bc', 'hl'] });
 const FADE_IN_STEP = new Label('fade_in_step');
-const FADE_OUT = new Label('fade_out');
+const FADE_OUT = routine('fade_out', { clobbers: ['a', 'd', 'bc', 'hl'] });
 const FADE_OUT_STEP = new Label('fade_out_step');
 const FADE_BGP = new Label('fade_bgp');
 
@@ -479,7 +480,7 @@ export function buildFadeRoutines(): Op[] {
     ld('c', FADE_STEP_FRAMES),
     label(FADE_WAIT_FRAME),
     call(FRAME_WAIT),
-    call(MEM.OAM_DMA.address), // see sprites.ts: so sprites update during fades
+    call(OAM_DMA), // so sprites update during fades
     dec('c'),
     jr('nz', FADE_WAIT_FRAME),
     ret(),

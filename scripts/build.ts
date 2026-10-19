@@ -8,7 +8,7 @@ import { ramSymbols } from '../src/game/ram';
 const outDir = path.join(import.meta.dirname, '..', 'build');
 fs.mkdirSync(outDir, { recursive: true });
 
-const { rom, symbols, unreferenced, programBytes } = buildRom();
+const { rom, symbols, unreferenced, programBytes, stackDepth } = buildRom();
 
 const romPath = path.join(outDir, 'kananeko.gb');
 fs.writeFileSync(romPath, rom);
@@ -22,6 +22,7 @@ console.log(`ROM written to ${romPath} (${String(rom.length)} bytes)`);
 console.log(
   `Program: ${String(programBytes)} bytes, ${String(rom.length - PROGRAM_START - programBytes)} free`,
 );
+console.log(`Stack: at most ${String(stackDepth)} bytes`);
 console.log(`Symbols: ${String(symbols.size)}`);
 for (const [name, address] of symbols) {
   console.log(`  $${hex(address, 4)} ${name}`);

@@ -13,7 +13,7 @@ import { encodeGlyph, glyphOf } from './font';
 import type { Palette } from './video';
 import { HUES, INK, PAPER } from './palette';
 import { UI_TILES } from './font-data';
-import { SPRITES_OFF } from './labels';
+import { OAM_DMA, SPRITES_OFF } from './labels';
 
 // Labels placed in this module
 const SPRITE_COPY_DMA = new Label('sprite_copy_dma');
@@ -98,10 +98,10 @@ const SPRITE_TILE_BYTES = SPRITE_GLYPHS.length * 16;
 
 /** Subroutine sprites_off: take every sprite off screen (before a fade or screen change) */
 export function buildSpriteRoutines(): Op[] {
-  return [label(SPRITES_OFF), ...zeroPages(SHADOW_OAM, 1), jp(DMA_HRAM)];
+  return [label(SPRITES_OFF), ...zeroPages(SHADOW_OAM, 1), jp(OAM_DMA)];
 }
 
 /** Copy the shadow OAM to OAM. Call right after HALT (VBlank). */
 export function runDma(): Op[] {
-  return [call(DMA_HRAM)];
+  return [call(OAM_DMA)];
 }

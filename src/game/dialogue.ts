@@ -41,7 +41,7 @@ import {
   push,
   xor,
 } from '../asm/sm83';
-import { type Op, u16, Label } from '../asm/types';
+import { type Op, u16, Label, routine } from '../asm/types';
 import { hi, lo } from '../asm/util';
 import { BAD_CHOICE_FLAG, NEXT_END, TEXT_END } from './dialogue-data';
 import type { Triple } from './fixed';
@@ -77,7 +77,7 @@ import {
 const DLG_ORDER_TWO = new Label('dlg_order_two');
 const DLG_ORDER_THREE = new Label('dlg_order_three');
 const DLG_ORDER_THREE_DISPATCH = new Label('dlg_order_three_dispatch');
-const DLG_CLEAR_BOX = new Label('dlg_clear_box');
+const DLG_CLEAR_BOX = routine('dlg_clear_box', { clobbers: ['a', 'bc', 'hl'] });
 const DLG_CLEAR_ROW = new Label('dlg_clear_row');
 const DLG_CLEAR_CELL = new Label('dlg_clear_cell');
 const DLG_CLEAR_NC = new Label('dlg_clear_nc');
@@ -87,7 +87,7 @@ const TEXT_NEXT_DONE = new Label('text_next_done');
 const DLG_OPEN = new Label('dlg_open');
 const DLG_DO_PRINT = new Label('dlg_do_print');
 const DLG_PRINT_SLOW = new Label('dlg_print_slow');
-const DLG_PRINT_CHAR = new Label('dlg_print_char');
+const DLG_PRINT_CHAR = routine('dlg_print_char', { clobbers: ['a', 'bc', 'hl'] });
 const DLG_TEXT_DONE = new Label('dlg_text_done');
 const DLG_SETUP_CHOICES = new Label('dlg_setup_choices');
 const DLG_DRAW_CHOICE_LOOP = new Label('dlg_draw_choice_loop');
@@ -105,7 +105,7 @@ const DLG_NEXT_STORE = new Label('dlg_next_store');
 const DLG_GOOD_CHOICE = new Label('dlg_good_choice');
 const DLG_BAD_CHOICE = new Label('dlg_bad_choice');
 const DLG_SCORE_DONE = new Label('dlg_score_done');
-const DLG_DRAW_CURSOR = new Label('dlg_draw_cursor');
+const DLG_DRAW_CURSOR = routine('dlg_draw_cursor', { clobbers: ['a'] });
 
 // Re-export data types and encoder from dialogue-data.ts
 export { buildDialogueTree, defineDialogueTree } from './dialogue-data';

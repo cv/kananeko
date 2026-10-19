@@ -11,6 +11,7 @@
   },
   "scripts": {
     "build": "tsx scripts/build.ts",
+    "contracts": "tsx scripts/contracts.ts",
     "screenshots": "tsx scripts/screenshots.ts",
     "typecheck": "tsc -b . src site test scripts site-tests",
     "test": "vitest run",
