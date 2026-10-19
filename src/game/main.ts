@@ -94,6 +94,9 @@ import { ENDING_COLORS, GAME_OVER_COLORS, TITLE_COLORS } from './scenes/colors';
 import { BACKDROP } from './backdrop';
 import {
   bgTileAddr,
+  buildDrawTiles,
+  buildTileLists,
+  resetTileLists,
   buildAttributeRuns,
   buildClearScreen,
   buildFadeData,
@@ -411,6 +414,11 @@ function drawClearedStamps(name: string, row: number): Op[] {
   });
 }
 
+/** Subroutine draw_stamps: the result screens' row of cleared-scene stamps (LCD off) */
+function buildDrawStamps(): Op[] {
+  return [label('draw_stamps'), ...drawClearedStamps('draw_stamps', ENDING_ROWS.stamps), ret()];
+}
+
 /** End-of-run screen: cat, title, cleared-scene stamps, final score; START returns to the title. */
 function buildResultScreen(screen: ResultScreen): Op[] {
   const { name } = screen;
@@ -425,7 +433,7 @@ function buildResultScreen(screen: ResultScreen): Op[] {
 
     call(ref('kana_draw_hud')),
     ...writeCenteredRow(ENDING_ROWS.title, textToTiles(screen.title)),
-    ...drawClearedStamps(name, ENDING_ROWS.stamps),
+    call(ref('draw_stamps')),
     ld_rr_nn('hl', u16(tilemapAddr(ENDING_ROWS.score, scoreCol))),
     ...labelTiles.flatMap((tile) => [ld_r_n('a', u8(tile)), ldi_hl_a()]),
     call(ref('score_digits')),
@@ -476,10 +484,10 @@ function buildTitleBlink(): Op[] {
     ld_r_r('a', 'b'),
     and_n(u8(BLINK_BIT)),
     jr_cc('z', ref('title_prompt_on')),
-    ...writeCenteredRow(START_PROMPT_ROW, START_BOX_OFF, { lcdOn: true }),
+    ...writeCenteredRow(START_PROMPT_ROW, START_BOX_OFF),
     ret(),
     label('title_prompt_on'),
-    ...writeCenteredRow(START_PROMPT_ROW, START_BOX_ON, { lcdOn: true }),
+    ...writeCenteredRow(START_PROMPT_ROW, START_BOX_ON),
     ret(),
   ];
 }
@@ -490,6 +498,7 @@ function buildTitleBlink(): Op[] {
 
 export function buildProgram(): Op[] {
   const packedScenes = buildSceneData();
+  resetTileLists(); // filled in as the code below is generated, emitted last
 
   return [
     // ==== Init ====
@@ -715,6 +724,7 @@ export function buildProgram(): Op[] {
     ...buildCatRoutines(),
     ...buildSpriteRoutines(),
     ...buildDrawStartBox(),
+    ...buildDrawStamps(),
     ...buildDialogueEngine(),
     ...buildKanaEngine(),
     ...buildDrawHudOps(),
@@ -722,6 +732,7 @@ export function buildProgram(): Op[] {
     ...buildScoreDigits(),
     ...buildCopyRows(),
     ...buildVramPut(),
+    ...buildDrawTiles(),
     ...buildFadeRoutines(),
     ...buildClearScreen(),
     ...buildAttributeRuns(),
@@ -772,6 +783,8 @@ export function buildProgram(): Op[] {
       label(resultFadeLabel(screen)),
       db(buildPaletteSet(screen.colors)),
     ]),
+    // Tile lists drawn by draw_tiles (collected while generating the code above)
+    ...buildTileLists(),
   ];
 }
 

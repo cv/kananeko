@@ -235,7 +235,7 @@ function messageTiles(text: string): number[] {
 }
 
 function showMessage(text: string): Op[] {
-  return writeCenteredRow(PROMPT_ROW, messageTiles(text), { lcdOn: true });
+  return writeCenteredRow(PROMPT_ROW, messageTiles(text));
 }
 
 /** The parts of the round screen that don't change between questions (LCD off) */
@@ -249,11 +249,13 @@ function buildRoundFrame(): Op[] {
   ];
   const horizontal = (row: number, l: string, edge: string, r: string): Op[] => [
     ld_rr_nn('hl', u16(tilemapAddr(row, left))),
-    ...[
-      requireTile(l),
-      ...Array<number>(innerWidth).fill(requireTile(edge)),
-      requireTile(r),
-    ].flatMap((tile) => [ld_r_n('a', u8(tile)), ldi_hl_a()]),
+    ld_r_n('a', u8(requireTile(l))),
+    ldi_hl_a(),
+    ld_r_n('a', u8(requireTile(edge))),
+    ld_r_n('b', u8(innerWidth)),
+    call(ref('fill_tiles')),
+    ld_r_n('a', u8(requireTile(r))),
+    ldi_hl_a(),
   ];
   return [
     ...writeCenteredRow(PROMPT_ROW, textToTiles(KANA_MESSAGES.prompt)),

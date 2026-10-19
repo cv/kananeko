@@ -218,9 +218,9 @@ function buildTextboxRow(row: number, left: number, fill: number | 'clear', righ
     ld_rr_nn('hl', u16(tilemapAddr(row, 0))),
     ld_r_n('a', u8(left)),
     ldi_hl_a(),
-    ...(fill === 'clear'
-      ? [xor_r('a'), ...Array.from({ length: interior }, () => ldi_hl_a())]
-      : Array.from({ length: interior }, () => [ld_r_n('a', u8(fill)), ldi_hl_a()]).flat()),
+    fill === 'clear' ? xor_r('a') : ld_r_n('a', u8(fill)),
+    ld_r_n('b', u8(interior)),
+    call(ref('fill_tiles')),
     ld_r_n('a', u8(right)),
     ldi_hl_a(),
   ];

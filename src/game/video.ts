@@ -94,20 +94,80 @@ export function vramPut(): Op[] {
   return [call(ref('vram_put'))];
 }
 
+/** Ends a tile list drawn by draw_tiles (no tile has this index) */
+const TILES_END = 0xff;
+
 /**
- * Write a row of tiles horizontally centered on the visible screen.
- * `lcdOn` routes each write through vram_put so it is safe mid-frame.
+ * Tile lists drawn by draw_tiles, stored once each in the data section. Reset at the
+ * start of every build (resetTileLists) and emitted at its end (buildTileLists).
  */
-export function writeCenteredRow(
-  row: number,
-  tiles: readonly number[],
-  { lcdOn = false }: { lcdOn?: boolean } = {},
-): Op[] {
-  const col = centerStartCol(tiles.length);
+const tileLists = new Map<string, { label: string; tiles: readonly number[] }>();
+
+export function resetTileLists(): void {
+  tileLists.clear();
+}
+
+/** Label of a tile list in the data section (identical lists share one) */
+export function tileListLabel(tiles: readonly number[]): string {
+  const key = tiles.join(',');
+  let entry = tileLists.get(key);
+  if (entry === undefined) {
+    entry = { label: `tile_list_${String(tileLists.size)}`, tiles };
+    tileLists.set(key, entry);
+  }
+  return entry.label;
+}
+
+/** The tile lists, each ending in TILES_END */
+export function buildTileLists(): Op[] {
+  return [...tileLists.values()].flatMap(({ label: name, tiles }) => [
+    label(name),
+    db([...tiles, TILES_END]),
+  ]);
+}
+
+/**
+ * Subroutines (drawTiles saves DE around draw_tiles, so callers only lose A and HL):
+ *   draw_tiles  HL = tilemap address, DE = tile list (see tileListLabel); safe with the LCD
+ *               on (each write goes through vram_put)
+ *   fill_tiles  HL = tilemap address, A = tile, B = count; LCD off
+ */
+export function buildDrawTiles(): Op[] {
   return [
-    ld_rr_nn('hl', u16(tilemapAddr(tileRow(row), col))),
-    ...tiles.flatMap((tile) => [ld_r_n('a', u8(tile)), ...(lcdOn ? vramPut() : [ldi_hl_a()])]),
+    label('draw_tiles'),
+    ld_a_de(),
+    inc_rr('de'),
+    cp_n(u8(TILES_END)),
+    ret_cc('z'),
+    call(ref('vram_put')),
+    jr(ref('draw_tiles')),
+
+    label('fill_tiles'),
+    push('bc'),
+    label('fill_tiles_next'),
+    ldi_hl_a(),
+    dec_r('b'),
+    jr_cc('nz', ref('fill_tiles_next')),
+    pop('bc'),
+    ret(),
   ];
+}
+
+/** Draw tiles at a tilemap address from a shared tile list (safe with the LCD on) */
+export function drawTiles(address: number, tiles: readonly number[]): Op[] {
+  // draw_tiles walks the list with DE: save the caller's
+  return [
+    push('de'),
+    ld_rr_nn('hl', u16(address)),
+    ld_rr_nn('de', ref(tileListLabel(tiles))),
+    call(ref('draw_tiles')),
+    pop('de'),
+  ];
+}
+
+/** Write a row of tiles horizontally centered on the visible screen (safe with the LCD on) */
+export function writeCenteredRow(row: number, tiles: readonly number[]): Op[] {
+  return drawTiles(tilemapAddr(tileRow(row), centerStartCol(tiles.length)), tiles);
 }
 
 // ---------------------------------------------------------------------------
