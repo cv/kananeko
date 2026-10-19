@@ -53,13 +53,26 @@ export function attributeOfCell(scheme: ColorScheme, cell: string): number {
   return paletteOfCell(scheme, cell) | ((scheme.front ?? '').includes(cell) ? BG_PRIORITY : 0);
 }
 
-/** Encode a scheme as [palette count, then 4 RGB555 colors (little-endian) per palette]. */
+/** Little-endian RGB555 bytes */
+function colorBytes(colors: readonly number[]): number[] {
+  return colors.flatMap((c) => [c & 0xff, c >> 8]);
+}
+
+/** The palettes every screen shares (UI, HUD), stored once: 4 colors each */
+export function buildSharedPalettes(): Uint8Array {
+  return Uint8Array.from(colorBytes([...UI_PALETTE, ...HUD_PALETTE]));
+}
+
+/**
+ * Encode a scheme's own palettes (palettes 2 and up; the shared ones come from
+ * buildSharedPalettes) as [count, then 4 colors per palette].
+ */
 export function buildPaletteSet(scheme: ColorScheme): Uint8Array {
   const names = paletteNames(scheme);
   if (names.length > MAX_PALETTES) {
     throw new RangeError(`At most ${String(MAX_PALETTES)} palettes, got ${String(names.length)}`);
   }
   const own = Object.values(scheme.ramps).map((ramp) => [scheme.paper, ...ramp]);
-  const colors = [UI_PALETTE, HUD_PALETTE, ...own].flat();
-  return Uint8Array.from([names.length, ...colors.flatMap((c) => [c & 0xff, c >> 8])]);
+  if (own.length === 0) throw new RangeError('A color scheme needs at least one ramp');
+  return Uint8Array.from([own.length, ...colorBytes(own.flat())]);
 }

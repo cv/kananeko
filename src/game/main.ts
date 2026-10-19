@@ -87,7 +87,7 @@ import { centerStartCol, tilemapAddr } from './tilemap';
 import { SCENES, SPEED_ROUND, buildSceneData } from './scene';
 import { BAD_PICK, END_OF_CONVERSATION, KanaMode, MAX_LIVES } from './state';
 import { REDEEM_KEY } from './rounds';
-import { type ColorScheme, buildPaletteSet, paletteOf } from './color';
+import { type ColorScheme, buildPaletteSet, buildSharedPalettes, paletteOf } from './color';
 import { LOGO_ROWS } from './logo';
 import {
   buildSceneTable,
@@ -778,6 +778,10 @@ export function buildProgram(): Op[] {
       label(resultFadeLabel(screen)),
       db(buildPaletteSet(screen.colors)),
     ]),
+    // GBC palettes every screen shares (the palette sets hold only their own)
+    label('shared_palettes'),
+    db(buildSharedPalettes()),
+
     // Everything the engine loads per scene (scene-table.ts)
     ...buildSceneTable(
       packedScenes.map((packed, i) => ({

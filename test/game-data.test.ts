@@ -16,7 +16,14 @@ import { packScene, SCENES } from '@game/scene';
 import { centerStartCol, tilemapAddr, tilePos } from '@game/tilemap';
 import { bgTileAddr, encodeAttributeRuns, rgb } from '@game/video';
 import { HUD_PALETTE, INK, UI_PALETTE, inked } from '@game/palette';
-import { PAL, attributeOfCell, buildPaletteSet, paletteOf, paletteOfCell } from '@game/color';
+import {
+  PAL,
+  attributeOfCell,
+  buildPaletteSet,
+  buildSharedPalettes,
+  paletteOf,
+  paletteOfCell,
+} from '@game/color';
 import { MAX_CAST, packCast } from '@game/npc';
 import { packAnimation } from '@game/anim';
 import { ENDING_COLORS, GAME_OVER_COLORS, TITLE_COLORS } from '@game/scenes/colors';
@@ -210,16 +217,24 @@ describe('buildPaletteSet', () => {
   const color = (palette: number, index: number): number =>
     (set[1 + palette * 8 + index * 2] ?? 0) | ((set[2 + palette * 8 + index * 2] ?? 0) << 8);
 
-  it('puts the shared ui and hud palettes first, then the scene ramps on its paper', () => {
+  it('holds only the scene ramps, each on its paper (the shared palettes are stored once)', () => {
     const count = set[0] ?? 0;
+    expect(count).toBe(Object.keys(scheme.ramps).length);
     expect(set.length).toBe(1 + count * 8);
-    UI_PALETTE.forEach((c, i) => {
-      expect(color(PAL.ui, i)).toBe(c);
-    });
-    HUD_PALETTE.forEach((c, i) => {
-      expect(color(PAL.hud, i)).toBe(c);
-    });
-    for (let p = 2; p < count; p++) expect(color(p, 0)).toBe(scheme.paper);
+    for (let p = 0; p < count; p++) expect(color(p, 0)).toBe(scheme.paper);
+    expect(paletteOf(scheme, Object.keys(scheme.ramps)[0] ?? '')).toBe(2); // after ui and hud
+  });
+
+  it('stores the ui and hud palettes once, for every screen', () => {
+    const shared = buildSharedPalettes();
+    const word = (i: number): number => (shared[i * 2] ?? 0) | ((shared[i * 2 + 1] ?? 0) << 8);
+    expect([0, 1, 2, 3].map(word)).toEqual([...UI_PALETTE]);
+    expect([4, 5, 6, 7].map(word)).toEqual([...HUD_PALETTE]);
+    expect(PAL).toEqual({ ui: 0, hud: 1 });
+  });
+
+  it('refuses a scheme with no ramps of its own', () => {
+    expect(() => buildPaletteSet({ paper: 0, ramps: {} })).toThrow(/at least one ramp/);
   });
 
   it('puts front cells (like the restaurant counter) over sprites', () => {

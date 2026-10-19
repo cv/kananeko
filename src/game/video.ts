@@ -322,7 +322,10 @@ export function fadeOut(): Op[] {
   return [call(ref('fade_out'))];
 }
 
-/** Subroutines palette_put, fade_apply, fade_wait, fade_in(_current), fade_out. */
+/** Palettes every screen shares (UI, HUD), stored once at shared_palettes (see color.ts) */
+const SHARED_PALETTES = 2;
+
+/** Subroutines palette_put, fade_apply, fade_palettes, fade_wait, fade_in(_current), fade_out. */
 export function buildFadeRoutines(): Op[] {
   return [
     // palette_put: write A to BCPD once palette RAM is accessible (preserves A)
@@ -349,11 +352,23 @@ export function buildFadeRoutines(): Op[] {
     label('fade_bgp_nc'),
     ld_r_r('a', 'hl_ptr'),
     ldh_n_a(HW.BGP),
-    pop('hl'),
+    pop('hl'), // the set (the other copy is restored on return)
     ld_r_n('a', u8(0x80)), // palette 0, color 0, auto-increment
     ldh_n_a(HW.BCPS),
+    // The UI and HUD palettes every screen shares, then the set's own
+    push('hl'),
+    ld_rr_nn('hl', ref('shared_palettes')),
+    ld_r_n('d', u8(SHARED_PALETTES)),
+    call(ref('fade_palettes')),
+    pop('hl'),
     ldi_a_hl(),
-    ld_r_r('d', 'a'), // D = palettes left
+    ld_r_r('d', 'a'), // D = palettes in the set
+    call(ref('fade_palettes')),
+    pop('hl'),
+    ret(),
+
+    // fade_palettes: write D palettes from HL at fade level B. Clobbers A, C, D, HL.
+    label('fade_palettes'),
     label('fade_palette'),
     ld_r_n('c', u8(0)), // C = color index j
     label('fade_color'),
@@ -386,7 +401,6 @@ export function buildFadeRoutines(): Op[] {
     label('fade_next_nc'),
     dec_r('d'),
     jr_cc('nz', ref('fade_palette')),
-    pop('hl'),
     ret(),
 
     // fade_wait: show the current level for FADE_STEP_FRAMES frames
