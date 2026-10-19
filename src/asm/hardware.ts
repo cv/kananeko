@@ -169,6 +169,11 @@ export const MEM = {
   PASS_LEN: u16(0xc0ea), // Kana entered so far
   PASS_CURSOR: u16(0xc0eb), // The kana grid's highlighted cell (0-31)
   MENU_CURSOR: u16(0xc0ec), // The title menu's highlighted item
+  CHART_WAIT: u16(0xc0ed), // 1 while the kana chart waits for a button
+
+  // WRAM — the kana chart (see chart.ts): a bit per kana, in CHART_KANA order
+  KANA_SEEN: u16(0xc0f0), // CHART_BYTES bytes: answered right ($C0F0-$C0F5)
+  KANA_MISSED: u16(0xc0f6), // CHART_BYTES bytes: answered wrong ($C0F6-$C0FB)
 
   // WRAM — frame budget (see frame_wait in video.ts)
   FRAME_COUNT: u16(0xc094), // VBlanks so far (the VBlank handler counts them)

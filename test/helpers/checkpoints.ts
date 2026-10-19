@@ -20,13 +20,22 @@ export const SETTLE_FRAMES = 2 * FADE_STEPS * FADE_STEP_FRAMES + 10;
 import { GameRunner, type GameRunnerSnapshot, rom } from './game-runner';
 
 export type Checkpoint =
-  `scene${string}:start` | `scene${string}:kana` | 'game:speed' | 'game:complete';
+  | `scene${string}:start`
+  | `scene${string}:kana`
+  | `scene${string}:chart`
+  | 'game:speed'
+  | 'game:chart'
+  | 'game:complete';
 
 export const checkpoint = {
   /** Scene `i` has just loaded and its opening dialogue is revealing */
   sceneStart: (i: number): Checkpoint => `scene${String(i)}:start`,
   /** Scene `i`'s dialogue was finished on the good path; the first kana question awaits input */
   kanaStart: (i: number): Checkpoint => `scene${String(i)}:kana`,
+  /** Scene `i` (not the last) is cleared; the kana chart waits for a button */
+  chartAfter: (i: number): Checkpoint => `scene${String(i)}:chart`,
+  /** The speed round is over; the last kana chart waits for a button */
+  finalChart: 'game:chart' as const,
   /** All scenes completed; the speed round's first question awaits input */
   speedRound: 'game:speed' as const,
   /** All scenes completed; the ending screen is showing */
@@ -49,10 +58,23 @@ export function recordCheckpoints(): Checkpoints {
     runner.completeDialogueTree().waitForKanaInput();
     out[checkpoint.kanaStart(i)] = runner.snapshot();
     runner.completeKanaQuestions(i);
+    if (i < SCENES.length - 1) {
+      out[checkpoint.chartAfter(i)] = runner
+        .waitUntil(() => runner.chartWaiting, `the chart after scene ${String(i)}`)
+        .frames(SETTLE_FRAMES)
+        .snapshot();
+    }
   });
   out[checkpoint.speedRound] = runner.waitForKanaInput().snapshot();
   SPEED_ROUND.forEach(() => runner.answerKanaCorrectly());
-  out[checkpoint.gameComplete] = runner.frames(SETTLE_FRAMES).snapshot();
+  out[checkpoint.finalChart] = runner
+    .waitUntil(() => runner.chartWaiting, 'the last chart')
+    .frames(SETTLE_FRAMES)
+    .snapshot();
+  out[checkpoint.gameComplete] = runner
+    .waitUntil(() => runner.music === 'ending', 'the ending')
+    .frames(SETTLE_FRAMES * 8)
+    .snapshot();
   return out;
 }
 

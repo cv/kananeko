@@ -107,10 +107,11 @@ describe('Given a password that is not one', () => {
 
 const ROUTINES = [...buildPasswordRoutines(SCENE_COUNT), ...buildPasswordData(), ...buildVramPut()];
 
-function gameEncode({ scene, score }: Progress): string {
+function gameEncode({ scene, lives, score }: Progress): string {
   const memory = runProgram(
     [
       ...storeByte(MEM.SCENE_ID, scene),
+      ...storeByte(MEM.KANA_LIVES, lives),
       ...storeByte(MEM.KANA_SCORE_LO, score & 0xff),
       ...storeByte(MEM.KANA_SCORE_HI, score >> 8),
       call(ref('pass_encode')),

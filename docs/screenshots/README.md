@@ -20,5 +20,5 @@ Captured from the real ROM in the test emulator by `npm run screenshots`.
 | After a bad choice: -5 and a lost heart                                      | Kana: correct answer feedback                                                | Kana: three first tries in a row pay a bonus                     |
 | ![Kana: the review ends with a word to write in katakana](kana-katakana.png) | ![Speed round: one more from each scene, against the clock](speed-round.png) | ![Kana: wrong answer feedback](kana-wrong.png)                   |
 | Kana: the review ends with a word to write in katakana                       | Speed round: one more from each scene, against the clock                     | Kana: wrong answer feedback                                      |
-| ![Ending: every scene cleared](ending.png)                                   | ![Game over](game-over.png)                                                  |
-| Ending: every scene cleared                                                  | Game over                                                                    |
+| ![Kana chart between scenes (one kana missed, in red)](chart.png)            | ![Ending: every scene cleared](ending.png)                                   | ![Game over](game-over.png)                                      |
+| Kana chart between scenes (one kana missed, in red)                          | Ending: every scene cleared                                                  | Game over                                                        |

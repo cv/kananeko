@@ -85,3 +85,9 @@ export const TITLE_COLORS: ColorScheme = { paper: PAPER, ramps: { cat: inked('gi
 export const ENDING_COLORS: ColorScheme = { paper: PAPER, ramps: { cat: inked('ginger') } };
 
 export const GAME_OVER_COLORS: ColorScheme = { paper: PAPER, ramps: { cat: inked('stone') } };
+
+/** The kana chart: missed kana stand out, inked in tomato red instead of plum */
+export const CHART_COLORS: ColorScheme = {
+  paper: PAPER,
+  ramps: { missed: [...HUES.sakura, HUES.tomato[1]] },
+};

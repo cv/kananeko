@@ -110,6 +110,15 @@ const SHOTS: Shot[] = [
     capture: () => runnerAt(checkpoint.kanaStart(0)).pressKanaAnswer(false).frames(10),
   },
   {
+    file: 'chart',
+    caption: 'Kana chart between scenes (one kana missed, in red)',
+    capture: (): GameRunner => {
+      const runner = runnerAt(checkpoint.kanaStart(0)).resetStreak();
+      runner.answerKanaWrong().completeKanaQuestions(0);
+      return runner.waitUntil(() => runner.chartWaiting, 'the chart').frames(SETTLE_FRAMES * 2);
+    },
+  },
+  {
     file: 'ending',
     caption: 'Ending: every scene cleared',
     capture: () => runnerAt(checkpoint.gameComplete),

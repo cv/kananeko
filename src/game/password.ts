@@ -42,7 +42,6 @@ import {
   ldh_n_a,
   ldi_hl_a,
   or_r,
-  or_n,
   pop,
   push,
   ret,
@@ -59,7 +58,6 @@ import { HW } from '../asm/hardware';
 import { type Op, type U16, ref, u8, u16 } from '../asm/types';
 import { storeByte, zeroBytes } from '../asm/macros';
 import { requireTile, textToTiles } from './font';
-import { MAX_LIVES } from './state';
 import { MAX_SCORE } from './kana-hud';
 import { playSfx } from './sound';
 import { SPRITE_SLOT, SPRITE_TILES, oamField, runDma } from './sprites';
@@ -152,7 +150,7 @@ export function decodePassword(password: string, sceneCount: number): Progress |
 const acc = (i: number): U16 => u16(MEM.PASS_ACC + i);
 
 /**
- * pass_encode  SCENE_ID, full hearts and the score → PASS_CHARS
+ * pass_encode  SCENE_ID, KANA_LIVES and the score → PASS_CHARS
  * pass_decode  PASS_CHARS → PASS_ACC; A = 0 (Z set) if it's a valid password
  * pass_apply   PASS_ACC (decoded) → the run: scene, hearts, score, stamps
  * pass_draw    draw PASS_CHARS at HL (vram_put: safe with the LCD on)
@@ -196,10 +194,12 @@ export function buildPasswordRoutines(sceneCount: number): Op[] {
     ret(),
 
     label('pass_encode'),
+    ld_a_nn(MEM.KANA_LIVES),
+    ld_r_r('b', 'a'),
     ld_a_nn(MEM.SCENE_ID),
     add_r('a'),
     add_r('a'),
-    or_n(u8(MAX_LIVES)),
+    or_r('b'),
     ld_nn_a(acc(1)),
     ld_a_nn(MEM.KANA_SCORE_HI),
     ld_nn_a(acc(2)),

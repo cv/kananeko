@@ -201,6 +201,11 @@ export class GameRunner {
     return id === SFX_NONE ? 'none' : (SFX_ORDER[id - 1] ?? 'none');
   }
 
+  /** Whether the kana chart is up, waiting for a button */
+  get chartWaiting(): boolean {
+    return this.readMem(MEM.CHART_WAIT) !== 0;
+  }
+
   /** The song playing ('none' for silence) */
   get music(): SongName | 'none' {
     const id = this.readMem(MEM.MUSIC_ID);
@@ -346,7 +351,9 @@ export class GameRunner {
       return this;
     }
     for (let i = 0; i < GameRunner.MAX_WAIT; i++) {
-      this.frames(1);
+      // The kana chart between scenes waits for a button: carry on past it
+      if (this.chartWaiting) this.pressA();
+      else this.frames(1);
       if (predicate()) return this;
     }
     throw new Error(`Timed out waiting for: ${description}`);

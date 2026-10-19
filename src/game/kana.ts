@@ -531,6 +531,7 @@ export function buildKanaEngine(): Op[] {
     jp_cc('nz', ref('kana_wrong')),
 
     // === CORRECT: a won-back life, or a score that depends on the attempt number ===
+    call(ref('chart_seen')),
     ld_a_nn(MEM.KANA_MODE),
     cp_n(u8(KanaMode.REDEEM)),
     jp_cc('z', ref('kana_redeem_win')),
@@ -566,6 +567,7 @@ export function buildKanaEngine(): Op[] {
 
     // === WRONG ===
     label('kana_wrong'),
+    call(ref('chart_missed')),
     ...playSfx('wrong'),
     ...zeroBytes(MEM.KANA_STREAK),
     ld_a_nn(MEM.KANA_MODE),

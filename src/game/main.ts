@@ -112,7 +112,8 @@ import {
   sceneByte,
   sceneWord,
 } from './scene-table';
-import { ENDING_COLORS, GAME_OVER_COLORS, TITLE_COLORS } from './scenes/colors';
+import { CHART_COLORS, ENDING_COLORS, GAME_OVER_COLORS, TITLE_COLORS } from './scenes/colors';
+import { buildChartData, buildChartRoutines } from './chart';
 import { BACKDROP } from './backdrop';
 import {
   bgTileAddr,
@@ -227,6 +228,7 @@ export function sceneFadeLabel(sceneIndex: number): string {
 }
 
 const TITLE_FADE = 'title_fade';
+const CHART_FADE = 'chart_fade';
 
 function resultFadeLabel(screen: { readonly name: string }): string {
   return `${screen.name}_fade`;
@@ -460,6 +462,7 @@ function buildResultScreen(screen: ResultScreen): Op[] {
     call(ref('draw_start_box')),
     ...(screen.password === true
       ? [
+          ...storeByte(MEM.KANA_LIVES, MAX_LIVES), // continuing starts with full hearts
           call(ref('pass_encode')),
           ...drawTiles(
             tilemapAddr(ENDING_ROWS.password, passwordLineCol()),
@@ -685,12 +688,19 @@ export function buildProgram(): Op[] {
     inc_r('a'),
     ld_nn_a(MEM.SCENE_ID),
     cp_n(u8(SCENES.length)),
-    jp_cc('c', ref('scene_load')), // more scenes to go
+    jr_cc('nc', ref('scene_last_done')),
+    // More scenes to go: the kana chart, with the password for the next
+    ld_r_n('c', u8(1)),
+    call(ref('chart_show')),
+    jp(ref('scene_load')),
+    label('scene_last_done'),
 
     // ==== Bonus: the speed round ====
     ...storeByte(MEM.KANA_MODE, KanaMode.SPEED),
     ld_rr_nn('de', ref(SPEED_ROUND_LABEL)),
     call(ref('play_round')),
+    ld_r_n('c', u8(0)),
+    call(ref('chart_show')), // the whole trip's kana, then the ending
 
     // ==== Game complete — ending screen, then back to the title ====
     ...buildResultScreen(ENDING),
@@ -772,6 +782,7 @@ export function buildProgram(): Op[] {
     ...buildMenuRoutines(),
     ...buildPasswordRoutines(SCENES.length),
     ...buildPasswordScreen(TITLE_FADE),
+    ...buildChartRoutines(CHART_FADE),
     ...buildDrawStamps(),
     ...buildDialogueEngine(),
     ...buildTextNext(dialogueCodec().base),
@@ -795,6 +806,9 @@ export function buildProgram(): Op[] {
     ...buildFadeData(),
     ...buildSoundData(),
     ...buildPasswordData(),
+    ...buildChartData(),
+    label(CHART_FADE),
+    db(buildPaletteSet(CHART_COLORS)),
     ...FONT_SEGMENTS.flatMap((segment) => [label(segment.label), db(segment.data)]),
 
     label(SPEED_ROUND_LABEL),
