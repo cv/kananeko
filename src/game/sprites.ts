@@ -20,7 +20,7 @@ import {
   ldi_hl_a,
 } from '../asm/ops';
 import { type Op, type U16, ref, u8, u16 } from '../asm/types';
-import { hi } from '../asm/util';
+import { hi, lo } from '../asm/util';
 import { encodeGlyph, glyphOf } from './font';
 import { type Palette } from './video';
 import { HUES, INK, PAPER } from './palette';
@@ -86,9 +86,9 @@ export function buildSpriteInit(): Op[] {
     ld_r_n('a', u8(0x80)), // GBC OBJ palette 0, auto-increment
     ldh_n_a(HW.OCPS),
     ...OBJ_PALETTE.flatMap((color) => [
-      ld_r_n('a', u8(color & 0xff)),
+      ld_r_n('a', lo(color)),
       ldh_n_a(HW.OCPD),
-      ld_r_n('a', u8(color >> 8)),
+      ld_r_n('a', hi(color)),
       ldh_n_a(HW.OCPD),
     ]),
   ];

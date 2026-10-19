@@ -31,6 +31,7 @@ import {
   xor_r,
 } from './ops';
 import { type LabelRef, type Op, type U16, ref, u8, u16 } from './types';
+import { lo } from './util';
 
 /** First scanline of the vertical blank period. */
 const VBLANK_LINE = 144;
@@ -93,8 +94,16 @@ export function storePointer(rr: PointerPair, loAddr: U16, hiAddr: U16): Op[] {
 // Block memory operations (256-byte pages)
 // ---------------------------------------------------------------------------
 
-/** Fill `pages` × 256 bytes starting at `dst` with zero. Clobbers A, BC, HL. */
+/** B counts pages down to zero, so 0 would mean 256 pages: all 64KB of the address space. */
+function checkPages(macro: string, pages: number): void {
+  if (!Number.isInteger(pages) || pages < 1 || pages > 255) {
+    throw new RangeError(`${macro} pages must be 1-255, got ${String(pages)}`);
+  }
+}
+
+/** Fill `pages` (1-255) × 256 bytes starting at `dst` with zero. Clobbers A, BC, HL. */
 export function zeroPages(name: string, dst: U16, pages: number): Op[] {
+  checkPages('zeroPages', pages);
   return [
     ld_rr_nn('hl', dst),
     xor_r('a'),
@@ -111,12 +120,12 @@ export function zeroPages(name: string, dst: U16, pages: number): Op[] {
 
 /** Copy `count` (1-256) bytes from `src` to `dst`. Clobbers A, B, DE, HL. */
 export function copyBytes(name: string, dst: U16, src: U16 | LabelRef, count: number): Op[] {
-  if (count < 1 || count > 256)
+  if (!Number.isInteger(count) || count < 1 || count > 256)
     throw new RangeError(`copyBytes count must be 1-256, got ${String(count)}`);
   return [
     ld_rr_nn('hl', dst),
     ld_rr_nn('de', src),
-    ld_r_n('b', u8(count & 0xff)), // 256 wraps to 0, which DEC/JR NZ treats as 256
+    ld_r_n('b', lo(count)), // 256 wraps to 0, which DEC/JR NZ treats as 256
     label(name),
     ld_a_de(),
     ldi_hl_a(),
@@ -128,7 +137,7 @@ export function copyBytes(name: string, dst: U16, src: U16 | LabelRef, count: nu
 
 /** Copy exactly `count` (1-65535) bytes from `src` to `dst`. Clobbers A, BC, DE, HL. */
 export function copyBlock(name: string, dst: U16, src: U16 | LabelRef, count: number): Op[] {
-  if (count < 1 || count > 0xffff)
+  if (!Number.isInteger(count) || count < 1 || count > 0xffff)
     throw new RangeError(`copyBlock count must be 1-65535, got ${String(count)}`);
   return [
     ld_rr_nn('hl', dst),
@@ -150,7 +159,7 @@ export function copyBlock(name: string, dst: U16, src: U16 | LabelRef, count: nu
  * (both bit planes), so set pixels become color 3. Clobbers A, BC, DE, HL.
  */
 export function expandOneBit(name: string, dst: U16, src: U16 | LabelRef, count: number): Op[] {
-  if (count < 1 || count > 0xffff)
+  if (!Number.isInteger(count) || count < 1 || count > 0xffff)
     throw new RangeError(`expandOneBit count must be 1-65535, got ${String(count)}`);
   return [
     ld_rr_nn('hl', dst),
@@ -168,8 +177,9 @@ export function expandOneBit(name: string, dst: U16, src: U16 | LabelRef, count:
   ];
 }
 
-/** Copy `pages` × 256 bytes from `src` to `dst`. Clobbers A, BC, DE, HL. */
+/** Copy `pages` (1-255) × 256 bytes from `src` to `dst`. Clobbers A, BC, DE, HL. */
 export function copyPages(name: string, dst: U16, src: U16 | LabelRef, pages: number): Op[] {
+  checkPages('copyPages', pages);
   return [
     ld_rr_nn('hl', dst),
     ld_rr_nn('de', src),

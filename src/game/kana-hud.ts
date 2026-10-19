@@ -42,7 +42,7 @@ import {
 } from '../asm/ops';
 import { MEM } from '../asm/hardware';
 import { switchCases, zeroBytes } from '../asm/macros';
-import { at } from '../asm/util';
+import { at, hi, lo } from '../asm/util';
 import { requireTile, requireTiles } from './font';
 import { CAT_TILES } from './font-data';
 import { type Quad } from './fixed';
@@ -155,10 +155,10 @@ export function buildScoreDigits(): Op[] {
         label(loop),
         // DE -= place, keeping the old value if that would go negative
         ld_r_r('a', 'e'),
-        sub_n(u8(place & 0xff)),
+        sub_n(lo(place)),
         ld_r_r('l', 'a'),
         ld_r_r('a', 'd'),
-        sbc_n(u8(place >> 8)),
+        sbc_n(hi(place)),
         jr_cc('c', ref(done)),
         ld_r_r('d', 'a'),
         ld_r_r('e', 'l'),
@@ -200,16 +200,16 @@ export function buildScoreRoutines(): Op[] {
     adc_n(u8(0)),
     ld_nn_a(MEM.KANA_SCORE_HI),
     // Cap: HI > hi(MAX) or (HI == hi(MAX) and LO > lo(MAX))
-    cp_n(u8(MAX_SCORE >> 8)),
+    cp_n(hi(MAX_SCORE)),
     ret_cc('c'),
     jr_cc('nz', ref('score_cap')),
     ld_a_nn(MEM.KANA_SCORE_LO),
-    cp_n(u8((MAX_SCORE & 0xff) + 1)),
+    cp_n(u8(lo(MAX_SCORE) + 1)),
     ret_cc('c'),
     label('score_cap'),
-    ld_r_n('a', u8(MAX_SCORE & 0xff)),
+    ld_r_n('a', lo(MAX_SCORE)),
     ld_nn_a(MEM.KANA_SCORE_LO),
-    ld_r_n('a', u8(MAX_SCORE >> 8)),
+    ld_r_n('a', hi(MAX_SCORE)),
     ld_nn_a(MEM.KANA_SCORE_HI),
     ret(),
 

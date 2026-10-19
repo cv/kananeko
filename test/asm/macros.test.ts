@@ -97,6 +97,11 @@ describe('block operations', () => {
     );
     expect(zeroed.slice(SCRATCH, SCRATCH + 256).every((b) => b === 0)).toBe(true);
   });
+
+  it.each([0, 256, 1.5])('rejects %s pages (B = 0 would mean 256 pages)', (pages) => {
+    expect(() => zeroPages('x', at(0), pages)).toThrow(RangeError);
+    expect(() => copyPages('x', at(0), ref('src'), pages)).toThrow(RangeError);
+  });
 });
 
 describe('copyBytes', () => {

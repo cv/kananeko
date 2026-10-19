@@ -9,6 +9,7 @@
  *   question lists (see buildKanaData)
  */
 
+import { hi, lo } from '../asm/util';
 import { type DialogueNode } from './dialogue';
 import { choiceRating } from './dialogue-data';
 import { CAT_TILES } from './font-data';
@@ -161,7 +162,7 @@ export function buildQuestionTable(entries: readonly KeyedQuestions[]): Uint8Arr
   const bytes: number[] = [entries.length];
   let offset = 1 + 3 * entries.length;
   for (const { key, list } of packed) {
-    bytes.push(key, offset & 0xff, offset >> 8);
+    bytes.push(key, lo(offset), hi(offset));
     offset += list.length;
   }
   for (const { list } of packed) bytes.push(...list);

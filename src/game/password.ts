@@ -55,7 +55,8 @@ import {
   xor_r,
 } from '../asm/ops';
 import { HW } from '../asm/hardware';
-import { type Op, type U16, ref, u8, u16 } from '../asm/types';
+import { type Op, type U16, ref, s8, u8, u16 } from '../asm/types';
+import { hi, lo } from '../asm/util';
 import { storeByte, zeroBytes } from '../asm/macros';
 import { requireTile, textToTiles } from './font';
 import { MAX_SCORE } from './kana-hud';
@@ -249,11 +250,11 @@ export function buildPasswordRoutines(sceneCount: number): Op[] {
     cp_n(u8(sceneCount << 2)),
     jr_cc('nc', ref('pass_bad')),
     ld_a_nn(acc(2)),
-    cp_n(u8(MAX_SCORE >> 8)),
+    cp_n(hi(MAX_SCORE)),
     jr_cc('c', ref('pass_score_ok')),
     jr_cc('nz', ref('pass_bad')),
     ld_a_nn(acc(3)),
-    cp_n(u8((MAX_SCORE & 0xff) + 1)),
+    cp_n(u8(lo(MAX_SCORE) + 1)),
     jr_cc('nc', ref('pass_bad')),
     label('pass_score_ok'),
     call(ref('pass_check')),
@@ -403,7 +404,7 @@ export function buildPasswordScreen(fade: string): Op[] {
       and_n(u8(button)),
       jr_cc('z', ref(`password_dpad_${String(i)}`)),
       ld_a_nn(MEM.PASS_CURSOR),
-      add_n(u8(step & 0xff)),
+      add_n(s8(step)),
       jp(ref('password_move')),
       label(`password_dpad_${String(i)}`),
     ]),

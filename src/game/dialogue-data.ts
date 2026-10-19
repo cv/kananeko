@@ -5,6 +5,7 @@
  * consumed by the dialogue engine at runtime.
  */
 
+import { hi, lo } from '../asm/util';
 import { type TupleIndex } from './fixed';
 import { textToTiles } from './font';
 
@@ -172,8 +173,7 @@ export function buildDialogueTree(
 
   let currentOffset = headerSize;
   for (const chunk of nodeChunks) {
-    header.push(currentOffset & 0xff);
-    header.push((currentOffset >> 8) & 0xff);
+    header.push(lo(currentOffset), hi(currentOffset));
     currentOffset += chunk.length;
   }
 

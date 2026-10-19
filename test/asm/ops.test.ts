@@ -2,7 +2,8 @@
 
 import { describe, expect, it } from 'vitest';
 import * as op from '@asm/ops';
-import { type Op, ioReg, ref, u8, u16 } from '@asm/types';
+import { type Op, ioReg, ref, s8, u8, u16 } from '@asm/types';
+import { hi, lo } from '@asm/util';
 
 function bytes(o: Op): number[] {
   if (o.kind !== 'inst') throw new Error(`expected an instruction, got ${o.kind}`);
@@ -148,5 +149,38 @@ describe('branded numbers', () => {
     expect(() => ioReg(0x100)).toThrow(RangeError);
     expect(u8(255)).toBe(255);
     expect(u16(0xffff)).toBe(0xffff);
+  });
+
+  it.each([Number.NaN, 1.5, Number.POSITIVE_INFINITY])('rejects %s', (n) => {
+    expect(() => u8(n)).toThrow(RangeError);
+    expect(() => u16(n)).toThrow(RangeError);
+    expect(() => ioReg(n)).toThrow(RangeError);
+    expect(() => s8(n)).toThrow(RangeError);
+  });
+
+  it("encodes signed bytes in two's complement", () => {
+    expect(s8(-1)).toBe(0xff);
+    expect(s8(-128)).toBe(0x80);
+    expect(s8(127)).toBe(0x7f);
+    expect(() => s8(128)).toThrow(RangeError);
+    expect(() => s8(-129)).toThrow(RangeError);
+  });
+
+  it('splits 16-bit values into bytes, rejecting anything wider', () => {
+    expect([lo(0x1234), hi(0x1234)]).toEqual([0x34, 0x12]);
+    expect(() => lo(0x10000)).toThrow(RangeError);
+    expect(() => hi(-1)).toThrow(RangeError);
+  });
+});
+
+describe('operand validation', () => {
+  it('rejects db bytes that would silently wrap', () => {
+    expect(() => op.db([0x100])).toThrow(/db byte 0/);
+    expect(() => op.db([1, -1])).toThrow(/db byte 1/);
+    expect(() => op.db([0.5])).toThrow(RangeError);
+  });
+
+  it('refuses LD (HL),(HL), whose encoding is HALT', () => {
+    expect(() => op.ld_r_r('hl_ptr', 'hl_ptr')).toThrow(/HALT/);
   });
 });

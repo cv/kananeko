@@ -43,6 +43,7 @@ import {
   xor_r,
 } from '../asm/ops';
 import { type Op, ref, u8, u16 } from '../asm/types';
+import { hi, lo } from '../asm/util';
 import { sliceArt } from './art';
 import { CAT_FACES, type CatFace, catArt } from './cat-art';
 import { encodeGlyph } from './font';
@@ -116,9 +117,9 @@ export function buildCatInit(): Op[] {
     ld_r_n('a', u8(0x80 | (CAT_OBJ_PALETTE * 8))), // auto-increment from palette 7
     ldh_n_a(HW.OCPS),
     ...CAT_PALETTE.flatMap((color) => [
-      ld_r_n('a', u8(color & 0xff)),
+      ld_r_n('a', lo(color)),
       ldh_n_a(HW.OCPD),
-      ld_r_n('a', u8(color >> 8)),
+      ld_r_n('a', hi(color)),
       ldh_n_a(HW.OCPD),
     ]),
   ];

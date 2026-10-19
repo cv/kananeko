@@ -24,17 +24,30 @@ export type IoRegOffset = number & { readonly [__ioReg]: true };
  */
 export type TileIndex = number & { readonly [__tileIndex]: true };
 
+/** True when `n` is an integer in [min, max]. Rejects NaN, ±Infinity and fractions. */
+function isIntIn(n: number, min: number, max: number): boolean {
+  return Number.isInteger(n) && n >= min && n <= max;
+}
+
 /** Brand a number as U8 with runtime range check */
 export function u8(n: number): U8 {
-  if (n < 0 || n > 0xff) {
+  if (!isIntIn(n, 0, 0xff)) {
     throw new RangeError(`u8 out of range: ${String(n)}`);
   }
   return n as U8;
 }
 
+/** A signed byte (-128 to 127) in two's complement, e.g. `add_n(s8(-1))` subtracts 1 */
+export function s8(n: number): U8 {
+  if (!isIntIn(n, -0x80, 0x7f)) {
+    throw new RangeError(`s8 out of range: ${String(n)}`);
+  }
+  return (n & 0xff) as U8;
+}
+
 /** Brand a number as U16 with runtime range check */
 export function u16(n: number): U16 {
-  if (n < 0 || n > 0xffff) {
+  if (!isIntIn(n, 0, 0xffff)) {
     throw new RangeError(`u16 out of range: ${String(n)}`);
   }
   return n as U16;
@@ -42,7 +55,7 @@ export function u16(n: number): U16 {
 
 /** Brand a number as an I/O register offset with runtime range check */
 export function ioReg(n: number): IoRegOffset {
-  if (n < 0 || n > 0xff) {
+  if (!isIntIn(n, 0, 0xff)) {
     throw new RangeError(`IoRegOffset out of range: ${String(n)}`);
   }
   return n as IoRegOffset;

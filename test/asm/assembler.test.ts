@@ -130,4 +130,13 @@ describe('symbol file', () => {
     ]);
     expect(formatSymbolFile(symbols)).toBe('00:0150 start\n01:4abc late\n');
   });
+
+  it('puts RAM symbols in bank 0', () => {
+    const symbols = new Map([
+      ['vram', 0x9800],
+      ['wram', 0xc000],
+      ['hram', 0xff80],
+    ]);
+    expect(formatSymbolFile(symbols)).toBe('00:9800 vram\n00:c000 wram\n00:ff80 hram\n');
+  });
 });

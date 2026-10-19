@@ -54,18 +54,26 @@ export function org(address: U16): Op {
   return { kind: 'org', address };
 }
 
-/** Insert raw bytes */
-export function db(data: Uint8Array | number[]): Op {
-  const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
-  return { kind: 'data', bytes };
+/** Insert raw bytes; plain numbers must each fit a byte (a Uint8Array would wrap 300 to 44) */
+export function db(data: Uint8Array | readonly number[]): Op {
+  if (data instanceof Uint8Array) return { kind: 'data', bytes: data };
+  for (const [i, b] of data.entries()) {
+    if (!Number.isInteger(b) || b < 0 || b > 0xff) {
+      throw new RangeError(`db byte ${String(i)} out of range: ${String(b)}`);
+    }
+  }
+  return { kind: 'data', bytes: Uint8Array.from(data) };
 }
 
 // ---------------------------------------------------------------------------
 // 8-bit loads
 // ---------------------------------------------------------------------------
 
-/** LD r8, r8 */
+/** LD r8, r8 — `LD (HL),(HL)` doesn't exist: its encoding ($76) is HALT */
 export function ld_r_r(dst: R8Name, src: R8Name): Op {
+  if (dst === 'hl_ptr' && src === 'hl_ptr') {
+    throw new Error('LD (HL),(HL) is not an instruction ($76 is HALT); use halt() if intended');
+  }
   return inst([0x40 + R8[dst] * 8 + R8[src]]);
 }
 

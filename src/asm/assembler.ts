@@ -209,13 +209,17 @@ export function assemble(program: readonly Op[], header: ROMHeader): AssembleRes
   return { rom, symbols };
 }
 
+function symbolBank(address: number): number {
+  return address >= 0x4000 && address < 0x8000 ? 1 : 0;
+}
+
 /**
  * Render symbols in the BGB/no$gmb `.sym` format (`bank:addr name`), sorted by address.
- * Without a mapper, $0000-$3FFF is bank 0 and $4000-$7FFF is bank 1.
+ * Without a mapper, $0000-$3FFF is bank 0 and $4000-$7FFF is bank 1; RAM addresses are bank 0.
  */
 export function formatSymbolFile(symbols: ReadonlyMap<string, number>): string {
   return [...symbols.entries()]
     .sort((a, b) => a[1] - b[1])
-    .map(([name, address]) => `${hex(address < 0x4000 ? 0 : 1, 2)}:${hex(address, 4)} ${name}\n`)
+    .map(([name, address]) => `${hex(symbolBank(address), 2)}:${hex(address, 4)} ${name}\n`)
     .join('');
 }
