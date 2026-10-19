@@ -147,6 +147,11 @@ export function ldh_a_n(n: IoRegOffset): Op {
   return inst([0xf0, n]);
 }
 
+/** RLCA: rotate A left, bit 7 into bit 0 and the carry */
+export function rlca(): Op {
+  return inst([0x07]);
+}
+
 /** LDH (C), A: store A into $FF00+C */
 export function ldh_c_a(): Op {
   return inst([0xe2]);

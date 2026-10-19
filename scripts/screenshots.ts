@@ -8,7 +8,6 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { MEM } from '../src/asm/hardware';
 import { SCENES, sceneRounds } from '../src/game/scene';
 import { checkpoint, runnerAt } from '../test/helpers/checkpoints';
 import { GameRunner } from '../test/helpers/game-runner';
@@ -18,7 +17,6 @@ const OUT_DIR = path.join(import.meta.dirname, '..', 'docs', 'screenshots');
 const SCREEN_W = 160;
 const SCREEN_H = 144;
 const SCALE = 3;
-const BLINK_BIT = 0x20;
 /** Frames to render after a state change (snapshots don't include the screen, and
  * the first frame after the LCD turns back on is blank) */
 const SETTLE_FRAMES = 4;
@@ -29,22 +27,28 @@ interface Shot {
   readonly capture: () => GameRunner;
 }
 
-function titleWithPrompt(visible: boolean): GameRunner {
+/** The title menu, faded in */
+function title(): GameRunner {
   const runner = new GameRunner().boot();
-  return runner
-    .waitUntil(
-      () => ((runner.readMem(MEM.TITLE_TIMER) & BLINK_BIT) === 0) === visible,
-      'title prompt blink phase',
-    )
-    .frames(SETTLE_FRAMES);
+  return runner.waitUntil(() => runner.music === 'title', 'the title').frames(30);
+}
+
+/** The password screen, from the title menu's つづき */
+function passwordScreen(): GameRunner {
+  return title().pressDown().frames(1).pressA().frames(40);
 }
 
 const SHOTS: Shot[] = [
-  { file: 'title', caption: 'Title screen', capture: () => titleWithPrompt(true) },
+  { file: 'title', caption: 'Title screen', capture: title },
   {
-    file: 'title-blink',
-    caption: 'Title, prompt blinked off',
-    capture: () => titleWithPrompt(false),
+    file: 'title-continue',
+    caption: 'Title menu: continue (つづき)',
+    capture: () => title().pressDown().frames(SETTLE_FRAMES),
+  },
+  {
+    file: 'password',
+    caption: 'Typing a password (あいことば)',
+    capture: () => passwordScreen().typePassword('のこす').frames(SETTLE_FRAMES),
   },
   ...SCENES.flatMap((scene, i): Shot[] => [
     {

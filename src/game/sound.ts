@@ -67,9 +67,9 @@ const LOWEST_OCTAVE = 3;
 const OCTAVES = 5;
 
 /** Note names by note number: c3 (0) to b7 (59) */
-export const NOTE_NAMES: readonly string[] = Array.from({ length: OCTAVES * 12 }, (_, n) => {
-  return `${PITCH_CLASSES[n % 12] ?? ''}${String(LOWEST_OCTAVE + Math.floor(n / 12))}`;
-});
+export const NOTE_NAMES: readonly string[] = Array.from({ length: OCTAVES }, (_, octave) =>
+  PITCH_CLASSES.map((pitch) => `${pitch}${String(LOWEST_OCTAVE + octave)}`),
+).flat();
 
 /** Frequency of a note number, in Hz (equal temperament, A4 = 440 Hz) */
 export function noteFrequency(note: number): number {
@@ -275,10 +275,10 @@ export function playMusic(name: SongName): Op[] {
 export function sequenceFrames(source: string): number {
   let length = 0;
   let frames = 0;
-  const bytes = encodeSequence(source);
-  for (let i = 0; i < bytes.length; i++) {
-    const b = bytes[i] ?? SEQ.END;
-    if (b === SEQ.ENVELOPE || b === SEQ.DUTY) i++;
+  let argument = false; // the byte after $C0 or $C1
+  for (const b of encodeSequence(source)) {
+    if (argument) argument = false;
+    else if (b === SEQ.ENVELOPE || b === SEQ.DUTY) argument = true;
     else if (b >= SEQ.LENGTH && b < SEQ.ENVELOPE) length = b & MAX_LENGTH;
     else if (b <= SEQ.REST) frames += length;
   }

@@ -163,6 +163,13 @@ export const MEM = {
   SFX_PRIO: u16(0xc0d9), // Its priority: a lower one can't cut it off
   MUSIC_ID: u16(0xc0da), // The song playing (see music_play)
 
+  // WRAM — passwords and the title menu (see password.ts, menu.ts)
+  PASS_ACC: u16(0xc0e0), // 4 bytes: check, scene << 2 | lives, score hi, score lo
+  PASS_CHARS: u16(0xc0e4), // PASSWORD_LENGTH kana, as PASSWORD_ALPHABET indices
+  PASS_LEN: u16(0xc0ea), // Kana entered so far
+  PASS_CURSOR: u16(0xc0eb), // The kana grid's highlighted cell (0-31)
+  MENU_CURSOR: u16(0xc0ec), // The title menu's highlighted item
+
   // WRAM — frame budget (see frame_wait in video.ts)
   FRAME_COUNT: u16(0xc094), // VBlanks so far (the VBlank handler counts them)
   LAST_FRAME: u16(0xc095), // FRAME_COUNT when the game last finished a frame's work

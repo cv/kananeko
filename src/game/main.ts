@@ -85,6 +85,14 @@ import {
 } from './kana-hud';
 import { centerStartCol, tilemapAddr } from './tilemap';
 import { SCENES, SPEED_ROUND, buildSceneData, dialogueCodec } from './scene';
+import { buildMenuRoutines, menuPick } from './menu';
+import {
+  PASSWORD_LABEL,
+  buildPasswordData,
+  buildPasswordRoutines,
+  buildPasswordScreen,
+  passwordLineCol,
+} from './password';
 import {
   type SongName,
   buildSoundData,
@@ -126,6 +134,7 @@ import {
   fillAttributes,
   screenOff,
   writeCenteredRow,
+  drawTiles,
 } from './video';
 
 export const ROM_HEADER: ROMHeader = {
@@ -159,7 +168,7 @@ const NAME_TAG_RIGHT = requireTile(UI_TILES.TAG_RIGHT);
 // Ending screen content
 const ENDING_TITLE = 'おめでとう!';
 const ENDING_SCORE_LABEL = 'とくてん ';
-const ENDING_ROWS = { cat: 2, title: 6, stamps: 8, score: 10 } as const;
+const ENDING_ROWS = { cat: 2, title: 6, stamps: 8, score: 10, password: 16 } as const;
 
 // ---------------------------------------------------------------------------
 // Font in ROM: 1-bit tiles first (expanded at boot), then 2-bit tiles, each split
@@ -383,6 +392,8 @@ interface ResultScreen {
   readonly colors: ColorScheme;
   /** The music it plays */
   readonly song: SongName;
+  /** Show the password that continues from the scene being played */
+  readonly password?: boolean;
 }
 
 const ENDING: ResultScreen = {
@@ -397,6 +408,7 @@ const GAME_OVER: ResultScreen = {
   name: 'game_over',
   face: 'sad',
   song: 'gameOver',
+  password: true,
   title: 'ゲームオーバー',
   colors: GAME_OVER_COLORS,
 };
@@ -446,6 +458,16 @@ function buildResultScreen(screen: ResultScreen): Op[] {
     call(ref('score_digits')),
     ...buildDrawScoreDigits(ENDING_ROWS.score, scoreCol + labelTiles.length),
     call(ref('draw_start_box')),
+    ...(screen.password === true
+      ? [
+          call(ref('pass_encode')),
+          ...drawTiles(
+            tilemapAddr(ENDING_ROWS.password, passwordLineCol()),
+            textToTiles(`${PASSWORD_LABEL} `),
+          ),
+          call(ref('pass_draw')),
+        ]
+      : []),
     ...fadeIn(resultFadeLabel(screen)),
     ...catFace('cat_rest', screen.face),
     ...placeCat(CAT_SPOTS.portrait),
@@ -573,7 +595,7 @@ export function buildProgram(): Op[] {
       ),
     ),
     ...writeCenteredRow(10, textToTiles(SUBTITLE)),
-    call(ref('draw_start_box')),
+    call(ref('menu_draw')),
     ...fadeIn(TITLE_FADE),
     ...catFace('cat_rest', 'neutral'),
     ...placeCat(CAT_SPOTS.portrait),
@@ -587,18 +609,21 @@ export function buildProgram(): Op[] {
     cp_n(u8(0)),
     jr_cc('nz', ref('title_debounce')),
 
-    // Wait for START, blinking the prompt
+    // The menu: はじめる starts a run, つづき takes a password
     label('title_loop'),
     ...frameWait(),
     ...runDma(),
     call(ref('joy_read')),
-
-    call(ref('title_blink')),
     call(ref('cat_tick')),
-
-    ld_a_nn(MEM.JOYPAD_NEW),
-    and_n(u8(JOY.START)),
+    call(ref('menu_update')),
+    or_r('a'),
     jr_cc('z', ref('title_loop')),
+    cp_n(u8(menuPick('つづき'))),
+    jr_cc('nz', ref('title_new_game')),
+    ...playSfx('confirm'),
+    jp(ref('password_screen')),
+
+    label('title_new_game'),
     ...playSfx('start'),
 
     // START pressed — begin a fresh run at scene 0
@@ -744,6 +769,9 @@ export function buildProgram(): Op[] {
     ...buildCatRoutines(),
     ...buildSpriteRoutines(),
     ...buildDrawStartBox(),
+    ...buildMenuRoutines(),
+    ...buildPasswordRoutines(SCENES.length),
+    ...buildPasswordScreen(TITLE_FADE),
     ...buildDrawStamps(),
     ...buildDialogueEngine(),
     ...buildTextNext(dialogueCodec().base),
@@ -766,6 +794,7 @@ export function buildProgram(): Op[] {
     ...buildCatData(),
     ...buildFadeData(),
     ...buildSoundData(),
+    ...buildPasswordData(),
     ...FONT_SEGMENTS.flatMap((segment) => [label(segment.label), db(segment.data)]),
 
     label(SPEED_ROUND_LABEL),

@@ -5,6 +5,7 @@
  * game scenarios instead of raw frame counts and hex addresses.
  */
 
+import { PASSWORD_ALPHABET } from '@game/password';
 import { MUSIC_NONE, SFX, SFX_NONE, SONGS, type SfxName, type SongName } from '@game/sound';
 import Gameboy from 'serverboy';
 import { MEM } from '@asm/hardware';
@@ -157,6 +158,26 @@ export class GameRunner {
   private pressKey(key: number): this {
     this.gb.pressKey(key);
     this.gb.doFrame();
+    return this;
+  }
+
+  pressB(): this {
+    return this.pressKey(Gameboy.KEYMAP.B);
+  }
+
+  pressRight(): this {
+    return this.pressKey(Gameboy.KEYMAP.RIGHT);
+  }
+
+  /** On the password screen: walk the cursor to each kana and press A on it */
+  typePassword(password: string): this {
+    for (const kana of password) {
+      const target = PASSWORD_ALPHABET.indexOf(kana);
+      if (target < 0) throw new Error(`Not a password kana: ${kana}`);
+      const moves = (target - this.readMem(MEM.PASS_CURSOR)) & (PASSWORD_ALPHABET.length - 1);
+      for (let i = 0; i < moves; i++) this.pressRight().frames(1);
+      this.pressA().frames(1);
+    }
     return this;
   }
 
