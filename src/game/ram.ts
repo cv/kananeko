@@ -6,15 +6,20 @@
 
 import { HW_MEM } from '../asm/hardware';
 import { allocate, checkRegions, same } from '../asm/ram';
+import { type U16, u16 } from '../asm/types';
 
 /** Bytes per sound voice: see VOICE in sound.ts */
 const VOICE_BYTES = 8;
 
+/** The OAM DMA routine, copied to the start of HRAM at boot (see sprites.ts) */
+export const DMA_REGION = allocate('HRAM DMA routine', 0xff80, 10, { OAM_DMA: 10 });
+
 /**
- * Engine state in WRAM page $C0: all of it shares H = $C0, and boot zeroes the
- * whole page (WRAM starts with random contents on real hardware).
+ * Engine state in HRAM, after the DMA routine and up to IE at $FFFF: LDH reaches it
+ * in a byte less and 4 cycles faster than WRAM. Boot zeroes it (HRAM starts with
+ * random contents on real hardware).
  */
-export const VARIABLES = allocate('WRAM variables', 0xc000, 0x100, {
+export const VARIABLES = allocate('HRAM variables', DMA_REGION.end, 0xffff - DMA_REGION.end, {
   // Joypad
   JOYPAD_CUR: 1, // Current frame button state
   JOYPAD_PREV: 1, // Previous frame button state
@@ -127,17 +132,14 @@ export const VARIABLES = allocate('WRAM variables', 0xc000, 0x100, {
 
   // Dialogue text decompression (see text_next in dialogue.ts)
   TEXT_SP: 1, // right halves of codes waiting on TEXT_STACK
-  TEXT_STACK: 16, // TEXT_STACK_SIZE bytes
 
   // Sound (see sound.ts)
-  SND_VOICES: 3 * VOICE_BYTES, // SOUND_VOICES × VOICE_SIZE bytes
   SFX_ID: 1, // The sound effect playing last (SFX_NONE before any)
   SFX_PRIO: 1, // Its priority: a lower one can't cut it off
   MUSIC_ID: 1, // The song playing (see music_play)
 
   // Passwords and the title menu (see password.ts, menu.ts)
   PASS_ACC: 4, // check, scene << 2 | lives, score hi, score lo
-  PASS_CHARS: 6, // PASSWORD_LENGTH kana, as PASSWORD_ALPHABET indices
   PASS_LEN: 1, // Kana entered so far
   PASS_CURSOR: 1, // The kana grid's highlighted cell (0-31)
   MENU_CURSOR: 1, // The title menu's highlighted item
@@ -146,9 +148,16 @@ export const VARIABLES = allocate('WRAM variables', 0xc000, 0x100, {
   CHART_WAIT: 1, // 1 while the kana chart waits for a button
   PRACTICE_NEXT: 1, // Where the next practice pick starts looking (a chart entry)
   PRACTICE_QUIT: 1, // Set when B leaves practice
+  PRACTICE_SEED: 1, // Mixed into the practice picks' randomness
+});
+
+/** Buffers in WRAM page $C0, walked with HL; boot zeroes the whole page */
+export const BUFFERS = allocate('WRAM buffers', 0xc000, 0x100, {
+  TEXT_STACK: 16, // TEXT_STACK_SIZE bytes (see text_next in dialogue.ts)
+  SND_VOICES: 3 * VOICE_BYTES, // SOUND_VOICES × VOICE_SIZE bytes (see sound.ts)
+  PASS_CHARS: 6, // PASSWORD_LENGTH kana, as PASSWORD_ALPHABET indices
   KANA_SEEN: 6, // CHART_BYTES bytes, a bit per kana in CHART_KANA order: answered right
   KANA_MISSED: 6, // CHART_BYTES bytes: answered wrong
-  PRACTICE_SEED: 1, // Mixed into the practice picks' randomness
 });
 
 /** The shadow copy of OAM that sprites.ts DMAs each frame: DMA needs it page-aligned */
@@ -157,13 +166,26 @@ export const SHADOW_OAM_REGION = allocate('shadow OAM', 0xc100, 0xa0, { SHADOW_O
 /** Questions picked for a practice or speed round, then a 0 */
 export const PRACTICE_REGION = allocate('practice buffer', 0xc200, 0x100, { PRACTICE_BUF: 0x100 });
 
-export const RAM_REGIONS = [VARIABLES, SHADOW_OAM_REGION, PRACTICE_REGION] as const;
+/** The stack grows down from the top of this region (SP starts at STACK_TOP) */
+export const STACK_REGION = allocate('stack', 0xc300, 0x100, { STACK: 0x100 });
+export const STACK_TOP: U16 = u16(STACK_REGION.limit);
+
+export const RAM_REGIONS = [
+  BUFFERS,
+  SHADOW_OAM_REGION,
+  PRACTICE_REGION,
+  STACK_REGION,
+  DMA_REGION,
+  VARIABLES,
+] as const;
 checkRegions(RAM_REGIONS);
 
 /** Hardware addresses and the game's variables */
 export const MEM = {
   ...HW_MEM,
+  ...DMA_REGION.addresses,
   ...VARIABLES.addresses,
+  ...BUFFERS.addresses,
   ...SHADOW_OAM_REGION.addresses,
   ...PRACTICE_REGION.addresses,
 };

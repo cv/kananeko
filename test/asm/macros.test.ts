@@ -12,6 +12,7 @@ import {
   storePointer,
   switchCases,
   zeroBytes,
+  zeroBlock,
   zeroPages,
 } from '@asm/macros';
 import { add_r, call, cp_r, db, label, ld_a_nn, ld_nn_a, ld_r_n, ld_r_r, ret } from '@asm/ops';
@@ -99,6 +100,19 @@ describe('block operations', () => {
       [label(SOURCE), db(source)],
     );
     expect(zeroed.slice(SCRATCH, SCRATCH + 256).every((b) => b === 0)).toBe(true);
+  });
+
+  it('zeroes a block of up to 256 bytes', () => {
+    const source = Array.from({ length: 256 }, () => 0xee);
+    const memory = runProgram(
+      [...copyPages('copy', at(0), SOURCE, 1), ...zeroBlock('zero', at(1), 254)],
+      [label(SOURCE), db(source)],
+    );
+    expect(memory[SCRATCH]).toBe(0xee);
+    expect(memory.slice(SCRATCH + 1, SCRATCH + 255).every((b) => b === 0)).toBe(true);
+    expect(memory[SCRATCH + 255]).toBe(0xee);
+    expect(() => zeroBlock('x', at(0), 0)).toThrow(RangeError);
+    expect(() => zeroBlock('x', at(0), 257)).toThrow(RangeError);
   });
 
   it.each([0, 256, 1.5])('rejects %s pages (B = 0 would mean 256 pages)', (pages) => {

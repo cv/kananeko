@@ -101,6 +101,22 @@ function checkPages(macro: string, pages: number): void {
   }
 }
 
+/** Fill `count` (1-256) bytes starting at `dst` with zero. Clobbers A, B, HL. */
+export function zeroBlock(name: string, dst: U16, count: number): Op[] {
+  if (!Number.isInteger(count) || count < 1 || count > 256)
+    throw new RangeError(`zeroBlock count must be 1-256, got ${String(count)}`);
+  const loop = new Label(name);
+  return [
+    ld_rr_nn('hl', dst),
+    xor_r('a'),
+    ld_r_n('b', lo(count)), // 256 wraps
+    label(loop),
+    ldi_hl_a(),
+    dec_r('b'),
+    jr_cc('nz', loop),
+  ];
+}
+
 /** Fill `pages` (1-255) × 256 bytes starting at `dst` with zero. Clobbers A, BC, HL. */
 export function zeroPages(name: string, dst: U16, pages: number): Op[] {
   checkPages('zeroPages', pages);

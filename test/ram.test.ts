@@ -6,9 +6,19 @@ import { buildKanaData } from '@game/kana';
 import { SCORE_DIGIT_COUNT } from '@game/kana-hud';
 import { PASSWORD_LENGTH } from '@game/password';
 import { PRACTICE_ROUND, practiceQuestions } from '@game/practice';
-import { MEM, PRACTICE_REGION, RAM_REGIONS, VARIABLES, ramSymbols } from '@game/ram';
+import {
+  BUFFERS,
+  DMA_REGION,
+  MEM,
+  PRACTICE_REGION,
+  RAM_REGIONS,
+  STACK_TOP,
+  VARIABLES,
+  ramSymbols,
+} from '@game/ram';
 import { SPEED_ROUND } from '@game/scene';
 import { SOUND_VOICES, VOICE_SIZE } from '@game/sound';
+import { DMA_ROUTINE_BYTES } from '@game/sprites';
 import { TEXT_STACK_SIZE } from '@game/text-codec';
 
 function sizeOf(name: string): number | undefined {
@@ -33,9 +43,19 @@ describe('the RAM map', () => {
     expect(longest).toBeLessThanOrEqual(PRACTICE_REGION.limit - PRACTICE_REGION.start);
   });
 
-  it('keeps every variable in page $C0, which boot zeroes', () => {
-    expect(VARIABLES.start).toBe(0xc000);
-    expect(VARIABLES.end).toBeLessThanOrEqual(0xc100);
+  it('keeps the variables in HRAM, after the DMA routine and before IE', () => {
+    expect(DMA_REGION.limit - DMA_REGION.start).toBe(DMA_ROUTINE_BYTES.length);
+    expect(VARIABLES.start).toBe(DMA_REGION.limit);
+    expect(VARIABLES.limit).toBe(MEM.IE);
+  });
+
+  it('keeps the buffers in WRAM page $C0, which boot zeroes', () => {
+    expect(BUFFERS.start).toBe(0xc000);
+    expect(BUFFERS.limit).toBe(0xc100);
+  });
+
+  it('starts the stack in WRAM, clear of HRAM', () => {
+    expect(STACK_TOP).toBeLessThan(0xd000);
   });
 
   it('shares bytes only between the dialogue and kana engines', () => {
@@ -50,6 +70,7 @@ describe('the RAM map', () => {
 
   it('lists every variable for the .sym file', () => {
     expect(ramSymbols().get('SHADOW_OAM')).toBe(0xc100);
-    expect(ramSymbols().get('JOYPAD_CUR')).toBe(0xc000);
+    expect(ramSymbols().get('JOYPAD_CUR')).toBe(VARIABLES.start);
+    expect(ramSymbols().get('TEXT_STACK')).toBe(0xc000);
   });
 });

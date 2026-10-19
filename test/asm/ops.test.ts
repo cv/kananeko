@@ -32,6 +32,8 @@ const ENCODINGS: [string, Op, number[]][] = [
   ['LD (HL-),A', op.ldd_hl_a(), [0x32]],
   ['LD ($C000),A', op.ld_nn_a(u16(0xc000)), [0xea, 0x00, 0xc0]],
   ['LD A,($C123)', op.ld_a_nn(u16(0xc123)), [0xfa, 0x23, 0xc1]],
+  ['LD ($FF90),A as LDH', op.ld_nn_a(u16(0xff90)), [0xe0, 0x90]],
+  ['LD A,($FFFE) as LDH', op.ld_a_nn(u16(0xfffe)), [0xf0, 0xfe]],
   ['LDH ($40),A', op.ldh_n_a(ioReg(0x40)), [0xe0, 0x40]],
   ['LDH (C),A', op.ldh_c_a(), [0xe2]],
   ['RLCA', op.rlca(), [0x07]],

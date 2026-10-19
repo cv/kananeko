@@ -24,6 +24,7 @@ export { rom, symbols, unreferenced };
 type SaveStatePayload = ReturnType<EmulatorCore['saveState']>;
 
 interface EmulatorCore {
+  stackPointer: number;
   saveState(): unknown[];
   saving(state: unknown[]): void;
 }
@@ -45,25 +46,20 @@ const SONG_ORDER = Object.keys(SONGS) as SongName[];
 function patchRomForServerboy(sourceRom: Uint8Array): Buffer {
   const patchedRom = Buffer.from(sourceRom);
   for (let i = 0x0150; i < 0x0300; i++) {
-    // Find: 3E 01 EA FF FF FB (LD A,$01; LD ($FFFF),A; EI)
+    // Find: 3E 01 E0 FF FB (LD A,$01; LDH ($FF),A; EI)
     if (
       patchedRom[i] === 0x3e &&
       patchedRom[i + 1] === 0x01 &&
-      patchedRom[i + 2] === 0xea &&
+      patchedRom[i + 2] === 0xe0 &&
       patchedRom[i + 3] === 0xff &&
-      patchedRom[i + 4] === 0xff &&
-      patchedRom[i + 5] === 0xfb
+      patchedRom[i + 4] === 0xfb
     ) {
-      // NOP out the LD A,$01 and LD ($FFFF),A (5 bytes), keep the EI
-      patchedRom[i] = 0x00;
-      patchedRom[i + 1] = 0x00;
-      patchedRom[i + 2] = 0x00;
-      patchedRom[i + 3] = 0x00;
-      patchedRom[i + 4] = 0x00;
-      break;
+      // NOP out the LD A,$01 and LDH ($FF),A (4 bytes), keep the EI
+      patchedRom.fill(0x00, i, i + 4);
+      return patchedRom;
     }
   }
-  return patchedRom;
+  throw new Error('The ROM no longer enables interrupts with LD A,1; LDH (IE),A; EI');
 }
 
 // Direction index → serverboy key mapping (0=UP, 1=DOWN, 2=LEFT, 3=RIGHT)
@@ -227,6 +223,11 @@ export class GameRunner {
   /** Get the full memory array */
   getMemory(): Uint8Array {
     return this.gb.getMemory();
+  }
+
+  /** The CPU's stack pointer */
+  get stackPointer(): number {
+    return this.internals.gameboy.stackPointer;
   }
 
   // ---------------------------------------------------------------------------

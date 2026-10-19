@@ -491,7 +491,7 @@ export function buildFadeRoutines(): Op[] {
     ld_r_n('c', u8(FADE_STEP_FRAMES)),
     label(FADE_WAIT_FRAME),
     call(FRAME_WAIT),
-    call(u16(0xff80)), // OAM DMA (see sprites.ts) so sprites update during fades
+    call(MEM.OAM_DMA), // see sprites.ts: so sprites update during fades
     dec_r('c'),
     jr_cc('nz', FADE_WAIT_FRAME),
     ret(),

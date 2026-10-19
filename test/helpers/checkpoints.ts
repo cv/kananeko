@@ -13,6 +13,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { SCENES, SPEED_ROUND } from '@game/scene';
 import { DialogueState } from '@game/state';
+import { STACK_REGION } from '@game/ram';
 import { FADE_STEPS, FADE_STEP_FRAMES } from '@game/video';
 
 /** Long enough for a screen change to fade out and back in */
@@ -44,6 +45,21 @@ export const checkpoint = {
 
 type Checkpoints = Partial<Record<Checkpoint, GameRunnerSnapshot>>;
 
+/**
+ * Fills the stack's unused bytes as the playthrough starts. The snapshots keep RAM, so
+ * the bytes still holding it show how deep the stack ever went (see stack.test.ts).
+ */
+export const STACK_CANARY = 0x5a;
+
+function markUnusedStack(runner: GameRunner): GameRunner {
+  const memory = runner.getMemory();
+  if (runner.stackPointer <= STACK_REGION.start || runner.stackPointer > STACK_REGION.limit) {
+    throw new Error(`SP is outside the stack region: ${runner.stackPointer.toString(16)}`);
+  }
+  memory.fill(STACK_CANARY, STACK_REGION.start, runner.stackPointer);
+  return runner;
+}
+
 const CACHE_DIR = path.join(import.meta.dirname, '..', '..', 'node_modules', '.cache', 'kananeko');
 const LOCK_STALE_MS = 5 * 60_000;
 const LOCK_POLL_MS = 100;
@@ -51,7 +67,7 @@ const LOCK_POLL_MS = 100;
 /** Play the whole game once, recording a snapshot at every checkpoint. */
 export function recordCheckpoints(): Checkpoints {
   const out: Checkpoints = {};
-  const runner = new GameRunner().boot().start();
+  const runner = markUnusedStack(new GameRunner().boot()).start();
   SCENES.forEach((_, i) => {
     runner.waitUntil(() => runner.dlgState !== DialogueState.IDLE, `scene ${String(i)} dialogue`);
     out[checkpoint.sceneStart(i)] = runner.snapshot();

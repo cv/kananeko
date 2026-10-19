@@ -180,14 +180,14 @@ export function ldh_a_c(): Op {
   return inst([0xf2]);
 }
 
-/** LD (nn), A */
+/** LD (nn), A; as LDH (2 bytes, 4 cycles faster) when nn is in $FF00-$FFFF */
 export function ld_nn_a(addr: U16): Op {
-  return instImm16(0xea, addr);
+  return addr >= 0xff00 ? inst([0xe0, addr & 0xff]) : instImm16(0xea, addr);
 }
 
-/** LD A, (nn) */
+/** LD A, (nn); as LDH (2 bytes, 4 cycles faster) when nn is in $FF00-$FFFF */
 export function ld_a_nn(addr: U16): Op {
-  return instImm16(0xfa, addr);
+  return addr >= 0xff00 ? inst([0xf0, addr & 0xff]) : instImm16(0xfa, addr);
 }
 
 // ---------------------------------------------------------------------------
