@@ -133,8 +133,19 @@ test('a quick second tap does not zoom the page', async ({ page, isMobile }) => 
   const box = await page.locator('#screen').boundingBox();
   if (box === null) throw new Error('no screen');
   const [x, y] = [box.x + box.width / 2, box.y + box.height / 2];
-  await page.touchscreen.tap(x, y);
-  await page.touchscreen.tap(x, y);
+  // Tap pairs until one lands within 350 ms (each tap waits on the page, so on a busy
+  // machine, with the game running and playing music, a pair can come slower)
+  const lastPairQuick = (): Promise<boolean> =>
+    page.evaluate(() => {
+      const { times } = window as unknown as { times: number[] };
+      return times.length >= 2 && (times.at(-1) ?? 0) - (times.at(-2) ?? 0) < 350;
+    });
+  for (let attempt = 0; attempt < 5; attempt++) {
+    await page.waitForTimeout(500);
+    await page.touchscreen.tap(x, y);
+    await page.touchscreen.tap(x, y);
+    if (await lastPairQuick()) break;
+  }
   await page.waitForTimeout(500);
   await page.touchscreen.tap(x, y);
   const { taps, times } = await page.evaluate(() => {
@@ -145,7 +156,8 @@ test('a quick second tap does not zoom the page', async ({ page, isMobile }) => 
   // machine the "quick" pair can come slower; the rule must hold either way)
   const quick = times.map((t, i) => i > 0 && t - (times[i - 1] ?? -Infinity) < 350);
   expect(taps, `touchend times: ${times.join(', ')}`).toEqual(quick);
-  expect(quick.slice(1, 2), 'the first two taps came quickly').toEqual([true]);
+  expect(quick.at(-2), 'a pair of taps came quickly').toBe(true);
+  expect(quick.at(-1), 'the last tap came alone').toBe(false);
   expect(await page.evaluate(() => window.visualViewport?.scale ?? 1)).toBe(1);
 });
 
