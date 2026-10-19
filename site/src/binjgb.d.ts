@@ -14,6 +14,7 @@ interface BinjgbModule {
   _joypad_new(): number;
   _emulator_set_default_joypad_callback(e: number, joypadBuffer: number): void;
   _emulator_get_ticks_f64(e: number): number;
+  _emulator_read_mem(e: number, address: number): number;
   _emulator_run_until_f64(e: number, ticks: number): number;
   _get_frame_buffer_ptr(e: number): number;
   _get_frame_buffer_size(e: number): number;

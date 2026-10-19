@@ -12,8 +12,8 @@ import {
   loadPointer,
   storeByte,
   storePointer,
-  waitFrame,
   zeroBytes,
+  zeroPages,
 } from '../asm/macros';
 import {
   add_hl_rr,
@@ -100,6 +100,7 @@ import { ENDING_COLORS, GAME_OVER_COLORS, TITLE_COLORS } from './scenes/colors';
 import { BACKDROP } from './backdrop';
 import {
   bgTileAddr,
+  buildFrameWait,
   buildDrawTiles,
   buildTileLists,
   resetTileLists,
@@ -112,6 +113,7 @@ import {
   cgbAttributes,
   clearScreen,
   fadeIn,
+  frameWait,
   fadeOut,
   fillAttributes,
   screenOff,
@@ -122,6 +124,7 @@ export const ROM_HEADER: ROMHeader = {
   title: 'KANANEKO',
   cgbFlag: 0x80, // CGB+DMG compatible
   destinationCode: 0x00, // Japan
+  vblankHandler: 'vblank_handler', // counts frames (see buildFrameWait)
 };
 
 // ---------------------------------------------------------------------------
@@ -255,7 +258,7 @@ function resetRunState(...alsoZero: U16[]): Op[] {
 function engineLoop(name: string, update: string, stateAddr: U16): Op[] {
   return [
     label(name),
-    ...waitFrame(),
+    ...frameWait(),
     ...runDma(),
     call(ref('hud_update')), // refresh HUD early in VBlank window
     call(ref('cat_tick')),
@@ -435,7 +438,7 @@ function buildResultScreen(screen: ResultScreen): Op[] {
     ...placeCat(CAT_SPOTS.portrait),
 
     label(`${name}_loop`),
-    ...waitFrame(),
+    ...frameWait(),
     ...runDma(),
     call(ref('joy_read')),
     call(ref('title_blink')),
@@ -500,8 +503,13 @@ export function buildProgram(): Op[] {
     jr_cc('nz', ref('init_not_cgb')),
     inc_r('a'),
     label('init_not_cgb'),
-    ld_nn_a(MEM.IS_CGB),
     ld_rr_nn('sp', u16(0xfffe)),
+    // WRAM starts with random contents on real hardware (and in accurate emulators):
+    // zero every game variable ($C000-$C0FF), keeping the GBC flag across
+    push('af'),
+    ...zeroPages('init_wram', u16(0xc000), 1),
+    pop('af'),
+    ld_nn_a(MEM.IS_CGB),
 
     // Clear WRAM state
     ...zeroBytes(MEM.JOYPAD_CUR, MEM.JOYPAD_PREV, MEM.JOYPAD_NEW, MEM.DLG_STATE),
@@ -523,8 +531,8 @@ export function buildProgram(): Op[] {
     ...buildSpriteInit(),
     ...buildCatInit(),
 
-    // Enable the VBlank interrupt so HALT wakes once per frame (fades and game loops).
-    // The handler at $0040 is a RETI placed by the assembler.
+    // Enable the VBlank interrupt so HALT wakes once per frame (fades and game loops);
+    // its handler counts frames (see buildFrameWait).
     ...storeByte(MEM.IE, 0x01), // bit 0 = VBlank
     ei(),
 
@@ -556,7 +564,7 @@ export function buildProgram(): Op[] {
 
     // Wait for all buttons to be released (debounce boot ROM START press)
     label('title_debounce'),
-    ...waitFrame(),
+    ...frameWait(),
     ...runDma(),
     call(ref('joy_read')),
     ld_a_nn(MEM.JOYPAD_CUR),
@@ -565,7 +573,7 @@ export function buildProgram(): Op[] {
 
     // Wait for START, blinking the prompt
     label('title_loop'),
-    ...waitFrame(),
+    ...frameWait(),
     ...runDma(),
     call(ref('joy_read')),
 
@@ -726,6 +734,7 @@ export function buildProgram(): Op[] {
     ...buildScoreRoutines(),
     ...buildScoreDigits(),
     ...buildVramPut(),
+    ...buildFrameWait(),
     ...buildDrawTiles(),
     ...buildFadeRoutines(),
     ...buildClearScreen(),

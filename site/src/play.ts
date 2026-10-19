@@ -104,6 +104,11 @@ class Emulator {
     });
   }
 
+  /** A byte of the Game Boy's memory (for tests: window.kananeko.readMemory) */
+  readMemory(address: number): number {
+    return this.module._emulator_read_mem(this.e, address);
+  }
+
   get running(): boolean {
     return this.raf !== 0;
   }
@@ -355,6 +360,10 @@ function main(): void {
       showMuted();
       bindControls(element('#controls', HTMLElement), emulator.joypad);
       bindKeyboard(emulator.joypad);
+      const running = emulator;
+      (window as unknown as { kananeko: unknown }).kananeko = {
+        readMemory: (address: number): number => running.readMemory(address),
+      };
       document.body.classList.add('playing');
       startButton.hidden = true;
       // On a phone the header just went away: bring the console to the top

@@ -21,6 +21,7 @@ import {
   label,
   ld_a_de,
   ld_a_nn,
+  ld_nn_a,
   ld_r_n,
   ld_r_r,
   ld_rr_nn,
@@ -32,6 +33,7 @@ import {
   pop,
   push,
   ret,
+  reti,
   ret_cc,
   sub_r,
   xor_r,
@@ -62,7 +64,60 @@ export function screenOff(name: string): Op[] {
 
 /** Turn the LCD on with the game's standard flags. */
 export function screenOn(): Op[] {
-  return lcdOn(SCREEN_ON_FLAGS);
+  return [
+    ...lcdOn(SCREEN_ON_FLAGS),
+    // The time spent with the screen off isn't a missed frame (see frame_wait)
+    ld_a_nn(MEM.FRAME_COUNT),
+    ld_nn_a(MEM.LAST_FRAME),
+  ];
+}
+
+/** Wait for the next VBlank, counting any frame the game's work ran past (frame_wait) */
+export function frameWait(): Op[] {
+  return [call(ref('frame_wait'))];
+}
+
+/**
+ * The VBlank handler (counts frames) and frame_wait: sleep until the next VBlank,
+ * then add the VBlanks beyond one since the last wait to FRAMES_MISSED. Every frame
+ * the game waits for goes through frame_wait, so FRAMES_MISSED counts the times its
+ * work took longer than a frame. Preserves all registers.
+ */
+export function buildFrameWait(): Op[] {
+  return [
+    label('vblank_handler'),
+    push('af'),
+    ld_a_nn(MEM.FRAME_COUNT),
+    inc_r('a'),
+    ld_nn_a(MEM.FRAME_COUNT),
+    pop('af'),
+    reti(),
+
+    label('frame_wait'),
+    halt(),
+    nop(),
+    push('af'),
+    push('bc'),
+    ld_a_nn(MEM.LAST_FRAME),
+    ld_r_r('c', 'a'),
+    ld_a_nn(MEM.FRAME_COUNT),
+    ld_nn_a(MEM.LAST_FRAME),
+    sub_r('c'), // VBlanks since the last wait
+    cp_n(u8(2)),
+    jr_cc('c', ref('frame_wait_done')),
+    dec_r('a'),
+    ld_r_r('c', 'a'),
+    ld_a_nn(MEM.FRAMES_MISSED),
+    add_r('c'),
+    jr_cc('nc', ref('frame_wait_store')),
+    ld_r_n('a', u8(0xff)),
+    label('frame_wait_store'),
+    ld_nn_a(MEM.FRAMES_MISSED),
+    label('frame_wait_done'),
+    pop('bc'),
+    pop('af'),
+    ret(),
+  ];
 }
 
 /** STAT mode bit 1 is set during OAM scan (2) and pixel transfer (3) */
@@ -407,8 +462,7 @@ export function buildFadeRoutines(): Op[] {
     label('fade_wait'),
     ld_r_n('c', u8(FADE_STEP_FRAMES)),
     label('fade_wait_frame'),
-    halt(),
-    nop(),
+    call(ref('frame_wait')),
     call(u16(0xff80)), // OAM DMA (see sprites.ts) so sprites update during fades
     dec_r('c'),
     jr_cc('nz', ref('fade_wait_frame')),

@@ -39,6 +39,20 @@ describe('Given the ROM boots in the emulator', () => {
   });
 });
 
+describe('Given WRAM starts with garbage, as on real hardware', () => {
+  it('clears its variables at boot and still reaches the title', () => {
+    const runner = new GameRunner();
+    const memory = runner.getMemory();
+    for (let address = 0xc000; address < 0xc100; address++) memory[address] = 0xa5;
+    runner.boot();
+    expect(runner.readMem(MEM.FRAMES_MISSED)).toBe(0);
+    expect(runner.readMem(MEM.SCENE_FLAGS)).toBe(0);
+    expect(runner.catVisible).toBe(true);
+    runner.start();
+    expect(runner.sceneId).toBe(0);
+  });
+});
+
 describe('Given the game has booted', () => {
   it('has every font tile in VRAM, the 1-bit ones expanded to ink', () => {
     const runner = new GameRunner().boot();

@@ -13,7 +13,7 @@ const TITLE_MAX_LENGTH = 11;
 
 /** ROM regions the assembler writes itself; program bytes must not overlap them. */
 const RESERVED_REGIONS: readonly { start: number; end: number; name: string }[] = [
-  { start: VBLANK_VECTOR, end: VBLANK_VECTOR + 1, name: 'VBlank vector' },
+  { start: VBLANK_VECTOR, end: VBLANK_VECTOR + 3, name: 'VBlank vector' },
   { start: HEADER_START, end: PROGRAM_START, name: 'cartridge header' },
 ];
 
@@ -31,6 +31,8 @@ export interface ROMHeader {
   romSize?: number; // $00 = 32KB
   ramSize?: number; // $00 = none
   destinationCode?: number; // $00 = Japan, $01 = international
+  /** Label of a VBlank interrupt handler (JP'd to from $0040); without one, VBlank just returns */
+  vblankHandler?: string;
 }
 
 export interface AssembleResult {
@@ -191,6 +193,13 @@ export function assemble(program: readonly Op[], header: ROMHeader): AssembleRes
 
   const { positioned, symbols } = layout(program);
   emit(rom, positioned, symbols);
+  if (header.vblankHandler !== undefined) {
+    const handler = symbols.get(header.vblankHandler);
+    if (handler === undefined) {
+      throw new Error(`Undefined VBlank handler label: "${header.vblankHandler}"`);
+    }
+    rom.set([0xc3, handler & 0xff, handler >> 8], VBLANK_VECTOR); // JP handler
+  }
 
   rom[0x014d] = headerChecksum(rom);
   const global = globalChecksum(rom);

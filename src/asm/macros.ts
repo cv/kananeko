@@ -11,7 +11,6 @@ import {
   cp_n,
   dec_r,
   dec_rr,
-  halt,
   inc_rr,
   jp,
   jp_cc,
@@ -27,7 +26,6 @@ import {
   ldh_a_n,
   ldh_n_a,
   ldi_hl_a,
-  nop,
   or_r,
   ret_cc,
   xor_r,
@@ -36,11 +34,6 @@ import { type LabelRef, type Op, type U16, ref, u8, u16 } from './types';
 
 /** First scanline of the vertical blank period. */
 const VBLANK_LINE = 144;
-
-/** Sleep until the next interrupt (VBlank). The NOP pads over the HALT bug. */
-export function waitFrame(): Op[] {
-  return [halt(), nop()];
-}
 
 /** Busy-wait until the LCD reaches VBlank (LY == 144). */
 export function waitVBlank(name: string): Op[] {

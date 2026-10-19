@@ -164,6 +164,27 @@ test('mashing a button still presses it every time', async ({ page, isMobile }) 
   expect(await page.evaluate(() => (window as unknown as { downs: number }).downs)).toBe(4);
 });
 
+test('keeps every frame on time while playing (no missed VBlanks)', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'one engine is enough: the count is the game, not the browser');
+  test.setTimeout(90_000);
+  await play(page, isMobile);
+  await page.waitForTimeout(1000);
+  await page.keyboard.press('Enter');
+  // Mash through dialogue and quizzes for a while: A to read and choose, the d-pad to answer
+  const keys = ['x', 'ArrowDown', 'x', 'ArrowRight', 'x', 'ArrowUp', 'x', 'ArrowLeft'];
+  for (let i = 0; i < 100; i++) {
+    await page.keyboard.press(keys[i % keys.length] ?? 'x');
+    await page.waitForTimeout(250);
+  }
+  // Addresses from src/asm/hardware.ts: FRAME_COUNT ($C094), FRAMES_MISSED ($C096)
+  const [frames, missed] = await page.evaluate(() => {
+    const k = (window as unknown as { kananeko: { readMemory: (a: number) => number } }).kananeko;
+    return [k.readMemory(0xc094), k.readMemory(0xc096)];
+  });
+  expect(frames, 'the VBlank handler counts frames').not.toBe(0);
+  expect(missed).toBe(0);
+});
+
 test('remembers the sound setting', async ({ page, isMobile }) => {
   await play(page, isMobile);
   const mute = page.locator('#mute');

@@ -151,6 +151,11 @@ export const MEM = {
   TEXT_SP: u16(0xc092), // right halves of codes waiting on TEXT_STACK
   TEXT_STACK: u16(0xc0a0), // TEXT_STACK_SIZE bytes ($C0A0-$C0AF)
 
+  // WRAM — frame budget (see frame_wait in video.ts)
+  FRAME_COUNT: u16(0xc094), // VBlanks so far (the VBlank handler counts them)
+  LAST_FRAME: u16(0xc095), // FRAME_COUNT when the game last finished a frame's work
+  FRAMES_MISSED: u16(0xc096), // VBlanks the game's work ran past (saturates at 255)
+
   // WRAM — scene system
   SCENE_ID: u16(0xc050), // Current scene index (0-4, 0xFF = title)
   SCENE_FLAGS: u16(0xc051), // Per-scene completion bitfield
