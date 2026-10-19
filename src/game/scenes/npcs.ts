@@ -131,6 +131,20 @@ export const CONBINI_CAST: SceneCast = {
   ],
 };
 
+export const SHRINE_CAST: SceneCast = {
+  npcs: [
+    { hair: 'long', outfit: 'dress', colors: [SKIN.light, rgb(0xd8, 0x40, 0x40), HAIR.black] }, // shrine maiden
+    { hair: 'pigtails', outfit: 'plain', colors: [SKIN.medium, rgb(0xf0, 0xb0, 0x30), HAIR.brown] }, // child
+    { hair: 'elder', outfit: 'coat', colors: [SKIN.light, rgb(0x70, 0x90, 0x70), HAIR.grey] }, // grandmother
+  ],
+  segments: [
+    { from: 0, npc: 0 }, // how to pray
+    { from: 15, npc: 0 }, // a fortune
+    { from: 30, npc: 1 }, // a wish
+    { from: 45, npc: 2 }, // the shrine cat
+  ],
+};
+
 export const PARK_CAST: SceneCast = {
   npcs: [
     { hair: 'long', outfit: 'dress', colors: [SKIN.light, rgb(0x90, 0x80, 0xd0), HAIR.black] }, // ゆき

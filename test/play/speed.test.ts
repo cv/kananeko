@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { CLOCK_POSITION, KANA_LAYOUT, KANA_MESSAGES, SPEED_SECONDS } from '@game/kana';
-import { SPEED_ROUND } from '@game/scene';
+import { SCENES, SPEED_ROUND } from '@game/scene';
 import { KanaMode, KanaState } from '@game/state';
 import { checkpoint, runnerAt } from '../helpers/checkpoints';
 import { type GameRunner } from '../helpers/game-runner';
@@ -21,7 +21,7 @@ const clock = (runner: GameRunner): string =>
 
 describe('Given every scene is cleared', () => {
   it('asks one more question from each scene against the clock', () => {
-    expect(SPEED_ROUND).toHaveLength(5);
+    expect(SPEED_ROUND).toHaveLength(SCENES.length);
     const runner = atSpeedRound();
     expect(runner.kanaMode).toBe(KanaMode.SPEED);
     expect(prompt(runner)).toBe(KANA_MESSAGES.hurry);

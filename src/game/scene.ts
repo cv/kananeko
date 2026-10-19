@@ -24,6 +24,7 @@ import { packAnimation } from './anim';
 import {
   CONBINI_ANIMATION,
   PARK_ANIMATION,
+  SHRINE_ANIMATION,
   RESTAURANT_ANIMATION,
   STATION_ANIMATION,
   STREET_ANIMATION,
@@ -32,6 +33,7 @@ import {
 import {
   CONBINI_CAST,
   PARK_CAST,
+  SHRINE_CAST,
   RESTAURANT_CAST,
   STATION_CAST,
   STREET_CAST,
@@ -44,10 +46,12 @@ import { STREET_DIALOGUE } from './scenes/street';
 import { RESTAURANT_DIALOGUE } from './scenes/restaurant';
 import { CONBINI_DIALOGUE } from './scenes/conbini';
 import { PARK_DIALOGUE } from './scenes/park';
+import { SHRINE_DIALOGUE } from './scenes/shrine';
 import { type Backdrop, buildSceneArt } from './backdrop';
 import {
   CONBINI_COLORS,
   PARK_COLORS,
+  SHRINE_COLORS,
   RESTAURANT_COLORS,
   STATION_COLORS,
   STREET_COLORS,
@@ -55,6 +59,7 @@ import {
 import {
   CONBINI_BACKDROP,
   PARK_BACKDROP,
+  SHRINE_BACKDROP,
   RESTAURANT_BACKDROP,
   STATION_BACKDROP,
   STREET_BACKDROP,
@@ -81,7 +86,7 @@ export interface Scene {
   readonly backdrop: Backdrop;
 }
 
-export type SceneList = Quint<Scene>;
+export type SceneList = readonly [Scene, Scene, Scene, Scene, Scene, Scene];
 
 export function defineScenes<const T extends SceneList>(scenes: T): T {
   return scenes;
@@ -124,6 +129,22 @@ export const SCENES = defineScenes([
       q(['あ', 'ち', 'ら'], 1, 'た', 'つ', 'て'),
       q(['ど', 'こ'], 0, 'だ', 'で', 'づ'),
       q(['あ', 'り', 'が', 'と', 'う'], 3, 'た', 'つ', 'て'),
+    ],
+  },
+  {
+    name: 'じんじゃ',
+    icon: SCENE_ICON_TILES.TORII,
+    animation: SHRINE_ANIMATION,
+    cast: SHRINE_CAST,
+    backdrop: SHRINE_BACKDROP,
+    colors: SHRINE_COLORS,
+    dialogue: SHRINE_DIALOGUE,
+    kanaQuestions: [
+      q(['お', 'み', 'く', 'じ'], 2, 'へ', 'し', 'つ'),
+      q(['ね', 'が', 'い'], 0, 'れ', 'わ', 'ぬ'),
+      q(['だ', 'い', 'き', 'ち'], 3, 'さ', 'ら', 'う'),
+      q(['お', 'ま', 'い', 'り'], 1, 'も', 'ほ', 'は'),
+      q(['ご', 'え', 'ん'], 1, 'ん', 'そ', 'る'),
     ],
   },
   {

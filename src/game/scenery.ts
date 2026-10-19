@@ -413,6 +413,77 @@ const SHOP_FLOOR = tile([
   '--------',
 ]);
 
+// ---------------------------------------------------------------------------
+// Shrine
+// ---------------------------------------------------------------------------
+
+/** A torii gate: the curved top beam and the tie beam, on two pillars */
+const TORII = prop(4, 3, (c) => {
+  for (const x of [6, 22]) c.box(x, 4, 4, 20, '+');
+  c.box(3, 8, 26, 3, '+');
+  c.box(14, 4, 4, 5, '-'); // the name plaque
+  c.box(0, 1, 32, 4, '+'); // the top beam, its ends turned up
+  c.rect(0, 0, 3, 1, '#');
+  c.rect(29, 0, 3, 1, '#');
+});
+
+/** The shrine hall: a big sloping roof over wooden walls and an open front */
+const SHRINE = prop(5, 3, (c) => {
+  c.box(5, 11, 30, 13, '-');
+  c.box(15, 14, 10, 10, '+');
+  c.rect(19, 11, 2, 7, '#'); // the bell rope
+  c.shape((x, y) => y >= 1 && y <= 11 && Math.abs(x - 19.5) <= 9 + y, '+');
+  c.rect(0, 10, 40, 1, '#');
+});
+
+/** A stone lantern's light box (it flickers, see animations.ts) */
+const LANTERN_LIGHT = tile([
+  '...##...',
+  '.######.',
+  '########',
+  '..#--#..',
+  '..#-+#..',
+  '..#--#..',
+  '.######.',
+  '..#--#..',
+]);
+
+/** A stone lantern's post and base */
+const LANTERN_BASE = tile([
+  '..#--#..',
+  '..#--#..',
+  '..#--#..',
+  '..#--#..',
+  '.#----#.',
+  '.######.',
+  '#------#',
+  '########',
+]);
+
+/** Raked gravel */
+const GRAVEL = tile([
+  '--------',
+  '-+------',
+  '-----+--',
+  '--------',
+  '---+----',
+  '-------+',
+  '-+------',
+  '--------',
+]);
+
+/** Stepping stones up to the shrine */
+const STEPPING_STONES = tile([
+  '-++++++-',
+  '+------+',
+  '+------+',
+  '-++++++-',
+  '--------',
+  '-++++++-',
+  '+------+',
+  '-++++++-',
+]);
+
 /** Every map character but ' ' (blank paper) */
 export const SCENERY: Readonly<Record<string, Scenery>> = {
   C: CLOUD,
@@ -441,4 +512,10 @@ export const SCENERY: Readonly<Record<string, Scenery>> = {
   S: SIGN,
   E: SHELF,
   k: SHOP_FLOOR,
+  R: TORII,
+  J: SHRINE,
+  i: LANTERN_LIGHT,
+  I: LANTERN_BASE,
+  v: GRAVEL,
+  s: STEPPING_STONES,
 };

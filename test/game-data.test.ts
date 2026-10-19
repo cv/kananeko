@@ -238,7 +238,7 @@ describe('buildPaletteSet', () => {
   });
 
   it('puts front cells (like the restaurant counter) over sprites', () => {
-    const restaurant = SCENES[2].colors;
+    const restaurant = SCENES.find((s) => s.name === 'レストラン')?.colors ?? SCENES[0].colors;
     expect(attributeOfCell(restaurant, 'n')).toBe(paletteOf(restaurant, 'wood') | 0x80);
     expect(attributeOfCell(restaurant, 'F')).toBe(paletteOf(restaurant, 'wood'));
   });
@@ -266,7 +266,7 @@ describe('encodeRuns', () => {
 });
 
 describe('packAnimation', () => {
-  const scene = SCENES[4];
+  const scene = SCENES[5]; // the park
   const art = buildSceneArt(scene.backdrop);
   const anim = scene.animation;
 

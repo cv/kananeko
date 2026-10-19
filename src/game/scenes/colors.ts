@@ -69,6 +69,29 @@ export const CONBINI_COLORS: ColorScheme = {
   cells: { S: 'sign', s: 'sign', E: 'goods', k: 'floor' },
 };
 
+export const SHRINE_COLORS: ColorScheme = {
+  paper: HUES.sky[0],
+  ramps: {
+    torii: inked('tomato'),
+    hall: inked('wood'),
+    stone: inked('stone'),
+    leaves: inked('matcha'),
+    sand: inked('honey'), // the gravel, and the lanterns' light
+    cloud: SKY,
+  },
+  cells: {
+    R: 'torii',
+    J: 'hall',
+    I: 'stone',
+    s: 'stone',
+    Y: 'leaves',
+    g: 'leaves',
+    v: 'sand',
+    i: 'sand',
+    C: 'cloud',
+  },
+};
+
 export const PARK_COLORS: ColorScheme = {
   paper: rgb(0xd4, 0xcc, 0xec), // evening
   ramps: {

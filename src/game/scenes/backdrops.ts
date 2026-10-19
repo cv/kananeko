@@ -62,6 +62,17 @@ export const CONBINI_BACKDROP: Backdrop = [
 ];
 
 /** An evening park: moon, stars, trees along a fence */
+export const SHRINE_BACKDROP: Backdrop = [
+  ' CCC          CCC   ',
+  ' RRRR   JJJJJ   YY  ',
+  ' RRRR i JJJJJ i YY  ',
+  ' RRRR I JJJJJ I YY  ',
+  'gggggggggggggggggggg',
+  'vvvvvvvvvsssvvvvvvvv',
+  'vvvvvvvvvsssvvvvvvvv',
+  'vvvvvvvvvsssvvvvvvvv',
+];
+
 export const PARK_BACKDROP: Backdrop = [
   ' .    OO CCCC   .   ',
   '   .  OO CCCC    .  ',

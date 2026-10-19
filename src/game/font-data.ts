@@ -68,4 +68,5 @@ export const SCENE_ICON_TILES = {
   BOWL: ['\uE024', '\uE025'],
   SHOP: ['\uE026', '\uE027'],
   TREE: ['\uE028', '\uE029'],
+  TORII: ['\uE02A', '\uE02B'],
 } as const;

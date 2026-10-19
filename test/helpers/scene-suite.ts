@@ -18,10 +18,14 @@ const FIRST_TRY_POINTS = 100;
 const SCENE_ADVANCE_FRAMES = 10;
 const TIMEOUT = 60_000;
 
-/** The always-good path is implied; list only the detours worth exercising. */
-export function describeScene(sceneIdx: number, paths: readonly DialoguePath[]): void {
+/**
+ * The always-good path is implied; list only the detours worth exercising. The
+ * scene is named (its place in SCENES can change as scenes are added).
+ */
+export function describeScene(sceneName: string, paths: readonly DialoguePath[]): void {
+  const sceneIdx = SCENES.findIndex((s) => s.name === sceneName);
   const scene = SCENES[sceneIdx];
-  if (scene === undefined) throw new Error(`No scene ${String(sceneIdx)}`);
+  if (scene === undefined) throw new Error(`No scene named ${sceneName}`);
   const isLast = sceneIdx === SCENES.length - 1;
   const doneFlags = (1 << (sceneIdx + 1)) - 1;
 

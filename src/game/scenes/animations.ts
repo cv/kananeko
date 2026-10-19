@@ -103,6 +103,34 @@ export const CONBINI_ANIMATION: TileAnimation = {
 };
 
 /** Park: stars twinkle */
+/** The stone lanterns' light flickers */
+export const SHRINE_ANIMATION: TileAnimation = {
+  cell: 'i',
+  period: 16,
+  frames: [
+    [
+      '...##...',
+      '.######.',
+      '########',
+      '..#--#..',
+      '..#+-#..',
+      '..#--#..',
+      '.######.',
+      '..#--#..',
+    ],
+    [
+      '...##...',
+      '.######.',
+      '########',
+      '..#-+#..',
+      '..#++#..',
+      '..#--#..',
+      '.######.',
+      '..#--#..',
+    ],
+  ],
+};
+
 export const PARK_ANIMATION: TileAnimation = {
   cell: '.',
   period: 16,
