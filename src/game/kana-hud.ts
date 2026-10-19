@@ -15,32 +15,8 @@
 
 import { playSfx } from './sound';
 import { loop } from '../asm/flow';
-import { type Op, type TileIndex, type U16, u8, u16, Label } from '../asm/types';
-import {
-  adc_n,
-  add_n,
-  add_r,
-  call,
-  cp_n,
-  cp_r,
-  dec_r,
-  inc_r,
-  jp_cc,
-  jp,
-  jr,
-  jr_cc,
-  label,
-  ld_a_nn,
-  ld_nn_a,
-  ld_r_n,
-  ld_r_r,
-  ld_rr_nn,
-  ret,
-  ret_cc,
-  sbc_n,
-  sub_n,
-  sub_r,
-} from '../asm/ops';
+import { type Op, type TileIndex, type U16, u16, Label } from '../asm/types';
+import { adc, add, call, cp, dec, inc, jp, jr, label, ld, ret, sbc, sub } from '../asm/sm83';
 import { MEM } from './ram';
 import { switchCases, zeroBytes } from '../asm/macros';
 import { at, hi, lo } from '../asm/util';
@@ -87,8 +63,8 @@ export const DELTA_PLUS_150 = 5;
  * value (register B or a memory address). Clobbers A and C.
  */
 function redrawIfChanged(shownAddr: U16, current: U16 | 'b'): Op[] {
-  const load = current === 'b' ? [ld_r_r('c', 'b')] : [ld_a_nn(current), ld_r_r('c', 'a')];
-  return [...load, ld_a_nn(shownAddr), cp_r('c'), jp_cc('nz', HUD_REDRAW)];
+  const load = current === 'b' ? [ld('c', 'b')] : [ld('a', [current]), ld('c', 'a')];
+  return [...load, ld('a', [shownAddr]), cp('c'), jp('nz', HUD_REDRAW)];
 }
 
 /** Dispatch order for the delta flash; the last entry is the fallback */
@@ -133,13 +109,13 @@ export const MAX_SCORE = 50_000; // well past a perfect run; adding at most 255 
 
 /** Add to the score, capped at MAX_SCORE (clobbers A, B). */
 export function buildAddScore(delta: ScoreDelta): Op[] {
-  return [ld_r_n('a', u8(delta)), call(SCORE_ADD)];
+  return [ld('a', delta), call(SCORE_ADD)];
 }
 
 /** Generate 16-bit score subtract: SCORE -= delta */
 /** Subtract from the score, stopping at zero (clobbers A, B). */
 export function buildSubScore(delta: ScoreDelta): Op[] {
-  return [ld_r_n('a', u8(delta)), call(SCORE_SUB)];
+  return [ld('a', delta), call(SCORE_SUB)];
 }
 
 /** Decimal places converted by score_digits (the ones digit is what remains) */
@@ -157,32 +133,32 @@ function scoreDigitAddr(i: number): U16 {
 export function buildScoreDigits(): Op[] {
   return [
     label(SCORE_DIGITS),
-    ld_a_nn(MEM.KANA_SCORE.hi),
-    ld_r_r('d', 'a'),
-    ld_a_nn(MEM.KANA_SCORE.lo),
-    ld_r_r('e', 'a'),
+    ld('a', [MEM.KANA_SCORE.hi]),
+    ld('d', 'a'),
+    ld('a', [MEM.KANA_SCORE.lo]),
+    ld('e', 'a'),
     ...DIGIT_PLACES.flatMap((place, i) => [
-      ld_r_n('c', u8(0)),
+      ld('c', 0),
       // C = how many times DE - place stays non-negative
       ...loop((again, done) => [
-        ld_r_r('a', 'e'),
-        sub_n(lo(place)),
-        ld_r_r('l', 'a'),
-        ld_r_r('a', 'd'),
-        sbc_n(hi(place)),
-        jr_cc('c', done),
-        ld_r_r('d', 'a'),
-        ld_r_r('e', 'l'),
-        inc_r('c'),
+        ld('a', 'e'),
+        sub(lo(place)),
+        ld('l', 'a'),
+        ld('a', 'd'),
+        sbc(hi(place)),
+        jr('c', done),
+        ld('d', 'a'),
+        ld('e', 'l'),
+        inc('c'),
         jr(again),
       ]),
-      ld_r_r('a', 'c'),
-      add_n(u8(d0)),
-      ld_nn_a(scoreDigitAddr(i)),
+      ld('a', 'c'),
+      add(d0),
+      ld([scoreDigitAddr(i)], 'a'),
     ]),
-    ld_r_r('a', 'e'),
-    add_n(u8(d0)),
-    ld_nn_a(scoreDigitAddr(DIGIT_PLACES.length)),
+    ld('a', 'e'),
+    add(d0),
+    ld([scoreDigitAddr(DIGIT_PLACES.length)], 'a'),
     ret(),
   ];
 }
@@ -190,9 +166,9 @@ export function buildScoreDigits(): Op[] {
 /** Draw the digit tiles computed by score_digits at (row, col); safe with the LCD on. */
 export function buildDrawScoreDigits(row: number, col: number): Op[] {
   return [
-    ld_rr_nn('hl', u16(tilemapAddr(row, col))),
+    ld('hl', u16(tilemapAddr(row, col))),
     ...Array.from({ length: SCORE_DIGIT_COUNT }, (_, i) => [
-      ld_a_nn(scoreDigitAddr(i)),
+      ld('a', [scoreDigitAddr(i)]),
       ...vramPut(),
     ]).flat(),
   ];
@@ -202,36 +178,36 @@ export function buildDrawScoreDigits(row: number, col: number): Op[] {
 export function buildScoreRoutines(): Op[] {
   return [
     label(SCORE_ADD),
-    ld_r_r('b', 'a'),
-    ld_a_nn(MEM.KANA_SCORE.lo),
-    add_r('b'),
-    ld_nn_a(MEM.KANA_SCORE.lo),
-    ld_a_nn(MEM.KANA_SCORE.hi),
-    adc_n(u8(0)),
-    ld_nn_a(MEM.KANA_SCORE.hi),
+    ld('b', 'a'),
+    ld('a', [MEM.KANA_SCORE.lo]),
+    add('b'),
+    ld([MEM.KANA_SCORE.lo], 'a'),
+    ld('a', [MEM.KANA_SCORE.hi]),
+    adc(0),
+    ld([MEM.KANA_SCORE.hi], 'a'),
     // Cap: HI > hi(MAX) or (HI == hi(MAX) and LO > lo(MAX))
-    cp_n(hi(MAX_SCORE)),
-    ret_cc('c'),
-    jr_cc('nz', SCORE_CAP),
-    ld_a_nn(MEM.KANA_SCORE.lo),
-    cp_n(u8(lo(MAX_SCORE) + 1)),
-    ret_cc('c'),
+    cp(hi(MAX_SCORE)),
+    ret('c'),
+    jr('nz', SCORE_CAP),
+    ld('a', [MEM.KANA_SCORE.lo]),
+    cp(lo(MAX_SCORE) + 1),
+    ret('c'),
     label(SCORE_CAP),
-    ld_r_n('a', lo(MAX_SCORE)),
-    ld_nn_a(MEM.KANA_SCORE.lo),
-    ld_r_n('a', hi(MAX_SCORE)),
-    ld_nn_a(MEM.KANA_SCORE.hi),
+    ld('a', lo(MAX_SCORE)),
+    ld([MEM.KANA_SCORE.lo], 'a'),
+    ld('a', hi(MAX_SCORE)),
+    ld([MEM.KANA_SCORE.hi], 'a'),
     ret(),
 
     label(SCORE_SUB),
-    ld_r_r('b', 'a'),
-    ld_a_nn(MEM.KANA_SCORE.lo),
-    sub_r('b'),
-    ld_nn_a(MEM.KANA_SCORE.lo),
-    ld_a_nn(MEM.KANA_SCORE.hi),
-    sbc_n(u8(0)),
-    ld_nn_a(MEM.KANA_SCORE.hi),
-    ret_cc('nc'),
+    ld('b', 'a'),
+    ld('a', [MEM.KANA_SCORE.lo]),
+    sub('b'),
+    ld([MEM.KANA_SCORE.lo], 'a'),
+    ld('a', [MEM.KANA_SCORE.hi]),
+    sbc(0),
+    ld([MEM.KANA_SCORE.hi], 'a'),
+    ret('nc'),
     ...zeroBytes(MEM.KANA_SCORE.lo, MEM.KANA_SCORE.hi), // went below zero
     ret(),
   ];
@@ -245,10 +221,10 @@ export function buildClearDelta(): Op[] {
 
 export function buildSetDelta(deltaType: DeltaType): Op[] {
   return [
-    ld_r_n('a', u8(deltaType)),
-    ld_nn_a(MEM.DELTA_TYPE),
-    ld_r_n('a', u8(DELTA_FRAMES)),
-    ld_nn_a(MEM.DELTA_TIMER),
+    ld('a', deltaType),
+    ld([MEM.DELTA_TYPE], 'a'),
+    ld('a', DELTA_FRAMES),
+    ld([MEM.DELTA_TIMER], 'a'),
   ];
 }
 
@@ -261,13 +237,13 @@ function buildHeart(n: number): Op[] {
   const empty = new Label(`hud_heart${String(n)}_empty`);
   const draw = new Label(`hud_heart${String(n)}_draw`);
   return [
-    ld_a_nn(MEM.KANA_LIVES),
-    cp_n(u8(n)),
-    jr_cc('c', empty),
-    ld_r_n('a', u8(HEART_FULL)),
+    ld('a', [MEM.KANA_LIVES]),
+    cp(n),
+    jr('c', empty),
+    ld('a', HEART_FULL),
     jr(draw),
     label(empty),
-    ld_r_n('a', u8(HEART_EMPTY)),
+    ld('a', HEART_EMPTY),
     label(draw),
     ...buildDrawTileAt(0, HEART_COL + n - 1, 'from_a'),
   ];
@@ -291,9 +267,9 @@ export function buildDrawTileAt(
     throw new TypeError('buildDrawTileAt(row, col, tile) requires a tile expression');
   }
 
-  const ops: Op[] = [ld_rr_nn('hl', u16(position))];
+  const ops: Op[] = [ld('hl', u16(position))];
   if (tileExpr !== 'from_a') {
-    ops.push(ld_r_n('a', u8(tileExpr)));
+    ops.push(ld('a', tileExpr));
   }
   ops.push(...vramPut());
   return ops;
@@ -317,30 +293,30 @@ export function buildDrawHudOps(): Op[] {
     // === hud_update: called once per frame from the game loops ===
     // Ticks the delta flash, then redraws only if what the HUD shows changed.
     label(HUD_UPDATE),
-    ld_a_nn(MEM.DELTA_TIMER),
-    cp_n(u8(0)),
-    jr_cc('z', HUD_DELTA_TICKED),
-    dec_r('a'),
-    ld_nn_a(MEM.DELTA_TIMER),
+    ld('a', [MEM.DELTA_TIMER]),
+    cp(0),
+    jr('z', HUD_DELTA_TICKED),
+    dec('a'),
+    ld([MEM.DELTA_TIMER], 'a'),
     label(HUD_DELTA_TICKED),
 
     // B = visible delta type (0 once the flash has expired)
-    ld_r_n('b', u8(0)),
-    ld_a_nn(MEM.DELTA_TIMER),
-    cp_n(u8(0)),
-    jr_cc('z', HUD_DELTA_KNOWN),
-    ld_a_nn(MEM.DELTA_TYPE),
-    ld_r_r('b', 'a'),
+    ld('b', 0),
+    ld('a', [MEM.DELTA_TIMER]),
+    cp(0),
+    jr('z', HUD_DELTA_KNOWN),
+    ld('a', [MEM.DELTA_TYPE]),
+    ld('b', 'a'),
     label(HUD_DELTA_KNOWN),
 
     // A heart won or lost: its sound, then the redraw (checked before the delta,
     // which usually changes on the same frame and would redraw the hearts silently)
-    ld_a_nn(MEM.KANA_LIVES),
-    ld_r_r('c', 'a'),
-    ld_a_nn(MEM.HUD_SHOWN_LIVES),
-    cp_r('c'),
-    jr_cc('z', HUD_LIVES_SAME),
-    jr_cc('c', HUD_HEART_UP),
+    ld('a', [MEM.KANA_LIVES]),
+    ld('c', 'a'),
+    ld('a', [MEM.HUD_SHOWN_LIVES]),
+    cp('c'),
+    jr('z', HUD_LIVES_SAME),
+    jr('c', HUD_HEART_UP),
     ...playSfx('heartDown'),
     jp(HUD_REDRAW),
     label(HUD_HEART_UP),
@@ -356,21 +332,21 @@ export function buildDrawHudOps(): Op[] {
     // === kana_draw_hud: full HUD redraw; safe with the LCD on or off ===
     label(HUD_REDRAW),
     label(KANA_DRAW_HUD),
-    ld_r_n('b', u8(0)),
-    ld_a_nn(MEM.DELTA_TIMER),
-    cp_n(u8(0)),
-    jr_cc('z', HUD_SHADOW_DELTA),
-    ld_a_nn(MEM.DELTA_TYPE),
-    ld_r_r('b', 'a'),
+    ld('b', 0),
+    ld('a', [MEM.DELTA_TIMER]),
+    cp(0),
+    jr('z', HUD_SHADOW_DELTA),
+    ld('a', [MEM.DELTA_TYPE]),
+    ld('b', 'a'),
     label(HUD_SHADOW_DELTA),
-    ld_r_r('a', 'b'),
-    ld_nn_a(MEM.HUD_SHOWN_DELTA),
-    ld_a_nn(MEM.KANA_LIVES),
-    ld_nn_a(MEM.HUD_SHOWN_LIVES),
-    ld_a_nn(MEM.KANA_SCORE.lo),
-    ld_nn_a(MEM.HUD_SHOWN_SCORE.lo),
-    ld_a_nn(MEM.KANA_SCORE.hi),
-    ld_nn_a(MEM.HUD_SHOWN_SCORE.hi),
+    ld('a', 'b'),
+    ld([MEM.HUD_SHOWN_DELTA], 'a'),
+    ld('a', [MEM.KANA_LIVES]),
+    ld([MEM.HUD_SHOWN_LIVES], 'a'),
+    ld('a', [MEM.KANA_SCORE.lo]),
+    ld([MEM.HUD_SHOWN_SCORE.lo], 'a'),
+    ld('a', [MEM.KANA_SCORE.hi]),
+    ld([MEM.HUD_SHOWN_SCORE.hi], 'a'),
 
     // --- Hearts at cols 1-3 ---
     ...Array.from({ length: MAX_LIVES }, (_, i) => buildHeart(i + 1)).flat(),
@@ -380,15 +356,15 @@ export function buildDrawHudOps(): Op[] {
     ...buildDrawScoreDigits(0, SCORE_COL),
 
     // --- Delta flash at cols 15-18 (timer ticks in hud_update) ---
-    ld_a_nn(MEM.DELTA_TIMER),
-    cp_n(u8(0)),
-    jp_cc('z', DELTA_CLEAR),
+    ld('a', [MEM.DELTA_TIMER]),
+    cp(0),
+    jp('z', DELTA_CLEAR),
 
     // Dispatch on delta type (the last case is the default)
-    ld_a_nn(MEM.DELTA_TYPE),
+    ld('a', [MEM.DELTA_TYPE]),
     ...switchCases(
       DELTA_TYPES.map((type) => [...buildDrawTilesAt(0, DELTA_COL, DELTA_TILE_RUNS[type]), ret()]),
-      { compare: (i) => [cp_n(u8(at(DELTA_TYPES, i)))], exit: 'none' },
+      { compare: (i) => [cp(at(DELTA_TYPES, i))], exit: 'none' },
     ),
 
     // Clear delta area (timer expired or type=0)

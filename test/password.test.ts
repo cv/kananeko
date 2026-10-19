@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { MEM } from '@game/ram';
-import { call, ld_nn_a } from '@asm/ops';
+import { call, ld } from '@asm/sm83';
 import { u16 } from '@asm/types';
 import { storeByte } from '@asm/macros';
 import { CHAR_MAP } from '@game/font';
@@ -131,7 +131,7 @@ function gameDecode(password: string): { valid: boolean; memory: Uint8Array } {
         storeByte(MEM.PASS_CHARS.at(i), PASSWORD_ALPHABET.indexOf(kana)),
       ),
       call(PASS_DECODE),
-      ld_nn_a(u16(SCRATCH)),
+      ld([u16(SCRATCH)], 'a'),
       call(PASS_APPLY),
     ],
     ROUTINES,

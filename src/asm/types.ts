@@ -13,6 +13,13 @@ export type U8 = number & { readonly [__u8]: true };
 /** 16-bit unsigned integer (0x0000–0xFFFF) */
 export type U16 = number & { readonly [__u16]: true };
 
+/**
+ * An immediate value: any number except an address (a U16, a RAM variable), so that
+ * `ld('a', MEM.X)` (load the address) is a type error where `ld('a', [MEM.X])`
+ * (load what's there) was meant. Its range is checked when the instruction is built.
+ */
+export type Imm = number & { readonly [__u16]?: never };
+
 /** I/O register offset from $FF00 (0x00–0xFF), used with LDH instructions */
 export type IoRegOffset = number & { readonly [__ioReg]: true };
 

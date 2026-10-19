@@ -10,7 +10,7 @@ import {
   globalChecksum,
   headerChecksum,
 } from '@asm/assembler';
-import { call, db, dw, jp, jp_cc, jr, jr_cc, label, ld_rr_nn, nop, org, pool, ret } from '@asm/ops';
+import { call, db, dw, jp, jr, label, ld, nop, org, pool, ret } from '@asm/sm83';
 import { type Op, Label, Pooled, labelFamily, u16 } from '@asm/types';
 
 // Labels placed in this module
@@ -48,7 +48,7 @@ describe('label resolution', () => {
   });
 
   it('patches rel8 offsets relative to the end of the instruction', () => {
-    const { rom } = build([label(LOOP), jr(LOOP), jr_cc('z', NEXT), label(NEXT)]);
+    const { rom } = build([label(LOOP), jr(LOOP), jr('z', NEXT), label(NEXT)]);
     expect(rom[PROGRAM_START + 1]).toBe(0xfe); // -2: back to itself
     expect(rom[PROGRAM_START + 3]).toBe(0x00); // falls through
   });
@@ -67,7 +67,7 @@ describe('jump relaxation', () => {
   });
 
   it('keeps a JP when the label is out of JR range', () => {
-    const { rom } = build([jp_cc('z', FAR), db(new Uint8Array(200)), label(FAR)]);
+    const { rom } = build([jp('z', FAR), db(new Uint8Array(200)), label(FAR)]);
     const far = PROGRAM_START + 3 + 200;
     expect(Array.from(rom.slice(PROGRAM_START, PROGRAM_START + 3))).toEqual([
       0xca,
@@ -138,8 +138,8 @@ describe('pooled data', () => {
 
   it('stores identical data once, at pool(), in order of first reference', () => {
     const { rom, symbols } = build([
-      ld_rr_nn('hl', list(7, 8)),
-      ld_rr_nn('de', list(9)),
+      ld('hl', list(7, 8)),
+      ld('de', list(9)),
       dw(list(7, 8)),
       pool(),
     ]);
@@ -154,7 +154,7 @@ describe('pooled data', () => {
   });
 
   it('needs exactly one pool() when anything is pooled', () => {
-    expect(() => build([ld_rr_nn('hl', list(1))])).toThrow(/no pool\(\)/);
+    expect(() => build([ld('hl', list(1))])).toThrow(/no pool\(\)/);
     expect(() => build([pool(), pool()])).toThrow(/only one pool\(\)/);
     expect(build([nop()]).symbols.size).toBe(0);
   });
@@ -174,7 +174,7 @@ describe('unreferenced labels', () => {
       label(TARGET),
       ret(),
       label(AFTER),
-      ld_rr_nn('hl', list(1)),
+      ld('hl', list(1)),
       pool(),
     ]);
     expect(unreferenced).toEqual(['start', 'after']);

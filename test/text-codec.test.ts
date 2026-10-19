@@ -3,8 +3,8 @@
 import { describe, expect, it } from 'vitest';
 import { MEM } from '@game/ram';
 import { storePointer, zeroBytes } from '@asm/macros';
-import { call, cp_n, db, jr_cc, label, ld_a_nn, ld_nn_a, ld_rr_nn, ldi_hl_a } from '@asm/ops';
-import { u8, u16, Label } from '@asm/types';
+import { call, cp, db, jr, label, ld } from '@asm/sm83';
+import { u16, Label } from '@asm/types';
 import { TEXT_END } from '@game/dialogue-data';
 import { buildTextNext } from '@game/dialogue';
 import { textToTiles } from '@game/font';
@@ -107,17 +107,17 @@ describe('text_next', () => {
 
     const mem = runProgram(
       [
-        ld_rr_nn('hl', LINE),
+        ld('hl', LINE),
         ...storePointer('hl', MEM.DLG_STR),
         ...zeroBytes(MEM.TEXT_SP),
-        ld_rr_nn('hl', u16(SCRATCH)),
+        ld('hl', u16(SCRATCH)),
         label(NEXT),
         call(TEXT_NEXT),
-        ldi_hl_a(),
-        cp_n(u8(TEXT_END)),
-        jr_cc('nz', NEXT),
-        ld_a_nn(MEM.TEXT_SP),
-        ld_nn_a(u16(SCRATCH + 0x80)),
+        ld(['hl+'], 'a'),
+        cp(TEXT_END),
+        jr('nz', NEXT),
+        ld('a', [MEM.TEXT_SP]),
+        ld([u16(SCRATCH + 0x80)], 'a'),
       ],
       [
         ...buildTextNext(codec.base),

@@ -16,32 +16,8 @@
 import { HW } from '../asm/hardware';
 import { MEM } from './ram';
 import { copyBlock, storeByte, zeroBytes } from '../asm/macros';
-import {
-  add_n,
-  add_r,
-  call,
-  cp_n,
-  dec_r,
-  inc_r,
-  inc_rr,
-  jp,
-  jr,
-  jr_cc,
-  label,
-  ld_a_nn,
-  ld_nn_a,
-  ld_r_n,
-  ld_r_r,
-  ld_rr_nn,
-  ldh_n_a,
-  db,
-  ldi_hl_a,
-  or_r,
-  ret,
-  ret_cc,
-  and_n,
-} from '../asm/ops';
-import { type Op, u8, u16, Label } from '../asm/types';
+import { add, call, cp, dec, inc, jp, jr, label, ld, ldh, db, or, ret, and } from '../asm/sm83';
+import { type Op, u16, Label } from '../asm/types';
 import { hi, lo } from '../asm/util';
 import { sliceArt } from './art';
 import { CAT_FACES, type CatFace, catArt } from './cat-art';
@@ -108,25 +84,25 @@ export function faceTile(face: CatFace): number {
 
 /** Call cat_place for a spot */
 export function placeCat(spot: { readonly x: number; readonly y: number }): Op[] {
-  return [ld_r_n('b', u8(spot.x)), ld_r_n('c', u8(spot.y)), call(CAT_PLACE)];
+  return [ld('b', spot.x), ld('c', spot.y), call(CAT_PLACE)];
 }
 
 /** Call CAT_REACT or CAT_REST with a face */
 export function catFace(routine: typeof CAT_REACT, face: CatFace): Op[] {
-  return [ld_r_n('a', u8(FACE[face])), call(routine)];
+  return [ld('a', FACE[face]), call(routine)];
 }
 
 /** At boot: copy the cat's tiles to sprite memory and set its GBC palette */
 export function buildCatInit(): Op[] {
   return [
     ...copyBlock(u16(MEM.OBJ_TILES + CAT_SPRITE_BASE * 16), CAT_TILES, buildCatTiles().length),
-    ld_r_n('a', u8(0x80 | (CAT_OBJ_PALETTE * 8))), // auto-increment from palette 7
-    ldh_n_a(HW.OCPS),
+    ld('a', 0x80 | (CAT_OBJ_PALETTE * 8)), // auto-increment from palette 7
+    ldh([HW.OCPS], 'a'),
     ...CAT_PALETTE.flatMap((color) => [
-      ld_r_n('a', lo(color)),
-      ldh_n_a(HW.OCPD),
-      ld_r_n('a', hi(color)),
-      ldh_n_a(HW.OCPD),
+      ld('a', lo(color)),
+      ldh([HW.OCPD], 'a'),
+      ld('a', hi(color)),
+      ldh([HW.OCPD], 'a'),
     ]),
   ];
 }
@@ -140,103 +116,103 @@ export function buildCatRoutines(): Op[] {
   return [
     // cat_place: B = left, C = top
     label(CAT_PLACE),
-    ld_r_r('a', 'b'),
-    add_n(u8(OAM_X_OFFSET)),
-    ld_nn_a(MEM.CAT_X),
-    ld_r_r('a', 'c'),
-    add_n(u8(OAM_Y_OFFSET)),
-    ld_r_r('c', 'a'), // C = OAM y of the current row
-    ld_rr_nn('hl', oamField(SPRITE_SLOT.cat, 'y')),
-    ld_r_n('d', u8(CAT_SPRITE_BASE)), // D = tile
-    ld_r_n('e', u8(ROWS)),
+    ld('a', 'b'),
+    add(OAM_X_OFFSET),
+    ld([MEM.CAT_X], 'a'),
+    ld('a', 'c'),
+    add(OAM_Y_OFFSET),
+    ld('c', 'a'), // C = OAM y of the current row
+    ld('hl', oamField(SPRITE_SLOT.cat, 'y')),
+    ld('d', CAT_SPRITE_BASE), // D = tile
+    ld('e', ROWS),
     label(CAT_PLACE_ROW),
-    ld_a_nn(MEM.CAT_X),
-    ld_r_r('b', 'a'), // B = OAM x of the current column
+    ld('a', [MEM.CAT_X]),
+    ld('b', 'a'), // B = OAM x of the current column
     ...storeByte(MEM.CAT_COL, COLS),
     label(CAT_PLACE_COL),
-    ld_r_r('a', 'c'),
-    ldi_hl_a(),
-    ld_r_r('a', 'b'),
-    ldi_hl_a(),
-    ld_r_r('a', 'd'),
-    ldi_hl_a(),
-    inc_r('d'),
-    ld_r_n('a', u8(CAT_OBJ_PALETTE)),
-    ldi_hl_a(),
-    ld_r_r('a', 'b'),
-    add_n(u8(8)),
-    ld_r_r('b', 'a'),
-    ld_a_nn(MEM.CAT_COL),
-    dec_r('a'),
-    ld_nn_a(MEM.CAT_COL),
-    jr_cc('nz', CAT_PLACE_COL),
-    ld_r_r('a', 'c'),
-    add_n(u8(8)),
-    ld_r_r('c', 'a'),
-    dec_r('e'),
-    jr_cc('nz', CAT_PLACE_ROW),
+    ld('a', 'c'),
+    ld(['hl+'], 'a'),
+    ld('a', 'b'),
+    ld(['hl+'], 'a'),
+    ld('a', 'd'),
+    ld(['hl+'], 'a'),
+    inc('d'),
+    ld('a', CAT_OBJ_PALETTE),
+    ld(['hl+'], 'a'),
+    ld('a', 'b'),
+    add(8),
+    ld('b', 'a'),
+    ld('a', [MEM.CAT_COL]),
+    dec('a'),
+    ld([MEM.CAT_COL], 'a'),
+    jr('nz', CAT_PLACE_COL),
+    ld('a', 'c'),
+    add(8),
+    ld('c', 'a'),
+    dec('e'),
+    jr('nz', CAT_PLACE_ROW),
     jr(CAT_SHOW_FACE),
 
     // cat_rest: A = resting face
     label(CAT_REST),
-    ld_nn_a(MEM.CAT_REST),
+    ld([MEM.CAT_REST], 'a'),
     ...zeroBytes(MEM.CAT_TIMER), // clobbers A
-    ld_a_nn(MEM.CAT_REST),
+    ld('a', [MEM.CAT_REST]),
     jr(CAT_SET_FACE),
 
     // cat_react: A = face for REACT_FRAMES
     label(CAT_REACT),
-    ld_r_r('b', 'a'),
+    ld('b', 'a'),
     ...storeByte(MEM.CAT_TIMER, REACT_FRAMES),
-    ld_r_r('a', 'b'),
+    ld('a', 'b'),
     label(CAT_SET_FACE),
-    ld_nn_a(MEM.CAT_FACE),
+    ld([MEM.CAT_FACE], 'a'),
 
     // cat_show_face: point the middle row's sprites at CAT_FACE's tiles
     label(CAT_SHOW_FACE),
-    ld_a_nn(MEM.CAT_FACE),
-    add_r('a'),
-    add_r('a'),
-    add_n(u8(faceTile('neutral'))),
-    ld_rr_nn('hl', oamField(FACE_SLOT, 'tile')),
-    ld_r_n('b', u8(COLS)),
+    ld('a', [MEM.CAT_FACE]),
+    add('a'),
+    add('a'),
+    add(faceTile('neutral')),
+    ld('hl', oamField(FACE_SLOT, 'tile')),
+    ld('b', COLS),
     label(CAT_FACE_TILE),
-    ld_r_r('hl_ptr', 'a'),
-    inc_r('a'),
-    inc_rr('hl'),
-    inc_rr('hl'),
-    inc_rr('hl'),
-    inc_rr('hl'),
-    dec_r('b'),
-    jr_cc('nz', CAT_FACE_TILE),
+    ld(['hl'], 'a'),
+    inc('a'),
+    inc('hl'),
+    inc('hl'),
+    inc('hl'),
+    inc('hl'),
+    dec('b'),
+    jr('nz', CAT_FACE_TILE),
     ret(),
 
     // cat_tick: end a reaction when its time is up; blink while resting neutral
     label(CAT_TICK),
-    ld_a_nn(MEM.CAT_TIMER),
-    or_r('a'),
-    jr_cc('z', CAT_TICK_REST),
-    dec_r('a'),
-    ld_nn_a(MEM.CAT_TIMER),
-    ret_cc('nz'),
-    ld_a_nn(MEM.CAT_REST),
+    ld('a', [MEM.CAT_TIMER]),
+    or('a'),
+    jr('z', CAT_TICK_REST),
+    dec('a'),
+    ld([MEM.CAT_TIMER], 'a'),
+    ret('nz'),
+    ld('a', [MEM.CAT_REST]),
     jr(CAT_SET_FACE),
     label(CAT_TICK_REST),
-    ld_a_nn(MEM.CAT_REST),
-    cp_n(u8(FACE.neutral)),
-    ret_cc('nz'), // only a neutral cat blinks
-    ld_a_nn(MEM.CAT_BLINK),
-    inc_r('a'),
-    ld_nn_a(MEM.CAT_BLINK),
-    and_n(u8(BLINK_PERIOD - 1)),
-    cp_n(u8(BLINK_PERIOD - BLINK_FRAMES)),
-    jr_cc('z', CAT_TICK_BLINK),
-    or_r('a'),
-    ret_cc('nz'),
-    ld_r_n('a', u8(FACE.neutral)),
+    ld('a', [MEM.CAT_REST]),
+    cp(FACE.neutral),
+    ret('nz'), // only a neutral cat blinks
+    ld('a', [MEM.CAT_BLINK]),
+    inc('a'),
+    ld([MEM.CAT_BLINK], 'a'),
+    and(BLINK_PERIOD - 1),
+    cp(BLINK_PERIOD - BLINK_FRAMES),
+    jr('z', CAT_TICK_BLINK),
+    or('a'),
+    ret('nz'),
+    ld('a', FACE.neutral),
     jr(CAT_SET_FACE),
     label(CAT_TICK_BLINK),
-    ld_r_n('a', u8(FACE.blink)),
+    ld('a', FACE.blink),
     jp(CAT_SET_FACE),
   ];
 }

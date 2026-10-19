@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { MEM } from '@game/ram';
 import { storeByte } from '@asm/macros';
-import { call } from '@asm/ops';
+import { call } from '@asm/sm83';
 import {} from '@asm/types';
 import { textToTiles } from '@game/font';
 import {

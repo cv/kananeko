@@ -18,42 +18,29 @@ import {
   zeroPages,
 } from '../asm/macros';
 import {
-  add_hl_rr,
-  and_n,
-  and_r,
+  add,
+  and,
   call,
-  cp_n,
-  cp_r,
-  dec_r,
+  cp,
+  dec,
   db,
   di,
   ei,
-  inc_r,
-  inc_rr,
+  inc,
   jp,
-  jp_cc,
   jr,
-  jr_cc,
   label,
-  ld_a_nn,
-  ld_nn_a,
-  ld_r_n,
-  ld_r_r,
-  ld_rr_nn,
-  ldh_n_a,
-  ldi_a_hl,
-  ldi_hl_a,
-  or_n,
-  or_r,
+  ld,
+  ldh,
+  or,
   pop,
   push,
   ret,
-  ret_cc,
   sla,
   pool,
-  xor_r,
-} from '../asm/ops';
-import { type Op, type U16, u8, u16, Label, labelFamily } from '../asm/types';
+  xor,
+} from '../asm/sm83';
+import { type Op, type U16, u16, Label, labelFamily } from '../asm/types';
 import { SCENE_TILE_BASE } from './backdrop';
 import { buildSpriteData, buildSpriteInit, buildSpriteRoutines, runDma } from './sprites';
 import {
@@ -326,9 +313,9 @@ function engineLoop(loop: Label, update: Label, stateAddr: U16): Op[] {
     call(CAT_TICK),
     call(JOY_READ),
     call(update),
-    ld_a_nn(stateAddr),
-    cp_n(u8(0)),
-    jr_cc('nz', loop),
+    ld('a', [stateAddr]),
+    cp(0),
+    jr('nz', loop),
   ];
 }
 
@@ -345,77 +332,77 @@ function buildRoundRoutines(): Op[] {
   return [
     label(TABLE_FIND),
     push('hl'), // table start, for the offset
-    ldi_a_hl(),
-    ld_r_r('b', 'a'), // entries left
-    ld_r_n('c', u8(1)),
+    ld('a', ['hl+']),
+    ld('b', 'a'), // entries left
+    ld('c', 1),
     label(TABLE_SCAN),
-    ld_r_r('a', 'b'),
-    or_r('a'),
-    jr_cc('z', TABLE_ABSENT),
-    ldi_a_hl(),
-    cp_r('d'),
-    jr_cc('z', TABLE_FOUND),
-    inc_rr('hl'), // skip the offset
-    inc_rr('hl'),
+    ld('a', 'b'),
+    or('a'),
+    jr('z', TABLE_ABSENT),
+    ld('a', ['hl+']),
+    cp('d'),
+    jr('z', TABLE_FOUND),
+    inc('hl'), // skip the offset
+    inc('hl'),
     sla('c'),
-    dec_r('b'),
+    dec('b'),
     jr(TABLE_SCAN),
     label(TABLE_ABSENT),
     pop('hl'),
-    xor_r('a'), // Z
+    xor('a'), // Z
     ret(),
     label(TABLE_FOUND),
-    ldi_a_hl(),
-    ld_r_r('e', 'a'),
-    ld_r_r('d', 'hl_ptr'), // DE = offset
+    ld('a', ['hl+']),
+    ld('e', 'a'),
+    ld('d', ['hl']), // DE = offset
     pop('hl'),
-    add_hl_rr('de'),
-    ld_r_r('d', 'h'),
-    ld_r_r('e', 'l'),
-    ld_r_n('a', u8(1)),
-    or_r('a'), // NZ
+    add('hl', 'de'),
+    ld('d', 'h'),
+    ld('e', 'l'),
+    ld('a', 1),
+    or('a'), // NZ
     ret(),
 
     label(ROUND_CHECK),
     ...loadPointer('hl', MEM.ROUNDS),
-    ld_a_nn(MEM.DLG_NODE_ID),
-    ld_r_r('d', 'a'),
+    ld('a', [MEM.DLG_NODE_ID]),
+    ld('d', 'a'),
     call(TABLE_FIND),
-    ret_cc('z'),
-    ld_a_nn(MEM.ROUNDS_DONE),
-    and_r('c'),
-    ret_cc('nz'), // already played (the dialogue looped back)
-    ld_a_nn(MEM.ROUNDS_DONE),
-    or_r('c'),
-    ld_nn_a(MEM.ROUNDS_DONE),
+    ret('z'),
+    ld('a', [MEM.ROUNDS_DONE]),
+    and('c'),
+    ret('nz'), // already played (the dialogue looped back)
+    ld('a', [MEM.ROUNDS_DONE]),
+    or('c'),
+    ld([MEM.ROUNDS_DONE], 'a'),
     ...storeByte(MEM.KANA_MODE, KanaMode.NORMAL),
     jr(PLAY_ROUND),
 
     label(CHANCE_CHECK),
-    ld_a_nn(MEM.DLG_PICK),
-    ld_r_r('b', 'a'),
-    and_n(u8(BAD_PICK)),
-    jr_cc('z', CHANCE_NOT_BAD),
-    ld_a_nn(MEM.KANA_LIVES),
-    or_r('a'),
-    ret_cc('z'), // the conversation is over anyway
-    ld_a_nn(MEM.DLG_FROM_NODE),
-    or_n(u8(REDEEM_KEY)),
-    ld_r_r('d', 'a'),
-    ld_r_n('a', u8(KanaMode.REDEEM)),
+    ld('a', [MEM.DLG_PICK]),
+    ld('b', 'a'),
+    and(BAD_PICK),
+    jr('z', CHANCE_NOT_BAD),
+    ld('a', [MEM.KANA_LIVES]),
+    or('a'),
+    ret('z'), // the conversation is over anyway
+    ld('a', [MEM.DLG_FROM_NODE]),
+    or(REDEEM_KEY),
+    ld('d', 'a'),
+    ld('a', KanaMode.REDEEM),
     jr(CHANCE_FIND),
     label(CHANCE_NOT_BAD),
-    ld_r_r('a', 'b'),
-    or_r('a'),
-    ret_cc('nz'), // only the first reply can be a fill-in
-    ld_a_nn(MEM.DLG_FROM_NODE),
-    ld_r_r('d', 'a'),
-    ld_r_n('a', u8(KanaMode.SAY_IT)),
+    ld('a', 'b'),
+    or('a'),
+    ret('nz'), // only the first reply can be a fill-in
+    ld('a', [MEM.DLG_FROM_NODE]),
+    ld('d', 'a'),
+    ld('a', KanaMode.SAY_IT),
     label(CHANCE_FIND),
-    ld_nn_a(MEM.KANA_MODE),
+    ld([MEM.KANA_MODE], 'a'),
     ...loadPointer('hl', MEM.CHANCES),
     call(TABLE_FIND),
-    ret_cc('z'),
+    ret('z'),
 
     label(PLAY_ROUND),
     push('de'),
@@ -467,11 +454,11 @@ function drawClearedStamps(row: number): Op[] {
   return SCENES.flatMap((scene, i) => {
     const skip = new Label();
     return [
-      ld_a_nn(MEM.SCENE_FLAGS),
-      and_n(u8(1 << i)),
-      jr_cc('z', skip),
-      ld_rr_nn('hl', u16(tilemapAddr(row, startCol + i * 3))),
-      ...requireTiles(scene.icon).flatMap((tile) => [ld_r_n('a', u8(tile)), ldi_hl_a()]),
+      ld('a', [MEM.SCENE_FLAGS]),
+      and(1 << i),
+      jr('z', skip),
+      ld('hl', u16(tilemapAddr(row, startCol + i * 3))),
+      ...requireTiles(scene.icon).flatMap((tile) => [ld('a', tile), ld(['hl+'], 'a')]),
       label(skip),
     ];
   });
@@ -499,8 +486,8 @@ function buildResultScreen(screen: ResultScreen): Op[] {
     call(KANA_DRAW_HUD),
     ...writeCenteredRow(ENDING_ROWS.title, textToTiles(screen.title)),
     call(DRAW_STAMPS),
-    ld_rr_nn('hl', u16(tilemapAddr(ENDING_ROWS.score, scoreCol))),
-    ...labelTiles.flatMap((tile) => [ld_r_n('a', u8(tile)), ldi_hl_a()]),
+    ld('hl', u16(tilemapAddr(ENDING_ROWS.score, scoreCol))),
+    ...labelTiles.flatMap((tile) => [ld('a', tile), ld(['hl+'], 'a')]),
     call(SCORE_DIGITS),
     ...buildDrawScoreDigits(ENDING_ROWS.score, scoreCol + labelTiles.length),
     call(DRAW_START_BOX),
@@ -525,9 +512,9 @@ function buildResultScreen(screen: ResultScreen): Op[] {
     call(JOY_READ),
     call(TITLE_BLINK),
     call(CAT_TICK),
-    ld_a_nn(MEM.JOYPAD_NEW),
-    and_n(u8(JOY.START)),
-    jr_cc('z', loop),
+    ld('a', [MEM.JOYPAD_NEW]),
+    and(JOY.START),
+    jr('z', loop),
     ...playSfx('confirm'),
 
     ...resetRunState(MEM.SCENE_FLAGS),
@@ -552,15 +539,15 @@ function buildDrawStartBox(): Op[] {
 function buildTitleBlink(): Op[] {
   return [
     label(TITLE_BLINK),
-    ld_a_nn(MEM.TITLE_TIMER),
-    inc_r('a'),
-    ld_nn_a(MEM.TITLE_TIMER),
-    ld_r_r('b', 'a'),
-    and_n(u8(BLINK_BIT - 1)),
-    ret_cc('nz'),
-    ld_r_r('a', 'b'),
-    and_n(u8(BLINK_BIT)),
-    jr_cc('z', TITLE_PROMPT_ON),
+    ld('a', [MEM.TITLE_TIMER]),
+    inc('a'),
+    ld([MEM.TITLE_TIMER], 'a'),
+    ld('b', 'a'),
+    and(BLINK_BIT - 1),
+    ret('nz'),
+    ld('a', 'b'),
+    and(BLINK_BIT),
+    jr('z', TITLE_PROMPT_ON),
     ...writeCenteredRow(START_PROMPT_ROW, START_BOX_OFF),
     ret(),
     label(TITLE_PROMPT_ON),
@@ -580,19 +567,19 @@ export function buildProgram(): Op[] {
     // ==== Init ====
     di(),
     // A = $11 at boot on a Game Boy Color (LD doesn't touch the flags CP set)
-    cp_n(u8(0x11)),
-    ld_r_n('a', u8(0)),
-    jr_cc('nz', INIT_NOT_CGB),
-    inc_r('a'),
+    cp(0x11),
+    ld('a', 0),
+    jr('nz', INIT_NOT_CGB),
+    inc('a'),
     label(INIT_NOT_CGB),
-    ld_rr_nn('sp', STACK_TOP),
+    ld('sp', STACK_TOP),
     // WRAM and HRAM start with random contents on real hardware (and in accurate
     // emulators): zero the buffers' page and every variable, keeping the GBC flag across
     push('af'),
     ...zeroPages(u16(BUFFERS.start), 1),
     ...zeroBlock(u16(VARIABLES.start), VARIABLES.end - VARIABLES.start),
     pop('af'),
-    ld_nn_a(MEM.IS_CGB),
+    ld([MEM.IS_CGB], 'a'),
 
     // Clear WRAM state
     ...zeroBytes(MEM.JOYPAD_CUR, MEM.JOYPAD_PREV, MEM.JOYPAD_NEW, MEM.DLG_STATE),
@@ -650,9 +637,9 @@ export function buildProgram(): Op[] {
     ...frameWait(),
     ...runDma(),
     call(JOY_READ),
-    ld_a_nn(MEM.JOYPAD_CUR),
-    cp_n(u8(0)),
-    jr_cc('nz', TITLE_DEBOUNCE),
+    ld('a', [MEM.JOYPAD_CUR]),
+    cp(0),
+    jr('nz', TITLE_DEBOUNCE),
 
     // The menu: はじめる starts a run, つづき takes a password
     label(TITLE_LOOP),
@@ -661,13 +648,13 @@ export function buildProgram(): Op[] {
     call(JOY_READ),
     call(CAT_TICK),
     call(MENU_UPDATE),
-    or_r('a'),
-    jr_cc('z', TITLE_LOOP),
-    cp_n(u8(menuPick('はじめる'))),
-    jr_cc('z', TITLE_NEW_GAME),
+    or('a'),
+    jr('z', TITLE_LOOP),
+    cp(menuPick('はじめる')),
+    jr('z', TITLE_NEW_GAME),
     ...playSfx('confirm'),
-    cp_n(u8(menuPick('つづき'))),
-    jp_cc('z', PASSWORD_SCREEN),
+    cp(menuPick('つづき')),
+    jp('z', PASSWORD_SCREEN),
     jp(PRACTICE_START),
 
     label(TITLE_NEW_GAME),
@@ -675,9 +662,9 @@ export function buildProgram(): Op[] {
 
     // START pressed — begin a fresh run at scene 0
     ...resetRunState(MEM.SCENE_FLAGS),
-    xor_r('a'),
-    ldh_n_a(HW.DIV), // reset entropy timing so gameplay remains deterministic after title idling
-    ld_nn_a(MEM.SCENE_ID),
+    xor('a'),
+    ldh([HW.DIV], 'a'), // reset entropy timing so gameplay remains deterministic after title idling
+    ld([MEM.SCENE_ID], 'a'),
 
     // ==== Scene load ====
     label(SCENE_LOAD),
@@ -691,8 +678,8 @@ export function buildProgram(): Op[] {
 
     // ==== Dialogue, with a kana round after each conversation ====
     ...sceneWord('dialogue'),
-    ld_r_r('d', 'h'),
-    ld_r_r('e', 'l'),
+    ld('d', 'h'),
+    ld('e', 'l'),
     call(DLG_OPEN_TREE), // initialize tree and open node 0
 
     // Process nodes until the conversation ends
@@ -700,22 +687,22 @@ export function buildProgram(): Op[] {
     ...zeroBytes(MEM.ROUND_RAN),
     call(CHANCE_CHECK), // a one-question chance after this choice?
     call(ROUND_CHECK), // a kana round before the next node?
-    ld_a_nn(MEM.ROUND_RAN),
-    or_r('a'),
-    jr_cc('z', SCENE_NO_ROUND),
+    ld('a', [MEM.ROUND_RAN]),
+    or('a'),
+    jr('z', SCENE_NO_ROUND),
     // Out of lives → game over
-    ld_a_nn(MEM.KANA_LIVES),
-    cp_n(u8(0)),
-    jp_cc('z', GAME_OVER_SCREEN.entry),
-    ld_a_nn(MEM.DLG_NODE_ID),
-    cp_n(u8(END_OF_CONVERSATION)),
-    jr_cc('z', SCENE_COMPLETE),
+    ld('a', [MEM.KANA_LIVES]),
+    cp(0),
+    jp('z', GAME_OVER_SCREEN.entry),
+    ld('a', [MEM.DLG_NODE_ID]),
+    cp(END_OF_CONVERSATION),
+    jr('z', SCENE_COMPLETE),
     call(SCENE_DRAW), // back from the round: the conversation resumes
     jr(SCENE_OPEN_NODE),
     label(SCENE_NO_ROUND),
-    ld_a_nn(MEM.DLG_NODE_ID),
-    cp_n(u8(END_OF_CONVERSATION)),
-    jr_cc('z', SCENE_COMPLETE),
+    ld('a', [MEM.DLG_NODE_ID]),
+    cp(END_OF_CONVERSATION),
+    jr('z', SCENE_COMPLETE),
     label(SCENE_OPEN_NODE),
     call(DLG_OPEN_NODE),
     jp(SCENE_DLG_LOOP),
@@ -723,18 +710,18 @@ export function buildProgram(): Op[] {
     label(SCENE_COMPLETE),
     // ==== Scene complete — set completion flag and advance ====
     ...sceneByte('flag'),
-    ld_r_r('b', 'a'),
-    ld_a_nn(MEM.SCENE_FLAGS),
-    or_r('b'),
-    ld_nn_a(MEM.SCENE_FLAGS),
+    ld('b', 'a'),
+    ld('a', [MEM.SCENE_FLAGS]),
+    or('b'),
+    ld([MEM.SCENE_FLAGS], 'a'),
 
-    ld_a_nn(MEM.SCENE_ID),
-    inc_r('a'),
-    ld_nn_a(MEM.SCENE_ID),
-    cp_n(u8(SCENES.length)),
-    jr_cc('nc', SCENE_LAST_DONE),
+    ld('a', [MEM.SCENE_ID]),
+    inc('a'),
+    ld([MEM.SCENE_ID], 'a'),
+    cp(SCENES.length),
+    jr('nc', SCENE_LAST_DONE),
     // More scenes to go: the kana chart, with the password for the next
-    ld_r_n('c', u8(1)),
+    ld('c', 1),
     call(CHART_SHOW),
     jp(SCENE_LOAD),
     label(SCENE_LAST_DONE),
@@ -742,11 +729,11 @@ export function buildProgram(): Op[] {
     // ==== Bonus: the speed round ====
     ...storeByte(MEM.KANA_MODE, KanaMode.SPEED),
     call(PRACTICE_RAND),
-    ld_nn_a(MEM.PRACTICE_NEXT),
+    ld([MEM.PRACTICE_NEXT], 'a'),
     call(SPEED_FILL), // the missed kana first, then the round's own questions
-    ld_rr_nn('de', MEM.PRACTICE_BUF.address),
+    ld('de', MEM.PRACTICE_BUF.address),
     call(PLAY_ROUND),
-    ld_r_n('c', u8(0)),
+    ld('c', 0),
     call(CHART_SHOW), // the whole trip's kana, then the ending
 
     // ==== Game complete — ending screen, then back to the title ====
@@ -766,32 +753,32 @@ export function buildProgram(): Op[] {
     // Backdrop above the dialogue box: the scene's own tiles, then its map
     ...copySceneBlock(u16(bgTileAddr(SCENE_TILE_BASE)), 'tiles', 'tilesLength'),
     ...sceneWord('backdrop'),
-    ld_r_r('d', 'h'),
-    ld_r_r('e', 'l'),
-    ld_rr_nn('hl', u16(tilemapAddr(BACKDROP.top, 0))),
+    ld('d', 'h'),
+    ld('e', 'l'),
+    ld('hl', u16(tilemapAddr(BACKDROP.top, 0))),
     call(DRAW_RUNS),
 
     // The cast: sprite tiles, GBC sprite palettes 1..n, who speaks when, where they stand
     ...copySceneBlock(u16(MEM.OBJ_TILES + NPC_TILE_BASE * 16), 'castTiles', 'castTilesLength'),
-    ld_r_n('a', u8(0x80 | 8)),
-    ldh_n_a(HW.OCPS),
+    ld('a', 0x80 | 8),
+    ldh([HW.OCPS], 'a'),
     ...sceneByte('castPaletteBytes'),
     push('af'),
     ...sceneWord('castPalettes'),
     pop('af'),
-    ld_r_r('b', 'a'),
+    ld('b', 'a'),
     label(SCENE_CAST_PALETTE),
-    ldi_a_hl(),
-    ldh_n_a(HW.OCPD),
-    dec_r('b'),
-    jr_cc('nz', SCENE_CAST_PALETTE),
+    ld('a', ['hl+']),
+    ldh([HW.OCPD], 'a'),
+    dec('b'),
+    jr('nz', SCENE_CAST_PALETTE),
     ...sceneWord('castTable'),
     ...storePointer('hl', MEM.NPC_TABLE),
     ...storeByte(MEM.NPC_CURRENT, NPC_NONE),
     ...sceneByte('stageX'),
-    ld_nn_a(MEM.NPC_X),
+    ld([MEM.NPC_X], 'a'),
     ...sceneByte('stageY'),
-    ld_nn_a(MEM.NPC_Y),
+    ld([MEM.NPC_Y], 'a'),
 
     // The animated tile
     ...sceneWord('animation'),
@@ -801,9 +788,9 @@ export function buildProgram(): Op[] {
     // GBC colors of the backdrop
     ...cgbAttributes([
       ...sceneWord('colors'),
-      ld_r_r('d', 'h'),
-      ld_r_r('e', 'l'),
-      ld_rr_nn('hl', u16(tilemapAddr(BACKDROP.top, 0))),
+      ld('d', 'h'),
+      ld('e', 'l'),
+      ld('hl', u16(tilemapAddr(BACKDROP.top, 0))),
       call(DRAW_RUNS),
     ]),
     call(KANA_DRAW_HUD), // hearts + score on row 0

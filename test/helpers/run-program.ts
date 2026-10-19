@@ -5,7 +5,7 @@
 
 import Gameboy from 'serverboy';
 import { assemble } from '@asm/assembler';
-import { di, jr, label, ld_rr_nn } from '@asm/ops';
+import { di, jr, label, ld } from '@asm/sm83';
 import { storeByte } from '@asm/macros';
 import { type Op, u16, Label } from '@asm/types';
 
@@ -25,7 +25,7 @@ export function runProgram(ops: readonly Op[], data: readonly Op[] = []): Uint8A
   const { rom } = assemble(
     [
       di(),
-      ld_rr_nn('sp', STACK_TOP),
+      ld('sp', STACK_TOP),
       ...ops,
       ...storeByte(DONE_FLAG, DONE_VALUE),
       label(__HALT),

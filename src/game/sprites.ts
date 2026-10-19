@@ -6,21 +6,8 @@
 import { HW } from '../asm/hardware';
 import { MEM } from './ram';
 import { copyBytes, zeroPages } from '../asm/macros';
-import {
-  call,
-  db,
-  dec_r,
-  inc_rr,
-  jr_cc,
-  jp,
-  label,
-  ld_a_de,
-  ld_r_n,
-  ld_rr_nn,
-  ldh_n_a,
-  ldi_hl_a,
-} from '../asm/ops';
-import { type Op, type U16, u8, u16, Label } from '../asm/types';
+import { call, db, dec, inc, jr, jp, label, ld, ldh } from '../asm/sm83';
+import { type Op, type U16, u16, Label } from '../asm/types';
 import { hi, lo } from '../asm/util';
 import { encodeGlyph, glyphOf } from './font';
 import type { Palette } from './video';
@@ -78,25 +65,25 @@ export function buildSpriteInit(): Op[] {
   return [
     ...zeroPages(SHADOW_OAM, 1),
     ...copyBytes(MEM.OBJ_TILES, SPRITE_TILES, SPRITE_TILE_BYTES),
-    ld_rr_nn('hl', DMA_HRAM),
-    ld_rr_nn('de', DMA_ROUTINE),
-    ld_r_n('b', u8(DMA_ROUTINE_BYTES.length)),
+    ld('hl', DMA_HRAM),
+    ld('de', DMA_ROUTINE),
+    ld('b', DMA_ROUTINE_BYTES.length),
     label(SPRITE_COPY_DMA),
-    ld_a_de(),
-    inc_rr('de'),
-    ldi_hl_a(),
-    dec_r('b'),
-    jr_cc('nz', SPRITE_COPY_DMA),
+    ld('a', ['de']),
+    inc('de'),
+    ld(['hl+'], 'a'),
+    dec('b'),
+    jr('nz', SPRITE_COPY_DMA),
 
-    ld_r_n('a', u8(0xe4)), // DMG: color index → shade, same as the background
-    ldh_n_a(HW.OBP0),
-    ld_r_n('a', u8(0x80)), // GBC OBJ palette 0, auto-increment
-    ldh_n_a(HW.OCPS),
+    ld('a', 0xe4), // DMG: color index → shade, same as the background
+    ldh([HW.OBP0], 'a'),
+    ld('a', 0x80), // GBC OBJ palette 0, auto-increment
+    ldh([HW.OCPS], 'a'),
     ...OBJ_PALETTE.flatMap((color) => [
-      ld_r_n('a', lo(color)),
-      ldh_n_a(HW.OCPD),
-      ld_r_n('a', hi(color)),
-      ldh_n_a(HW.OCPD),
+      ld('a', lo(color)),
+      ldh([HW.OCPD], 'a'),
+      ld('a', hi(color)),
+      ldh([HW.OCPD], 'a'),
     ]),
   ];
 }

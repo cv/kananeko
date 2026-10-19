@@ -2,19 +2,8 @@
 
 import { describe, expect, it } from 'vitest';
 import { MEM } from '@game/ram';
-import {
-  call,
-  db,
-  dec_r,
-  jr_cc,
-  label,
-  ld_a_nn,
-  ld_nn_a,
-  ld_r_n,
-  ld_r_r,
-  ld_rr_nn,
-} from '@asm/ops';
-import { type Op, u8, u16, Label } from '@asm/types';
+import { call, db, dec, jr, label, ld } from '@asm/sm83';
+import { type Op, u16, Label } from '@asm/types';
 import {
   NOTE_NAMES,
   SEQ,
@@ -124,14 +113,14 @@ let tickLoops = 0;
 function ticks(count: number): Op[] {
   const loop = new Label(`ticks_${String(tickLoops++)}`);
   return [
-    ld_r_n('a', u8(count)),
-    ld_nn_a(u16(SCRATCH)),
+    ld('a', count),
+    ld([u16(SCRATCH)], 'a'),
     label(loop),
     call(SOUND_TICK),
-    ld_a_nn(u16(SCRATCH)),
-    dec_r('a'),
-    ld_nn_a(u16(SCRATCH)),
-    jr_cc('nz', loop),
+    ld('a', [u16(SCRATCH)]),
+    dec('a'),
+    ld([u16(SCRATCH)], 'a'),
+    jr('nz', loop),
   ];
 }
 
@@ -143,11 +132,11 @@ function runSound(setup: readonly Op[], count: number, data: readonly Op[] = [])
   );
 }
 
-const play = (name: keyof typeof SFX): Op[] => [ld_r_n('a', u8(sfxId(name))), call(SFX_PLAY)];
+const play = (name: keyof typeof SFX): Op[] => [ld('a', sfxId(name)), call(SFX_PLAY)];
 
 /** Point voice 0 (pulse channel 2) at a sequence labelled `seq` */
 const startVoice0: Op[] = [
-  ld_rr_nn('hl', SEQ_DATA),
+  ld('hl', SEQ_DATA),
   ...(
     [
       ['PTR_LO', 'l'],
@@ -155,9 +144,9 @@ const startVoice0: Op[] = [
       ['START_HI', 'h'],
       ['PTR_HI', 'h'],
     ] as const
-  ).flatMap(([field, reg]) => [ld_r_r('a', reg), ld_nn_a(voiceField(0, field))]),
-  ld_r_n('a', u8(1)),
-  ld_nn_a(voiceField(0, 'TIMER')),
+  ).flatMap(([field, reg]) => [ld('a', reg), ld([voiceField(0, field)], 'a')]),
+  ld('a', 1),
+  ld([voiceField(0, 'TIMER')], 'a'),
 ];
 
 const voice = (memory: Uint8Array, v: number): number[] =>
@@ -213,7 +202,7 @@ describe('Given the songs', () => {
   });
 });
 
-const playSong = (id: number): Op[] => [ld_r_n('a', u8(id)), call(MUSIC_PLAY)];
+const playSong = (id: number): Op[] => [ld('a', id), call(MUSIC_PLAY)];
 
 describe('Given a song starts', () => {
   it('plays its melody and bass on the music voices', () => {

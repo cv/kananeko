@@ -5,28 +5,8 @@
 
 import { MEM } from './ram';
 import { loadPointer } from '../asm/macros';
-import {
-  add_hl_rr,
-  and_r,
-  cp_n,
-  cp_r,
-  dec_r,
-  inc_r,
-  jr_cc,
-  label,
-  ld_a_nn,
-  ld_nn_a,
-  ld_r_n,
-  ld_r_r,
-  ldi_a_hl,
-  pop,
-  push,
-  ret,
-  ret_cc,
-  swap,
-  xor_r,
-} from '../asm/ops';
-import { type Op, u8, Label } from '../asm/types';
+import { add, and, cp, dec, inc, jr, label, ld, pop, push, ret, swap, xor } from '../asm/sm83';
+import { type Op, Label } from '../asm/types';
 import type { SceneArt } from './backdrop';
 import { encodeGlyph } from './font';
 import { SCENERY, isProp } from './scenery';
@@ -75,48 +55,48 @@ export function buildAnimRoutines(): Op[] {
   return [
     label(ANIM_TICK),
     ...loadPointer('hl', MEM.ANIM),
-    ldi_a_hl(),
-    ld_r_r('e', 'a'), // DE = tile's VRAM address
-    ldi_a_hl(),
-    ld_r_r('d', 'a'),
-    ldi_a_hl(),
-    cp_n(u8(0)),
-    ret_cc('z'), // no animation in this scene
-    ld_r_r('b', 'a'), // B = frame count
-    ldi_a_hl(),
-    ld_r_r('c', 'a'), // C = period mask
-    ld_a_nn(MEM.ANIM_TIMER),
-    inc_r('a'),
-    ld_nn_a(MEM.ANIM_TIMER),
-    and_r('c'),
-    ret_cc('nz'),
+    ld('a', ['hl+']),
+    ld('e', 'a'), // DE = tile's VRAM address
+    ld('a', ['hl+']),
+    ld('d', 'a'),
+    ld('a', ['hl+']),
+    cp(0),
+    ret('z'), // no animation in this scene
+    ld('b', 'a'), // B = frame count
+    ld('a', ['hl+']),
+    ld('c', 'a'), // C = period mask
+    ld('a', [MEM.ANIM_TIMER]),
+    inc('a'),
+    ld([MEM.ANIM_TIMER], 'a'),
+    and('c'),
+    ret('nz'),
 
     // Next frame, wrapping to 0
-    ld_a_nn(MEM.ANIM_FRAME),
-    inc_r('a'),
-    cp_r('b'),
-    jr_cc('c', ANIM_FRAME_OK),
-    xor_r('a'),
+    ld('a', [MEM.ANIM_FRAME]),
+    inc('a'),
+    cp('b'),
+    jr('c', ANIM_FRAME_OK),
+    xor('a'),
     label(ANIM_FRAME_OK),
-    ld_nn_a(MEM.ANIM_FRAME),
+    ld([MEM.ANIM_FRAME], 'a'),
     swap('a'), // A = frame * 16
-    ld_r_r('c', 'a'),
-    ld_r_n('b', u8(0)),
-    add_hl_rr('bc'), // HL = frame data
+    ld('c', 'a'),
+    ld('b', 0),
+    add('hl', 'bc'), // HL = frame data
 
     // Copy 16 bytes from [HL] to VRAM at DE
-    ld_r_n('b', u8(16)),
+    ld('b', 16),
     label(ANIM_COPY),
-    ldi_a_hl(),
+    ld('a', ['hl+']),
     push('hl'),
-    ld_r_r('h', 'd'),
-    ld_r_r('l', 'e'),
+    ld('h', 'd'),
+    ld('l', 'e'),
     ...vramPut(),
-    ld_r_r('d', 'h'),
-    ld_r_r('e', 'l'),
+    ld('d', 'h'),
+    ld('e', 'l'),
     pop('hl'),
-    dec_r('b'),
-    jr_cc('nz', ANIM_COPY),
+    dec('b'),
+    jr('nz', ANIM_COPY),
     ret(),
   ];
 }

@@ -320,6 +320,11 @@ export function call(target: U16 | Label): Op {
   return instImm16(0xcd, target);
 }
 
+/** CALL cc, nn */
+export function call_cc(cc: CCName, target: U16 | Label): Op {
+  return instImm16(0xc4 + CC[cc] * 8, target);
+}
+
 /** RET */
 export function ret(): Op {
   return inst([0xc9]);

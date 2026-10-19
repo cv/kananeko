@@ -7,29 +7,8 @@
 
 import { MEM } from './ram';
 import { loadPointer, storePointer } from '../asm/macros';
-import {
-  add_hl_rr,
-  add_r,
-  call,
-  db,
-  dec_rr,
-  dw,
-  inc_rr,
-  jr_cc,
-  label,
-  ld_a_de,
-  ld_a_nn,
-  ld_r_n,
-  ld_r_r,
-  ld_rr_nn,
-  ldi_a_hl,
-  ldi_hl_a,
-  or_r,
-  pop,
-  push,
-  ret,
-} from '../asm/ops';
-import { type Op, type Target, type U16, u8, Label } from '../asm/types';
+import { add, call, db, dec, dw, inc, jr, label, ld, or, pop, push, ret } from '../asm/sm83';
+import { type Op, type Target, type U16, Label } from '../asm/types';
 import { at } from '../asm/util';
 import { SCENE_DESC } from './labels';
 
@@ -95,56 +74,56 @@ export function buildSceneTable(entries: readonly SceneEntry[]): Op[] {
 export function buildSceneTableRoutines(): Op[] {
   return [
     label(SCENE_DESC),
-    ld_a_nn(MEM.SCENE_ID),
-    add_r('a'),
-    ld_r_r('e', 'a'),
-    ld_r_n('d', u8(0)),
-    ld_rr_nn('hl', SCENE_TABLE),
-    add_hl_rr('de'),
-    ldi_a_hl(),
-    ld_r_r('h', 'hl_ptr'),
-    ld_r_r('l', 'a'),
+    ld('a', [MEM.SCENE_ID]),
+    add('a'),
+    ld('e', 'a'),
+    ld('d', 0),
+    ld('hl', SCENE_TABLE),
+    add('hl', 'de'),
+    ld('a', ['hl+']),
+    ld('h', ['hl']),
+    ld('l', 'a'),
     ...storePointer('hl', MEM.SCENE_DESC),
     ret(),
 
     label(SCENE_WORD),
-    ld_r_r('e', 'a'),
-    ld_r_n('d', u8(0)),
+    ld('e', 'a'),
+    ld('d', 0),
     ...loadPointer('hl', MEM.SCENE_DESC),
-    add_hl_rr('de'),
-    ldi_a_hl(),
-    ld_r_r('h', 'hl_ptr'),
-    ld_r_r('l', 'a'),
+    add('hl', 'de'),
+    ld('a', ['hl+']),
+    ld('h', ['hl']),
+    ld('l', 'a'),
     ret(),
 
     label(SCENE_BYTE),
-    ld_r_r('e', 'a'),
-    ld_r_n('d', u8(0)),
+    ld('e', 'a'),
+    ld('d', 0),
     ...loadPointer('hl', MEM.SCENE_DESC),
-    add_hl_rr('de'),
-    ld_r_r('a', 'hl_ptr'),
+    add('hl', 'de'),
+    ld('a', ['hl']),
     ret(),
 
     label(COPY_BLOCK),
-    ld_a_de(),
-    ldi_hl_a(),
-    inc_rr('de'),
-    dec_rr('bc'),
-    ld_r_r('a', 'b'),
-    or_r('c'),
-    jr_cc('nz', COPY_BLOCK),
+    ld('a', ['de']),
+    ld(['hl+'], 'a'),
+    inc('de'),
+    dec('bc'),
+    ld('a', 'b'),
+    or('c'),
+    jr('nz', COPY_BLOCK),
     ret(),
   ];
 }
 
 /** HL = a word field of the current scene */
 export function sceneWord(field: SceneWord): Op[] {
-  return [ld_r_n('a', u8(SCENE_FIELD[field])), call(SCENE_WORD)];
+  return [ld('a', SCENE_FIELD[field]), call(SCENE_WORD)];
 }
 
 /** A = a byte field of the current scene */
 export function sceneByte(field: SceneByte): Op[] {
-  return [ld_r_n('a', u8(SCENE_FIELD[field])), call(SCENE_BYTE)];
+  return [ld('a', SCENE_FIELD[field]), call(SCENE_BYTE)];
 }
 
 /**
@@ -156,10 +135,10 @@ export function copySceneBlock(dst: U16, source: SceneWord, length: SceneWord): 
     ...sceneWord(source),
     push('hl'),
     ...sceneWord(length),
-    ld_r_r('b', 'h'),
-    ld_r_r('c', 'l'),
+    ld('b', 'h'),
+    ld('c', 'l'),
     pop('de'),
-    ld_rr_nn('hl', dst),
+    ld('hl', dst),
     call(COPY_BLOCK),
   ];
 }

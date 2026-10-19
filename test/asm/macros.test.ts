@@ -15,9 +15,9 @@ import {
   zeroBlock,
   zeroPages,
 } from '@asm/macros';
-import { add_r, call, cp_r, db, label, ld_a_nn, ld_nn_a, ld_r_n, ld_r_r, ret } from '@asm/ops';
+import { add, call, cp, db, label, ld, ret } from '@asm/sm83';
 import { allocate, word } from '@asm/ram';
-import { type Op, u8, u16, Label } from '@asm/types';
+import { type Op, u16, Label } from '@asm/types';
 import { SCRATCH, runProgram } from '../helpers/run-program';
 
 // Labels placed in this module
@@ -59,10 +59,10 @@ describe('loadPointer / storePointer', () => {
       ...storeByte(at(0), 0x11),
       ...storeByte(at(1), 0x22),
       ...loadPointer('de', W0),
-      ld_r_r('a', 'e'),
-      ld_nn_a(at(2)),
-      ld_r_r('a', 'd'),
-      ld_nn_a(at(3)),
+      ld('a', 'e'),
+      ld([at(2)], 'a'),
+      ld('a', 'd'),
+      ld([at(3)], 'a'),
     ]);
     expect([mem[SCRATCH + 2], mem[SCRATCH + 3]]).toEqual([0x11, 0x22]);
   });
@@ -81,8 +81,8 @@ describe('countDownOrReturn', () => {
         ...storeByte(at(0), 3),
         call(TICK),
         call(TICK),
-        ld_a_nn(at(1)),
-        ld_nn_a(at(2)), // snapshot after two ticks
+        ld('a', [at(1)]),
+        ld([at(2)], 'a'), // snapshot after two ticks
         call(TICK),
       ],
       tick,
@@ -176,15 +176,15 @@ describe('switchCases', () => {
   ])('runs only the matching case for A=%i', (value, expected) => {
     const mem = runProgram([
       ...storeByte(at(1), 0), // counts how many bodies ran
-      ld_r_n('a', u8(value)),
+      ld('a', value),
       ...switchCases(
         cases.map((body) => [
           ...body,
           // Count executed bodies so fall-through bugs are visible
-          ld_a_nn(at(1)),
-          ld_r_n('b', u8(1)),
-          add_r('b'),
-          ld_nn_a(at(1)),
+          ld('a', [at(1)]),
+          ld('b', 1),
+          add('b'),
+          ld([at(1)], 'a'),
         ]),
       ),
     ]);
@@ -194,14 +194,14 @@ describe('switchCases', () => {
 
   it('supports custom comparisons and bodies that exit on their own', () => {
     const marks = [0xaa, 0xbb, 0xcc];
-    const program = (b: number): Op[] => [ld_r_n('b', u8(b)), call(PICK)];
+    const program = (b: number): Op[] => [ld('b', b), call(PICK)];
     const pick: Op[] = [
       label(PICK),
       ...switchCases(
         marks.map((m) => [...storeByte(at(0), m), ret()]),
         {
           // Match when B equals the case index
-          compare: (i) => [ld_r_n('a', u8(i)), cp_r('b')],
+          compare: (i) => [ld('a', i), cp('b')],
           exit: 'none',
         },
       ),

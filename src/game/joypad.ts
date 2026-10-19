@@ -11,22 +11,8 @@
  *   7=Down 6=Up 5=Left 4=Right 3=Start 2=Select 1=B 0=A
  */
 
-import { type Op, u8 } from '../asm/types';
-import {
-  label,
-  ld_r_n,
-  ld_r_r,
-  ldh_n_a,
-  ldh_a_n,
-  ld_a_nn,
-  ld_nn_a,
-  cpl,
-  and_n,
-  and_r,
-  or_r,
-  swap,
-  ret,
-} from '../asm/ops';
+import type { Op } from '../asm/types';
+import { label, ld, ldh, cpl, and, or, swap, ret } from '../asm/sm83';
 import { HW } from '../asm/hardware';
 import { MEM } from './ram';
 import { JOY_READ } from './labels';
@@ -38,47 +24,47 @@ export function buildReadJoypad(): Op[] {
     label(JOY_READ),
 
     // Save previous state
-    ld_a_nn(MEM.JOYPAD_CUR),
-    ld_nn_a(MEM.JOYPAD_PREV),
+    ld('a', [MEM.JOYPAD_CUR]),
+    ld([MEM.JOYPAD_PREV], 'a'),
 
     // Select d-pad (write $20 to P1)
-    ld_r_n('a', u8(0x20)),
-    ldh_n_a(HW.P1),
+    ld('a', 0x20),
+    ldh([HW.P1], 'a'),
     // Read twice — bus needs time to settle
-    ldh_a_n(HW.P1),
-    ldh_a_n(HW.P1),
+    ldh('a', [HW.P1]),
+    ldh('a', [HW.P1]),
     // Invert (active-low → active-high), mask low nibble
     cpl(),
-    and_n(u8(0x0f)),
+    and(0x0f),
     // Swap into high nibble (d-pad = bits 7-4)
     swap('a'),
-    ld_r_r('b', 'a'), // save d-pad in B
+    ld('b', 'a'), // save d-pad in B
 
     // Select buttons (write $10 to P1)
-    ld_r_n('a', u8(0x10)),
-    ldh_n_a(HW.P1),
+    ld('a', 0x10),
+    ldh([HW.P1], 'a'),
     // Read twice
-    ldh_a_n(HW.P1),
-    ldh_a_n(HW.P1),
+    ldh('a', [HW.P1]),
+    ldh('a', [HW.P1]),
     // Invert, mask low nibble (buttons = bits 3-0)
     cpl(),
-    and_n(u8(0x0f)),
+    and(0x0f),
 
     // Combine: A = d-pad (high) | buttons (low)
-    or_r('b'),
+    or('b'),
     // Store as current state
-    ld_nn_a(MEM.JOYPAD_CUR),
+    ld([MEM.JOYPAD_CUR], 'a'),
 
     // Edge detect: newly_pressed = current AND (NOT previous)
-    ld_r_r('b', 'a'), // B = current
-    ld_a_nn(MEM.JOYPAD_PREV),
+    ld('b', 'a'), // B = current
+    ld('a', [MEM.JOYPAD_PREV]),
     cpl(), // A = NOT previous
-    and_r('b'), // A = current AND (NOT previous)
-    ld_nn_a(MEM.JOYPAD_NEW),
+    and('b'), // A = current AND (NOT previous)
+    ld([MEM.JOYPAD_NEW], 'a'),
 
     // Deselect joypad lines (standard cleanup)
-    ld_r_n('a', u8(0x30)),
-    ldh_n_a(HW.P1),
+    ld('a', 0x30),
+    ldh([HW.P1], 'a'),
 
     ret(),
   ];

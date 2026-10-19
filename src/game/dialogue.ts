@@ -22,39 +22,26 @@ import {
   zeroBytes,
 } from '../asm/macros';
 import {
-  adc_r,
-  add_hl_rr,
-  add_n,
-  add_r,
-  and_n,
+  adc,
+  add,
+  and,
   call,
-  cp_n,
-  cp_r,
-  dec_r,
-  inc_r,
-  inc_rr,
+  cp,
+  dec,
+  inc,
   jp,
-  jp_cc,
   jr,
-  jr_cc,
   label,
-  ld_a_nn,
-  ld_nn_a,
-  ld_r_n,
-  ld_r_r,
-  ld_rr_nn,
-  ldh_a_n,
-  ldi_a_hl,
-  ldi_hl_a,
+  ld,
+  ldh,
   ret,
-  ret_cc,
-  sub_n,
-  or_r,
+  sub,
+  or,
   pop,
   push,
-  xor_r,
-} from '../asm/ops';
-import { type Op, u8, u16, Label } from '../asm/types';
+  xor,
+} from '../asm/sm83';
+import { type Op, u16, Label } from '../asm/types';
 import { hi, lo } from '../asm/util';
 import { BAD_CHOICE_FLAG, NEXT_END, TEXT_END } from './dialogue-data';
 import type { Triple } from './fixed';
@@ -195,15 +182,15 @@ const TWO_CHOICE_SWAPPED = [1, 0] as const;
 /** HL = text position of the display row whose DLG_ORDER entry equals B */
 function buildLoadChoicePositionForLogicalChoice(): Op[] {
   return switchCases(
-    CHOICE_TEXT_POSITIONS.map((position) => [ld_rr_nn('hl', u16(tilemapAddr(position)))]),
-    { compare: (row) => [ld_a_nn(MEM.DLG_ORDER.at(row)), cp_r('b')] },
+    CHOICE_TEXT_POSITIONS.map((position) => [ld('hl', u16(tilemapAddr(position)))]),
+    { compare: (row) => [ld('a', [MEM.DLG_ORDER.at(row)]), cp('b')] },
   );
 }
 
 /** A = DLG_ORDER[A]: map a display row (cursor) to its logical choice */
 function buildLoadLogicalChoiceFromCursor(): Op[] {
   return switchCases(
-    Array.from({ length: MEM.DLG_ORDER.size }, (_, row) => [ld_a_nn(MEM.DLG_ORDER.at(row))]),
+    Array.from({ length: MEM.DLG_ORDER.size }, (_, row) => [ld('a', [MEM.DLG_ORDER.at(row)])]),
   );
 }
 
@@ -211,7 +198,7 @@ function buildLoadLogicalChoiceFromCursor(): Op[] {
 function writeChoiceOrder(order: readonly number[]): Op[] {
   return order.flatMap((choice, row) => {
     if (choice === row) return [];
-    return [choice === 0 ? xor_r('a') : ld_r_n('a', u8(choice)), ld_nn_a(MEM.DLG_ORDER.at(row))];
+    return [choice === 0 ? xor('a') : ld('a', choice), ld([MEM.DLG_ORDER.at(row)], 'a')];
   });
 }
 
@@ -220,35 +207,35 @@ function buildInitChoiceOrder(): Op[] {
   const done = new Label('dlg_order_done');
   return [
     // Identity order: row i shows choice i
-    xor_r('a'),
-    ld_nn_a(MEM.DLG_ORDER.at(0)),
-    inc_r('a'),
-    ld_nn_a(MEM.DLG_ORDER.at(1)),
-    inc_r('a'),
-    ld_nn_a(MEM.DLG_ORDER.at(2)),
+    xor('a'),
+    ld([MEM.DLG_ORDER.at(0)], 'a'),
+    inc('a'),
+    ld([MEM.DLG_ORDER.at(1)], 'a'),
+    inc('a'),
+    ld([MEM.DLG_ORDER.at(2)], 'a'),
 
-    ld_a_nn(MEM.DLG_CHOICE_CNT),
-    cp_n(u8(2)),
-    jr_cc('z', DLG_ORDER_TWO),
-    cp_n(u8(3)),
-    jr_cc('z', DLG_ORDER_THREE),
+    ld('a', [MEM.DLG_CHOICE_CNT]),
+    cp(2),
+    jr('z', DLG_ORDER_TWO),
+    cp(3),
+    jr('z', DLG_ORDER_THREE),
     jp(done),
 
     // Two choices: swap on an odd DIV
     label(DLG_ORDER_TWO),
-    ldh_a_n(HW.DIV),
-    and_n(u8(1)),
-    jr_cc('z', done),
+    ldh('a', [HW.DIV]),
+    and(1),
+    jr('z', done),
     ...writeChoiceOrder(TWO_CHOICE_SWAPPED),
     jp(done),
 
     // Three choices: DIV & 7, folded into 0..5, picks a permutation
     label(DLG_ORDER_THREE),
-    ldh_a_n(HW.DIV),
-    and_n(u8(7)),
-    cp_n(u8(THREE_CHOICE_ORDERS.length)),
-    jr_cc('c', DLG_ORDER_THREE_DISPATCH),
-    sub_n(u8(THREE_CHOICE_ORDERS.length)),
+    ldh('a', [HW.DIV]),
+    and(7),
+    cp(THREE_CHOICE_ORDERS.length),
+    jr('c', DLG_ORDER_THREE_DISPATCH),
+    sub(THREE_CHOICE_ORDERS.length),
     label(DLG_ORDER_THREE_DISPATCH),
     ...switchCases(THREE_CHOICE_ORDERS.map(writeChoiceOrder)),
 
@@ -260,14 +247,14 @@ function buildInitChoiceOrder(): Op[] {
 function buildTextboxRow(row: number, left: number, fill: number | 'clear', right: number): Op[] {
   const interior = SCREEN_COLS - 2;
   return [
-    ld_rr_nn('hl', u16(tilemapAddr(row, 0))),
-    ld_r_n('a', u8(left)),
-    ldi_hl_a(),
-    fill === 'clear' ? xor_r('a') : ld_r_n('a', u8(fill)),
-    ld_r_n('b', u8(interior)),
+    ld('hl', u16(tilemapAddr(row, 0))),
+    ld('a', left),
+    ld(['hl+'], 'a'),
+    fill === 'clear' ? xor('a') : ld('a', fill),
+    ld('b', interior),
     call(FILL_TILES),
-    ld_r_n('a', u8(right)),
-    ldi_hl_a(),
+    ld('a', right),
+    ld(['hl+'], 'a'),
   ];
 }
 
@@ -290,24 +277,24 @@ const BOX_INTERIOR_COLS = SCREEN_COLS - 2;
 function buildClearTextbox(): Op[] {
   return [
     label(DLG_CLEAR_BOX),
-    ld_rr_nn('hl', u16(tilemapAddr(BOX_TOP_ROW + 1, 1))),
-    ld_r_n('b', u8(BOX_ROWS - 2)),
+    ld('hl', u16(tilemapAddr(BOX_TOP_ROW + 1, 1))),
+    ld('b', BOX_ROWS - 2),
     label(DLG_CLEAR_ROW),
-    ld_r_n('c', u8(BOX_INTERIOR_COLS)),
+    ld('c', BOX_INTERIOR_COLS),
     label(DLG_CLEAR_CELL),
-    xor_r('a'),
+    xor('a'),
     ...vramPut(),
-    dec_r('c'),
-    jr_cc('nz', DLG_CLEAR_CELL),
+    dec('c'),
+    jr('nz', DLG_CLEAR_CELL),
     // Skip to column 1 of the next row
-    ld_r_r('a', 'l'),
-    add_n(u8(32 - BOX_INTERIOR_COLS)),
-    ld_r_r('l', 'a'),
-    jr_cc('nc', DLG_CLEAR_NC),
-    inc_r('h'),
+    ld('a', 'l'),
+    add(32 - BOX_INTERIOR_COLS),
+    ld('l', 'a'),
+    jr('nc', DLG_CLEAR_NC),
+    inc('h'),
     label(DLG_CLEAR_NC),
-    dec_r('b'),
-    jr_cc('nz', DLG_CLEAR_ROW),
+    dec('b'),
+    jr('nz', DLG_CLEAR_ROW),
     ret(),
   ];
 }
@@ -335,48 +322,48 @@ export function buildTextNext(base: number): Op[] {
     push('bc'),
     push('de'),
     push('hl'),
-    ld_a_nn(MEM.TEXT_SP),
-    or_r('a'),
-    jr_cc('z', TEXT_NEXT_RAW),
+    ld('a', [MEM.TEXT_SP]),
+    or('a'),
+    jr('z', TEXT_NEXT_RAW),
     // A right half waiting on the stack comes first
-    dec_r('a'),
-    ld_nn_a(MEM.TEXT_SP),
-    ld_r_r('e', 'a'),
-    ld_r_n('d', u8(0)),
-    ld_rr_nn('hl', MEM.TEXT_STACK.address),
-    add_hl_rr('de'),
-    ld_r_r('a', 'hl_ptr'),
+    dec('a'),
+    ld([MEM.TEXT_SP], 'a'),
+    ld('e', 'a'),
+    ld('d', 0),
+    ld('hl', MEM.TEXT_STACK.address),
+    add('hl', 'de'),
+    ld('a', ['hl']),
     jr(TEXT_NEXT_EXPAND),
     label(TEXT_NEXT_RAW),
     ...loadPointer('hl', MEM.DLG_STR),
-    ldi_a_hl(),
-    ld_r_r('b', 'a'),
+    ld('a', ['hl+']),
+    ld('b', 'a'),
     ...storePointer('hl', MEM.DLG_STR),
-    ld_r_r('a', 'b'),
+    ld('a', 'b'),
     label(TEXT_NEXT_EXPAND),
-    cp_n(u8(base)),
-    jr_cc('c', TEXT_NEXT_DONE), // a tile
-    cp_n(u8(TEXT_END)),
-    jr_cc('z', TEXT_NEXT_DONE),
+    cp(base),
+    jr('c', TEXT_NEXT_DONE), // a tile
+    cp(TEXT_END),
+    jr('z', TEXT_NEXT_DONE),
     // A code: push its right half, go on with its left half
-    sub_n(u8(base)),
-    ld_r_r('l', 'a'),
-    ld_r_n('h', u8(0)),
-    add_hl_rr('hl'),
-    ld_rr_nn('de', TEXT_DICT),
-    add_hl_rr('de'),
-    ldi_a_hl(),
-    ld_r_r('b', 'a'), // left half
-    ld_r_r('c', 'hl_ptr'), // right half
-    ld_a_nn(MEM.TEXT_SP),
-    ld_r_r('e', 'a'),
-    inc_r('a'),
-    ld_nn_a(MEM.TEXT_SP),
-    ld_r_n('d', u8(0)),
-    ld_rr_nn('hl', MEM.TEXT_STACK.address),
-    add_hl_rr('de'),
-    ld_r_r('hl_ptr', 'c'),
-    ld_r_r('a', 'b'),
+    sub(base),
+    ld('l', 'a'),
+    ld('h', 0),
+    add('hl', 'hl'),
+    ld('de', TEXT_DICT),
+    add('hl', 'de'),
+    ld('a', ['hl+']),
+    ld('b', 'a'), // left half
+    ld('c', ['hl']), // right half
+    ld('a', [MEM.TEXT_SP]),
+    ld('e', 'a'),
+    inc('a'),
+    ld([MEM.TEXT_SP], 'a'),
+    ld('d', 0),
+    ld('hl', MEM.TEXT_STACK.address),
+    add('hl', 'de'),
+    ld(['hl'], 'c'),
+    ld('a', 'b'),
     jr(TEXT_NEXT_EXPAND),
     label(TEXT_NEXT_DONE),
     pop('hl'),
@@ -417,14 +404,14 @@ export function buildDialogueEngine(): Op[] {
     label(DLG_UPDATE),
     call(NPC_UPDATE), // idle bob of the speaker
     call(ANIM_TICK), // animated backdrop tile
-    ld_a_nn(MEM.DLG_STATE),
-    cp_n(u8(DialogueState.IDLE)),
-    ret_cc('z'),
-    cp_n(u8(DialogueState.PRINTING)),
-    jp_cc('z', DLG_DO_PRINT),
-    cp_n(u8(DialogueState.WAITING)),
-    jp_cc('z', DLG_DO_WAIT),
-    cp_n(u8(DialogueState.CHOOSING)),
+    ld('a', [MEM.DLG_STATE]),
+    cp(DialogueState.IDLE),
+    ret('z'),
+    cp(DialogueState.PRINTING),
+    jp('z', DLG_DO_PRINT),
+    cp(DialogueState.WAITING),
+    jp('z', DLG_DO_WAIT),
+    cp(DialogueState.CHOOSING),
     jp(DLG_DO_CHOOSE),
 
     // =================================================================
@@ -432,14 +419,14 @@ export function buildDialogueEngine(): Op[] {
     // FAST_REVEAL_CHARS every frame while B is held
     // =================================================================
     label(DLG_DO_PRINT),
-    ld_a_nn(MEM.JOYPAD_CUR),
-    and_n(u8(JOY.B)),
-    jr_cc('z', DLG_PRINT_SLOW),
+    ld('a', [MEM.JOYPAD_CUR]),
+    and(JOY.B),
+    jr('z', DLG_PRINT_SLOW),
     ...Array.from({ length: FAST_REVEAL_CHARS - 1 }, () => [
       call(DLG_PRINT_CHAR),
-      ld_a_nn(MEM.DLG_STATE),
-      cp_n(u8(DialogueState.PRINTING)),
-      ret_cc('nz'), // the text ended
+      ld('a', [MEM.DLG_STATE]),
+      cp(DialogueState.PRINTING),
+      ret('nz'), // the text ended
     ]).flat(),
     jr(DLG_PRINT_CHAR),
 
@@ -452,19 +439,19 @@ export function buildDialogueEngine(): Op[] {
     call(TEXT_NEXT),
 
     // Check for text terminator (not 0x00, because tile 0 = space)
-    cp_n(u8(TEXT_END)),
-    jr_cc('z', DLG_TEXT_DONE),
+    cp(TEXT_END),
+    jr('z', DLG_TEXT_DONE),
 
     // Write the tile at the VRAM cursor and advance it
-    ld_r_r('b', 'a'),
+    ld('b', 'a'),
     ...loadPointer('hl', MEM.DLG_VRAM),
-    ld_r_r('a', 'b'),
+    ld('a', 'b'),
     ...vramPut(),
     ...storePointer('hl', MEM.DLG_VRAM),
     // A soft blip for each letter (not for spaces)
-    ld_r_r('a', 'b'),
-    or_r('a'),
-    ret_cc('z'),
+    ld('a', 'b'),
+    or('a'),
+    ret('z'),
     ...playSfx('blip'),
     ret(),
 
@@ -472,25 +459,25 @@ export function buildDialogueEngine(): Op[] {
     label(DLG_TEXT_DONE),
     // String pointer now points to choice_count byte
     ...loadPointer('hl', MEM.DLG_STR),
-    ldi_a_hl(), // A = choice count
-    ld_nn_a(MEM.DLG_CHOICE_CNT),
+    ld('a', ['hl+']), // A = choice count
+    ld([MEM.DLG_CHOICE_CNT], 'a'),
 
     // HL now points to the next_node lookup table. Save this position.
     ...storePointer('hl', MEM.DLG_META0),
 
     // Skip past the next_node table (choice_count bytes)
-    ld_a_nn(MEM.DLG_CHOICE_CNT),
-    ld_r_r('c', 'a'),
-    ld_r_n('b', u8(0)),
-    add_hl_rr('bc'),
+    ld('a', [MEM.DLG_CHOICE_CNT]),
+    ld('c', 'a'),
+    ld('b', 0),
+    add('hl', 'bc'),
 
     // Save pointer to first choice text
     ...storePointer('hl', MEM.DLG_STR),
 
     // If 0 choices, go to wait-for-A mode
-    ld_a_nn(MEM.DLG_CHOICE_CNT),
-    cp_n(u8(0)),
-    jr_cc('nz', DLG_SETUP_CHOICES),
+    ld('a', [MEM.DLG_CHOICE_CNT]),
+    cp(0),
+    jr('nz', DLG_SETUP_CHOICES),
     ...storeByte(MEM.DLG_STATE, DialogueState.WAITING),
     ret(),
 
@@ -501,9 +488,9 @@ export function buildDialogueEngine(): Op[] {
 
     // Draw each choice on its shuffled row (DLG_STR walks through their texts)
 
-    ld_a_nn(MEM.DLG_CHOICE_CNT),
-    ld_r_r('c', 'a'), // C = remaining choices
-    ld_r_n('b', u8(0)), // B = choice index
+    ld('a', [MEM.DLG_CHOICE_CNT]),
+    ld('c', 'a'), // C = remaining choices
+    ld('b', 0), // B = choice index
 
     label(DLG_DRAW_CHOICE_LOOP),
     // HL = text position of the display row showing logical choice B
@@ -512,15 +499,15 @@ export function buildDialogueEngine(): Op[] {
     // Copy the choice's tiles to [HL] until the text terminator
     label(DLG_CHOICE_CHAR),
     call(TEXT_NEXT),
-    cp_n(u8(TEXT_END)),
-    jr_cc('z', DLG_CHOICE_STR_DONE),
+    cp(TEXT_END),
+    jr('z', DLG_CHOICE_STR_DONE),
     ...vramPut(),
     jr(DLG_CHOICE_CHAR),
 
     label(DLG_CHOICE_STR_DONE),
-    inc_r('b'), // next choice index
-    dec_r('c'), // remaining--
-    jr_cc('nz', DLG_DRAW_CHOICE_LOOP),
+    inc('b'), // next choice index
+    dec('c'), // remaining--
+    jr('nz', DLG_DRAW_CHOICE_LOOP),
 
     // Cursor sprite on the first row
     ...zeroBytes(MEM.DLG_CURSOR, MEM.DLG_BOUNCE),
@@ -532,12 +519,12 @@ export function buildDialogueEngine(): Op[] {
     // dlg_do_wait — Wait for A button press, then set idle
     // =================================================================
     label(DLG_DO_WAIT),
-    ld_a_nn(MEM.JOYPAD_NEW),
-    and_n(u8(JOY.A)),
-    ret_cc('z'), // not pressed
+    ld('a', [MEM.JOYPAD_NEW]),
+    and(JOY.A),
+    ret('z'), // not pressed
     // A pressed — close dialogue
-    xor_r('a'),
-    ld_nn_a(MEM.DLG_STATE), // state = idle
+    xor('a'),
+    ld([MEM.DLG_STATE], 'a'), // state = idle
     ret(),
 
     // =================================================================
@@ -545,65 +532,65 @@ export function buildDialogueEngine(): Op[] {
     // =================================================================
     label(DLG_DO_CHOOSE),
     // Bounce the cursor one pixel right every CURSOR_BOUNCE_FRAMES frames
-    ld_a_nn(MEM.DLG_BOUNCE),
-    inc_r('a'),
-    ld_nn_a(MEM.DLG_BOUNCE),
-    and_n(u8(CURSOR_BOUNCE_FRAMES)),
-    ld_r_n('a', u8(CURSOR_X)),
-    jr_cc('z', DLG_BOUNCE_SET),
-    inc_r('a'),
+    ld('a', [MEM.DLG_BOUNCE]),
+    inc('a'),
+    ld([MEM.DLG_BOUNCE], 'a'),
+    and(CURSOR_BOUNCE_FRAMES),
+    ld('a', CURSOR_X),
+    jr('z', DLG_BOUNCE_SET),
+    inc('a'),
     label(DLG_BOUNCE_SET),
-    ld_nn_a(oamField(SPRITE_SLOT.cursor, 'x')),
+    ld([oamField(SPRITE_SLOT.cursor, 'x')], 'a'),
 
-    ld_a_nn(MEM.JOYPAD_NEW),
+    ld('a', [MEM.JOYPAD_NEW]),
 
     // Check A button
-    ld_r_r('b', 'a'), // save joypad in B
-    and_n(u8(JOY.A)),
-    jr_cc('nz', DLG_CONFIRM_CHOICE),
+    ld('b', 'a'), // save joypad in B
+    and(JOY.A),
+    jr('nz', DLG_CONFIRM_CHOICE),
 
     // Check DOWN
-    ld_r_r('a', 'b'),
-    and_n(u8(JOY.DOWN)),
-    jr_cc('nz', DLG_CURSOR_DOWN),
+    ld('a', 'b'),
+    and(JOY.DOWN),
+    jr('nz', DLG_CURSOR_DOWN),
 
     // Check UP
-    ld_r_r('a', 'b'),
-    and_n(u8(JOY.UP)),
-    jr_cc('nz', DLG_CURSOR_UP),
+    ld('a', 'b'),
+    and(JOY.UP),
+    jr('nz', DLG_CURSOR_UP),
 
     ret(), // no relevant input
 
     // --- Move cursor down ---
     label(DLG_CURSOR_DOWN),
     // Increment cursor, wrap around
-    ld_a_nn(MEM.DLG_CURSOR),
-    inc_r('a'),
-    ld_r_r('b', 'a'),
-    ld_a_nn(MEM.DLG_CHOICE_CNT),
-    ld_r_r('c', 'a'), // C = choice count
-    ld_r_r('a', 'b'),
-    cp_r('c'),
-    jr_cc('c', DLG_CURSOR_SAVE), // if cursor < count, no wrap
-    xor_r('a'), // wrap to 0
+    ld('a', [MEM.DLG_CURSOR]),
+    inc('a'),
+    ld('b', 'a'),
+    ld('a', [MEM.DLG_CHOICE_CNT]),
+    ld('c', 'a'), // C = choice count
+    ld('a', 'b'),
+    cp('c'),
+    jr('c', DLG_CURSOR_SAVE), // if cursor < count, no wrap
+    xor('a'), // wrap to 0
     jr(DLG_CURSOR_SAVE),
 
     // --- Move cursor up ---
     label(DLG_CURSOR_UP),
-    ld_a_nn(MEM.DLG_CURSOR),
-    cp_n(u8(0)),
-    jr_cc('nz', DLG_CURSOR_UP_DEC),
+    ld('a', [MEM.DLG_CURSOR]),
+    cp(0),
+    jr('nz', DLG_CURSOR_UP_DEC),
     // Wrap to last choice
-    ld_a_nn(MEM.DLG_CHOICE_CNT),
-    dec_r('a'),
+    ld('a', [MEM.DLG_CHOICE_CNT]),
+    dec('a'),
     jr(DLG_CURSOR_SAVE),
 
     label(DLG_CURSOR_UP_DEC),
-    ld_a_nn(MEM.DLG_CURSOR),
-    dec_r('a'),
+    ld('a', [MEM.DLG_CURSOR]),
+    dec('a'),
 
     label(DLG_CURSOR_SAVE),
-    ld_nn_a(MEM.DLG_CURSOR),
+    ld([MEM.DLG_CURSOR], 'a'),
     ...playSfx('cursor'),
     call(DLG_DRAW_CURSOR),
     ret(),
@@ -612,41 +599,41 @@ export function buildDialogueEngine(): Op[] {
     label(DLG_CONFIRM_CHOICE),
     ...playSfx('confirm'),
     ...zeroBytes(oamField(SPRITE_SLOT.cursor, 'y')), // hide the cursor
-    ld_a_nn(MEM.DLG_CURSOR),
-    ld_nn_a(MEM.DLG_RESULT),
+    ld('a', [MEM.DLG_CURSOR]),
+    ld([MEM.DLG_RESULT], 'a'),
 
     // Read next_node = table_base[logical_choice]
-    ld_a_nn(MEM.DLG_CURSOR),
+    ld('a', [MEM.DLG_CURSOR]),
     ...buildLoadLogicalChoiceFromCursor(),
-    ld_r_r('c', 'a'), // C = logical choice
-    ld_a_nn(MEM.DLG_NODE_ID),
-    ld_nn_a(MEM.DLG_FROM_NODE),
+    ld('c', 'a'), // C = logical choice
+    ld('a', [MEM.DLG_NODE_ID]),
+    ld([MEM.DLG_FROM_NODE], 'a'),
 
     ...loadPointer('hl', MEM.DLG_META0),
-    ld_r_n('b', u8(0)),
-    add_hl_rr('bc'), // HL = table_base + logical_choice
-    ldi_a_hl(),
-    ld_r_r('b', 'a'), // B = raw next byte (bit 7 = bad answer)
+    ld('b', 0),
+    add('hl', 'bc'), // HL = table_base + logical_choice
+    ld('a', ['hl+']),
+    ld('b', 'a'), // B = raw next byte (bit 7 = bad answer)
     // Remember what was picked (bad flag | logical choice) for kana chances
-    and_n(u8(BAD_CHOICE_FLAG)),
-    or_r('c'),
-    ld_nn_a(MEM.DLG_PICK),
-    ld_r_r('a', 'b'),
-    and_n(u8(0xff ^ BAD_CHOICE_FLAG)),
-    cp_n(u8(NEXT_END)),
-    jr_cc('nz', DLG_NEXT_STORE),
-    ld_r_n('a', u8(END_OF_CONVERSATION)),
+    and(BAD_CHOICE_FLAG),
+    or('c'),
+    ld([MEM.DLG_PICK], 'a'),
+    ld('a', 'b'),
+    and(0xff ^ BAD_CHOICE_FLAG),
+    cp(NEXT_END),
+    jr('nz', DLG_NEXT_STORE),
+    ld('a', END_OF_CONVERSATION),
     label(DLG_NEXT_STORE),
-    ld_nn_a(MEM.DLG_NODE_ID),
+    ld([MEM.DLG_NODE_ID], 'a'),
 
     // Rating: flagged = bad, first authored choice = good, anything else = ok.
     // good = +10 & regain a life, ok = no change, bad = -5 & lose a life
-    ld_r_r('a', 'b'),
-    and_n(u8(BAD_CHOICE_FLAG)),
-    jr_cc('nz', DLG_BAD_CHOICE),
-    ld_r_r('a', 'c'),
-    cp_n(u8(0)),
-    jr_cc('z', DLG_GOOD_CHOICE),
+    ld('a', 'b'),
+    and(BAD_CHOICE_FLAG),
+    jr('nz', DLG_BAD_CHOICE),
+    ld('a', 'c'),
+    cp(0),
+    jr('z', DLG_GOOD_CHOICE),
     ...buildClearDelta(), // ok: nothing changes
     jr(DLG_SCORE_DONE),
 
@@ -655,11 +642,11 @@ export function buildDialogueEngine(): Op[] {
     // Good: +10 score, +1 life (capped at MAX_LIVES)
     ...buildAddScore(10),
     ...buildSetDelta(DELTA_PLUS_10),
-    ld_a_nn(MEM.KANA_LIVES),
-    cp_n(u8(MAX_LIVES)),
-    jr_cc('nc', DLG_SCORE_DONE), // already at max
-    inc_r('a'),
-    ld_nn_a(MEM.KANA_LIVES),
+    ld('a', [MEM.KANA_LIVES]),
+    cp(MAX_LIVES),
+    jr('nc', DLG_SCORE_DONE), // already at max
+    inc('a'),
+    ld([MEM.KANA_LIVES], 'a'),
     jr(DLG_SCORE_DONE),
 
     label(DLG_BAD_CHOICE),
@@ -667,14 +654,14 @@ export function buildDialogueEngine(): Op[] {
     // Bad: -5 score, -1 life (floor at 0)
     ...buildSubScore(5),
     ...buildSetDelta(DELTA_MINUS_5),
-    ld_a_nn(MEM.KANA_LIVES),
-    cp_n(u8(0)),
-    jr_cc('z', DLG_SCORE_DONE), // already at 0
-    dec_r('a'),
-    ld_nn_a(MEM.KANA_LIVES),
+    ld('a', [MEM.KANA_LIVES]),
+    cp(0),
+    jr('z', DLG_SCORE_DONE), // already at 0
+    dec('a'),
+    ld([MEM.KANA_LIVES], 'a'),
     // If lives just hit 0, end conversation → skip to kana
-    cp_n(u8(0)),
-    jr_cc('nz', DLG_SCORE_DONE),
+    cp(0),
+    jr('nz', DLG_SCORE_DONE),
     ...storeByte(MEM.DLG_NODE_ID, END_OF_CONVERSATION),
 
     label(DLG_SCORE_DONE),
@@ -685,13 +672,13 @@ export function buildDialogueEngine(): Op[] {
     // dlg_draw_cursor — Move the cursor sprite to the highlighted row
     // =================================================================
     label(DLG_DRAW_CURSOR),
-    ld_a_nn(MEM.DLG_CURSOR),
-    add_r('a'),
-    add_r('a'),
-    add_r('a'),
-    add_r('a'), // A = cursor * 16 (choices are two tile rows apart)
-    add_n(u8(CURSOR_Y)),
-    ld_nn_a(oamField(SPRITE_SLOT.cursor, 'y')),
+    ld('a', [MEM.DLG_CURSOR]),
+    add('a'),
+    add('a'),
+    add('a'),
+    add('a'), // A = cursor * 16 (choices are two tile rows apart)
+    add(CURSOR_Y),
+    ld([oamField(SPRITE_SLOT.cursor, 'y')], 'a'),
     ...storeByte(oamField(SPRITE_SLOT.cursor, 'x'), CURSOR_X),
     ...storeByte(oamField(SPRITE_SLOT.cursor, 'tile'), SPRITE_TILE.cursor),
     ...zeroBytes(oamField(SPRITE_SLOT.cursor, 'attr')),
@@ -714,27 +701,27 @@ export function buildDialogueEngine(): Op[] {
     call(NPC_SELECT), // show whoever speaks at this node
     ...loadPointer('hl', MEM.DLG_TREE),
     // HL = tree base. Skip node_count byte.
-    inc_rr('hl'),
+    inc('hl'),
     // Offset table entry = base + 1 + node_id * 2
-    ld_a_nn(MEM.DLG_NODE_ID),
+    ld('a', [MEM.DLG_NODE_ID]),
     // Multiply by 2: shift left
-    add_r('a'), // A = node_id * 2
+    add('a'), // A = node_id * 2
     // Add A to HL (HL += A)
-    ld_r_r('c', 'a'),
-    ld_r_n('b', u8(0)),
-    add_hl_rr('bc'), // HL = tree_base + 1 + node_id * 2
+    ld('c', 'a'),
+    ld('b', 0),
+    add('hl', 'bc'), // HL = tree_base + 1 + node_id * 2
     // Read offset (16-bit LE)
-    ldi_a_hl(), // lo byte
-    ld_r_r('e', 'a'),
-    ldi_a_hl(), // hi byte
-    ld_r_r('d', 'a'),
+    ld('a', ['hl+']), // lo byte
+    ld('e', 'a'),
+    ld('a', ['hl+']), // hi byte
+    ld('d', 'a'),
     // DE = offset from tree start. Compute absolute: tree_base + offset
-    ld_a_nn(MEM.DLG_TREE.lo),
-    add_r('e'),
-    ld_r_r('e', 'a'),
-    ld_a_nn(MEM.DLG_TREE.hi),
-    adc_r('d'),
-    ld_r_r('d', 'a'),
+    ld('a', [MEM.DLG_TREE.lo]),
+    add('e'),
+    ld('e', 'a'),
+    ld('a', [MEM.DLG_TREE.hi]),
+    adc('d'),
+    ld('d', 'a'),
     // DE = absolute ROM pointer to node data
     jp(DLG_OPEN),
 

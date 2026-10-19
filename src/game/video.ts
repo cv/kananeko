@@ -6,40 +6,28 @@ import { HW, LCDC } from '../asm/hardware';
 import { MEM } from './ram';
 import { lcdOff, lcdOn, loadPointer, storePointer, zeroPages } from '../asm/macros';
 import {
-  add_n,
-  add_r,
-  and_n,
+  add,
+  and,
   call,
-  cp_n,
+  cp,
   db,
-  dec_r,
+  dec,
   halt,
-  inc_r,
-  inc_rr,
-  jp_cc,
+  inc,
+  jp,
   jr,
-  jr_cc,
   label,
-  ld_a_de,
-  ld_a_nn,
-  ld_nn_a,
-  ld_r_n,
-  ld_r_r,
-  ld_rr_nn,
-  ldh_a_n,
-  ldh_n_a,
-  ldi_a_hl,
-  ldi_hl_a,
+  ld,
+  ldh,
   nop,
   pop,
   push,
   ret,
   reti,
-  ret_cc,
-  sub_r,
-  xor_r,
-} from '../asm/ops';
-import { type Op, u8, u16, Label, Pooled } from '../asm/types';
+  sub,
+  xor,
+} from '../asm/sm83';
+import { type Op, u16, Label, Pooled } from '../asm/types';
 import type { Quad } from './fixed';
 import { SCREEN_COLS, centerStartCol, tilemapAddr, tileRow } from './tilemap';
 import {
@@ -108,8 +96,8 @@ export function screenOn(): Op[] {
   return [
     ...lcdOn(SCREEN_ON_FLAGS),
     // The time spent with the screen off isn't a missed frame (see frame_wait)
-    ld_a_nn(MEM.FRAME_COUNT),
-    ld_nn_a(MEM.LAST_FRAME),
+    ld('a', [MEM.FRAME_COUNT]),
+    ld([MEM.LAST_FRAME], 'a'),
   ];
 }
 
@@ -128,9 +116,9 @@ export function buildFrameWait(): Op[] {
   return [
     label(VBLANK_HANDLER),
     push('af'),
-    ld_a_nn(MEM.FRAME_COUNT),
-    inc_r('a'),
-    ld_nn_a(MEM.FRAME_COUNT),
+    ld('a', [MEM.FRAME_COUNT]),
+    inc('a'),
+    ld([MEM.FRAME_COUNT], 'a'),
     pop('af'),
     reti(),
 
@@ -139,21 +127,21 @@ export function buildFrameWait(): Op[] {
     nop(),
     push('af'),
     push('bc'),
-    ld_a_nn(MEM.LAST_FRAME),
-    ld_r_r('c', 'a'),
-    ld_a_nn(MEM.FRAME_COUNT),
-    ld_nn_a(MEM.LAST_FRAME),
-    sub_r('c'), // VBlanks since the last wait
-    cp_n(u8(2)),
-    jr_cc('c', FRAME_WAIT_DONE),
-    dec_r('a'),
-    ld_r_r('c', 'a'),
-    ld_a_nn(MEM.FRAMES_MISSED),
-    add_r('c'),
-    jr_cc('nc', FRAME_WAIT_STORE),
-    ld_r_n('a', u8(0xff)),
+    ld('a', [MEM.LAST_FRAME]),
+    ld('c', 'a'),
+    ld('a', [MEM.FRAME_COUNT]),
+    ld([MEM.LAST_FRAME], 'a'),
+    sub('c'), // VBlanks since the last wait
+    cp(2),
+    jr('c', FRAME_WAIT_DONE),
+    dec('a'),
+    ld('c', 'a'),
+    ld('a', [MEM.FRAMES_MISSED]),
+    add('c'),
+    jr('nc', FRAME_WAIT_STORE),
+    ld('a', 0xff),
     label(FRAME_WAIT_STORE),
-    ld_nn_a(MEM.FRAMES_MISSED),
+    ld([MEM.FRAMES_MISSED], 'a'),
     label(FRAME_WAIT_DONE),
     // Sound steps once per frame here rather than in the VBlank handler, so it plays
     // the same with interrupts off (the tests' emulator runs without them)
@@ -183,11 +171,11 @@ export function buildVramPut(): Op[] {
     label(VRAM_PUT),
     push('af'),
     label(VRAM_PUT_WAIT),
-    ldh_a_n(HW.STAT),
-    and_n(u8(STAT_BUSY)),
-    jr_cc('nz', VRAM_PUT_WAIT),
+    ldh('a', [HW.STAT]),
+    and(STAT_BUSY),
+    jr('nz', VRAM_PUT_WAIT),
     pop('af'),
-    ldi_hl_a(),
+    ld(['hl+'], 'a'),
     ret(),
   ];
 }
@@ -217,19 +205,19 @@ export function tileList(tiles: readonly number[]): Pooled {
 export function buildDrawTiles(): Op[] {
   return [
     label(DRAW_TILES),
-    ld_a_de(),
-    inc_rr('de'),
-    cp_n(u8(TILES_END)),
-    ret_cc('z'),
+    ld('a', ['de']),
+    inc('de'),
+    cp(TILES_END),
+    ret('z'),
     call(VRAM_PUT),
     jr(DRAW_TILES),
 
     label(FILL_TILES),
     push('bc'),
     label(FILL_TILES_NEXT),
-    ldi_hl_a(),
-    dec_r('b'),
-    jr_cc('nz', FILL_TILES_NEXT),
+    ld(['hl+'], 'a'),
+    dec('b'),
+    jr('nz', FILL_TILES_NEXT),
     pop('bc'),
     ret(),
   ];
@@ -240,8 +228,8 @@ export function drawTiles(address: number, tiles: readonly number[]): Op[] {
   // draw_tiles walks the list with DE: save the caller's
   return [
     push('de'),
-    ld_rr_nn('hl', u16(address)),
-    ld_rr_nn('de', tileList(tiles)),
+    ld('hl', u16(address)),
+    ld('de', tileList(tiles)),
     call(DRAW_TILES),
     pop('de'),
   ];
@@ -271,14 +259,14 @@ export type Palette = Quad<number>;
 export function cgbAttributes(ops: readonly Op[]): Op[] {
   const skip = new Label();
   return [
-    ld_a_nn(MEM.IS_CGB),
-    cp_n(u8(0)),
-    jp_cc('z', skip),
-    ld_r_n('a', u8(1)),
-    ldh_n_a(HW.VBK),
+    ld('a', [MEM.IS_CGB]),
+    cp(0),
+    jp('z', skip),
+    ld('a', 1),
+    ldh([HW.VBK], 'a'),
     ...ops,
-    xor_r('a'),
-    ldh_n_a(HW.VBK),
+    xor('a'),
+    ldh([HW.VBK], 'a'),
     label(skip),
   ];
 }
@@ -292,9 +280,9 @@ export function fillAttributes(
   palette: number,
 ): Op[] {
   return Array.from({ length: rows }, (_, r) => [
-    ld_rr_nn('hl', u16(tilemapAddr(row + r, col))),
-    ld_r_n('a', u8(palette)),
-    ...Array.from({ length: cols }, () => ldi_hl_a()),
+    ld('hl', u16(tilemapAddr(row + r, col))),
+    ld('a', palette),
+    ...Array.from({ length: cols }, () => ld(['hl+'], 'a')),
   ]).flat();
 }
 
@@ -347,32 +335,32 @@ export function encodeRuns(palettes: readonly number[]): Uint8Array {
 export function buildDrawRuns(): Op[] {
   return [
     label(DRAW_RUNS),
-    ld_r_n('c', u8(SCREEN_COLS)),
+    ld('c', SCREEN_COLS),
     label(DRAW_RUNS_NEXT),
-    ld_a_de(),
-    inc_rr('de'),
-    cp_n(u8(0)),
-    ret_cc('z'),
-    ld_r_r('b', 'a'), // run length
-    ld_a_de(),
-    inc_rr('de'), // A = tile or palette
+    ld('a', ['de']),
+    inc('de'),
+    cp(0),
+    ret('z'),
+    ld('b', 'a'), // run length
+    ld('a', ['de']),
+    inc('de'), // A = tile or palette
     label(DRAW_RUNS_CELL),
-    ldi_hl_a(),
-    dec_r('c'),
-    jr_cc('nz', DRAW_RUNS_SAME_ROW),
+    ld(['hl+'], 'a'),
+    dec('c'),
+    jr('nz', DRAW_RUNS_SAME_ROW),
     // End of a visible row: skip to the next tilemap row
     push('af'),
-    ld_r_r('a', 'l'),
-    add_n(u8(32 - SCREEN_COLS)),
-    ld_r_r('l', 'a'),
-    jr_cc('nc', DRAW_RUNS_NC),
-    inc_r('h'),
+    ld('a', 'l'),
+    add(32 - SCREEN_COLS),
+    ld('l', 'a'),
+    jr('nc', DRAW_RUNS_NC),
+    inc('h'),
     label(DRAW_RUNS_NC),
     pop('af'),
-    ld_r_n('c', u8(SCREEN_COLS)),
+    ld('c', SCREEN_COLS),
     label(DRAW_RUNS_SAME_ROW),
-    dec_r('b'),
-    jr_cc('nz', DRAW_RUNS_CELL),
+    dec('b'),
+    jr('nz', DRAW_RUNS_CELL),
     jr(DRAW_RUNS_NEXT),
   ];
 }
@@ -392,7 +380,7 @@ const FADE_BGP_SHADES = [0xe4, 0x90, 0x40, 0x00] as const;
 
 /** Fade in the palette set at `setLabel`, turning the LCD on first. */
 export function fadeIn(setLabel: Label): Op[] {
-  return [ld_rr_nn('hl', setLabel), call(FADE_IN)];
+  return [ld('hl', setLabel), call(FADE_IN)];
 }
 
 /** Fade the palette set currently on screen back in (e.g. after redrawing). */
@@ -415,37 +403,37 @@ export function buildFadeRoutines(): Op[] {
     label(PALETTE_PUT),
     push('af'),
     label(PALETTE_PUT_WAIT),
-    ldh_a_n(HW.STAT),
-    and_n(u8(STAT_BUSY)),
-    jr_cc('nz', PALETTE_PUT_WAIT),
+    ldh('a', [HW.STAT]),
+    and(STAT_BUSY),
+    jr('nz', PALETTE_PUT_WAIT),
     pop('af'),
-    ldh_n_a(HW.BCPD),
+    ldh([HW.BCPD], 'a'),
     ret(),
 
     // fade_apply: show fade level B of the palette set at HL. Preserves B, HL.
     label(FADE_APPLY),
     push('hl'),
     push('hl'),
-    ld_rr_nn('hl', FADE_BGP),
-    ld_r_r('a', 'b'),
-    add_r('l'),
-    ld_r_r('l', 'a'),
-    jr_cc('nc', FADE_BGP_NC),
-    inc_r('h'),
+    ld('hl', FADE_BGP),
+    ld('a', 'b'),
+    add('l'),
+    ld('l', 'a'),
+    jr('nc', FADE_BGP_NC),
+    inc('h'),
     label(FADE_BGP_NC),
-    ld_r_r('a', 'hl_ptr'),
-    ldh_n_a(HW.BGP),
+    ld('a', ['hl']),
+    ldh([HW.BGP], 'a'),
     pop('hl'), // the set (the other copy is restored on return)
-    ld_r_n('a', u8(0x80)), // palette 0, color 0, auto-increment
-    ldh_n_a(HW.BCPS),
+    ld('a', 0x80), // palette 0, color 0, auto-increment
+    ldh([HW.BCPS], 'a'),
     // The UI and HUD palettes every screen shares, then the set's own
     push('hl'),
-    ld_rr_nn('hl', SHARED_PALETTES),
-    ld_r_n('d', u8(SHARED_PALETTE_COUNT)),
+    ld('hl', SHARED_PALETTES),
+    ld('d', SHARED_PALETTE_COUNT),
     call(FADE_PALETTES),
     pop('hl'),
-    ldi_a_hl(),
-    ld_r_r('d', 'a'), // D = palettes in the set
+    ld('a', ['hl+']),
+    ld('d', 'a'), // D = palettes in the set
     call(FADE_PALETTES),
     pop('hl'),
     ret(),
@@ -453,47 +441,47 @@ export function buildFadeRoutines(): Op[] {
     // fade_palettes: write D palettes from HL at fade level B. Clobbers A, C, D, HL.
     label(FADE_PALETTES),
     label(FADE_PALETTE),
-    ld_r_n('c', u8(0)), // C = color index j
+    ld('c', 0), // C = color index j
     label(FADE_COLOR),
     push('hl'),
-    ld_r_r('a', 'c'),
-    sub_r('b'),
-    jr_cc('nc', FADE_SRC_OK),
-    xor_r('a'), // max(0, j - k)
+    ld('a', 'c'),
+    sub('b'),
+    jr('nc', FADE_SRC_OK),
+    xor('a'), // max(0, j - k)
     label(FADE_SRC_OK),
-    add_r('a'), // 2 bytes per color
-    add_r('l'),
-    ld_r_r('l', 'a'),
-    jr_cc('nc', FADE_SRC_NC),
-    inc_r('h'),
+    add('a'), // 2 bytes per color
+    add('l'),
+    ld('l', 'a'),
+    jr('nc', FADE_SRC_NC),
+    inc('h'),
     label(FADE_SRC_NC),
-    ldi_a_hl(),
+    ld('a', ['hl+']),
     call(PALETTE_PUT),
-    ld_r_r('a', 'hl_ptr'),
+    ld('a', ['hl']),
     call(PALETTE_PUT),
     pop('hl'),
-    inc_r('c'),
-    ld_r_r('a', 'c'),
-    cp_n(u8(4)),
-    jr_cc('nz', FADE_COLOR),
-    ld_r_r('a', 'l'),
-    add_n(u8(8)), // next palette
-    ld_r_r('l', 'a'),
-    jr_cc('nc', FADE_NEXT_NC),
-    inc_r('h'),
+    inc('c'),
+    ld('a', 'c'),
+    cp(4),
+    jr('nz', FADE_COLOR),
+    ld('a', 'l'),
+    add(8), // next palette
+    ld('l', 'a'),
+    jr('nc', FADE_NEXT_NC),
+    inc('h'),
     label(FADE_NEXT_NC),
-    dec_r('d'),
-    jr_cc('nz', FADE_PALETTE),
+    dec('d'),
+    jr('nz', FADE_PALETTE),
     ret(),
 
     // fade_wait: show the current level for FADE_STEP_FRAMES frames
     label(FADE_WAIT),
-    ld_r_n('c', u8(FADE_STEP_FRAMES)),
+    ld('c', FADE_STEP_FRAMES),
     label(FADE_WAIT_FRAME),
     call(FRAME_WAIT),
     call(MEM.OAM_DMA.address), // see sprites.ts: so sprites update during fades
-    dec_r('c'),
-    jr_cc('nz', FADE_WAIT_FRAME),
+    dec('c'),
+    jr('nz', FADE_WAIT_FRAME),
     ret(),
 
     // fade_in: HL = palette set. Starts at paper, turns the LCD on, steps to full color.
@@ -501,34 +489,34 @@ export function buildFadeRoutines(): Op[] {
     ...loadPointer('hl', MEM.FADE_TABLE),
     label(FADE_IN),
     ...storePointer('hl', MEM.FADE_TABLE),
-    ld_r_n('b', u8(FADE_STEPS - 1)),
+    ld('b', FADE_STEPS - 1),
     call(FADE_APPLY),
     ...screenOn(),
     label(FADE_IN_STEP),
     call(FADE_WAIT),
-    dec_r('b'),
+    dec('b'),
     call(FADE_APPLY),
-    ld_r_r('a', 'b'),
-    cp_n(u8(0)),
-    jr_cc('nz', FADE_IN_STEP),
+    ld('a', 'b'),
+    cp(0),
+    jr('nz', FADE_IN_STEP),
     ret(),
 
     // fade_out: step the current set to paper. HALT never wakes with the LCD
     // off (no VBlank), so do nothing in that case.
     label(FADE_OUT),
-    ldh_a_n(HW.LCDC),
-    and_n(u8(LCDC.LCD_ON)),
-    ret_cc('z'),
+    ldh('a', [HW.LCDC]),
+    and(LCDC.LCD_ON),
+    ret('z'),
     call(SPRITES_OFF), // sprites don't fade: take them off first
     ...loadPointer('hl', MEM.FADE_TABLE),
-    ld_r_n('b', u8(0)),
+    ld('b', 0),
     label(FADE_OUT_STEP),
     call(FADE_WAIT),
-    inc_r('b'),
+    inc('b'),
     call(FADE_APPLY),
-    ld_r_r('a', 'b'),
-    cp_n(u8(FADE_STEPS - 1)),
-    jr_cc('nz', FADE_OUT_STEP),
+    ld('a', 'b'),
+    cp(FADE_STEPS - 1),
+    jr('nz', FADE_OUT_STEP),
     ret(),
   ];
 }
