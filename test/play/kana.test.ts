@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { DELTA_MINUS_100, DELTA_PLUS_10, DELTA_PLUS_100 } from '@game/kana-hud';
 import { KanaState, MAX_LIVES } from '@game/state';
+import { FEEDBACK_FRAMES } from '@game/kana';
 import { checkpoint, runnerAt } from '../helpers/checkpoints';
 import { type GameRunner } from '../helpers/game-runner';
 import { answerKanaAndCheckDelta, loseAllKanaLives, loseOneKanaLife } from '../helpers/play';
@@ -52,6 +53,23 @@ describe('Given the player misses kana prompts repeatedly', () => {
     expect(runner.kanaScore - before).toBe(-100);
     expect(runner.deltaType).toBe(DELTA_MINUS_100);
     expect(runner.kanaQuestionIdx).toBe(1);
+  });
+
+  it('moves to the next question right after the feedback, without blanking the screen', () => {
+    const runner = kanaRound().resetStreak();
+    runner.pressKanaAnswer(true);
+    let frames = 0;
+    let screenWentOff = false;
+    while (!(runner.kanaQuestionIdx === 1 && runner.kanaState === KanaState.AWAITING)) {
+      runner.frames(1);
+      frames++;
+      if ((runner.readMem(0xff40) & 0x80) === 0) screenWentOff = true;
+      if (frames > 300) throw new Error('the next question never came');
+    }
+    expect(screenWentOff).toBe(false);
+    expect(frames, `frames from answer to next question: ${String(frames)}`).toBeLessThan(
+      FEEDBACK_FRAMES + 10,
+    );
   });
 
   it('ends the round when the last life is lost', () => {

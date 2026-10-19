@@ -76,7 +76,15 @@ import {
 } from './kana-hud';
 import { KanaMode, KanaState, MAX_LIVES } from './state';
 import { type TilePosition, tilePos, tilemapAddr } from './tilemap';
-import { clearScreen, fadeInCurrent, fadeOut, screenOff, vramPut, writeCenteredRow } from './video';
+import {
+  clearScreen,
+  drawTiles,
+  fadeInCurrent,
+  fadeOut,
+  screenOff,
+  vramPut,
+  writeCenteredRow,
+} from './video';
 import { CAT_SPOTS, catFace, placeCat } from './cat';
 
 // ---------------------------------------------------------------------------
@@ -179,7 +187,8 @@ export const KANA_MESSAGES = {
 const MESSAGE_WIDTH = Math.max(...Object.values(KANA_MESSAGES).map((m) => Array.from(m).length));
 
 // Game constants
-const FEEDBACK_FRAMES = 40;
+/** Frames the feedback (せいかい!, ざんねん...) shows before the round moves on */
+export const FEEDBACK_FRAMES = 40;
 const SCORE_FIRST_TRY = 100;
 const SCORE_SECOND_TRY = 10;
 const SCORE_DEATH_PENALTY = 100;
@@ -258,7 +267,6 @@ function buildRoundFrame(): Op[] {
     ldi_hl_a(),
   ];
   return [
-    ...writeCenteredRow(PROMPT_ROW, textToTiles(KANA_MESSAGES.prompt)),
     ...horizontal(top, '┌', '─', '┐'),
     ...tileAt(tilePos(top + 1, left), requireTile('│')),
     ...tileAt(tilePos(top + 1, right), requireTile('▕')),
@@ -375,10 +383,18 @@ export function buildKanaEngine(): Op[] {
     cp_n(u8(0)),
     jp_cc('z', ref('kana_all_done')),
 
+    // The round's first question gets a fresh screen; later ones keep the frame and
+    // redraw only the word, the answers, and the prompt, with the LCD on
+    ld_a_nn(MEM.KANA_Q_IDX),
+    or_r('a'),
+    jr_cc('nz', ref('kana_next_question')),
     ...fadeOut(),
     ...screenOff('kana_vblank'),
     ...clearScreen(),
     call(ref('kana_draw_hud')),
+    ...buildRoundFrame(),
+    label('kana_next_question'),
+    ...drawTiles(WORD_INNER_ADDR, Array<number>(WORD_BOX.innerWidth).fill(0)), // empty word box
 
     ...loadPointer('de', MEM.KANA_DATA_LO, MEM.KANA_DATA_HI),
 
@@ -393,20 +409,7 @@ export function buildKanaEngine(): Op[] {
     ld_r_r('a', 'c'),
     and_n(u8(0xff ^ MATCH_FLAG)),
     ld_r_r('c', 'a'), // C = word length
-
-    ...buildRoundFrame(),
-    // Match questions ask for katakana instead
-    ld_a_nn(MEM.KANA_PROMPT),
-    or_r('a'),
-    jr_cc('z', ref('kana_prompt_drawn')),
-    ...writeCenteredRow(PROMPT_ROW, messageTiles(KANA_MESSAGES.katakana)),
-    label('kana_prompt_drawn'),
-    // ...and the speed round hurries you along
-    ld_a_nn(MEM.KANA_MODE),
-    cp_n(u8(KanaMode.SPEED)),
-    jr_cc('nz', ref('kana_prompt_final')),
-    ...writeCenteredRow(PROMPT_ROW, messageTiles(KANA_MESSAGES.hurry)),
-    label('kana_prompt_final'),
+    call(ref('kana_show_prompt')),
 
     // HL = start of the word, centered in the box: inner + (width - length) / 2
     ld_r_n('a', u8(WORD_BOX.innerWidth)),
@@ -420,7 +423,7 @@ export function buildKanaEngine(): Op[] {
     label('kana_draw_word'),
     ld_a_de(),
     inc_rr('de'),
-    ldi_hl_a(),
+    ...vramPut(),
     dec_r('c'),
     jr_cc('nz', ref('kana_draw_word')),
 
@@ -433,7 +436,7 @@ export function buildKanaEngine(): Op[] {
     ...addAToHL('kana_blank_found'),
     ...storePointer('hl', MEM.KANA_BLANK_LO, MEM.KANA_BLANK_HI),
     ld_r_n('a', u8(BLANK_TILE)),
-    ldi_hl_a(),
+    ...vramPut(),
 
     // Copy [correct, d1, d2, d3] into the KANA_SHUFFLE buffer
     ld_rr_nn('hl', MEM.KANA_SHUFFLE),
@@ -452,8 +455,13 @@ export function buildKanaEngine(): Op[] {
       exit: 'jp',
     }),
 
+    // A fresh screen fades in, with the cat beside it
+    ld_a_nn(MEM.KANA_Q_IDX),
+    or_r('a'),
+    jr_cc('nz', ref('kana_question_shown')),
     ...fadeInCurrent(),
     ...placeCat(CAT_SPOTS.quiz),
+    label('kana_question_shown'),
 
     // Reset attempts and wait for input
     ...zeroBytes(MEM.KANA_ATTEMPTS),
@@ -640,16 +648,23 @@ export function buildKanaEngine(): Op[] {
     ret(),
 
     // =================================================================
-    // kana_show_prompt — Ask again, for katakana if the question wants it.
+    // kana_show_prompt — The question's prompt: hurry in the speed round, katakana for
+    // match questions, the usual one otherwise. Safe with the LCD on.
     // =================================================================
     label('kana_show_prompt'),
+    ld_a_nn(MEM.KANA_MODE),
+    cp_n(u8(KanaMode.SPEED)),
+    jr_cc('z', ref('kana_show_hurry')), // the speed round hurries you along
     ld_a_nn(MEM.KANA_PROMPT),
     or_r('a'),
-    jr_cc('nz', ref('kana_show_katakana')),
+    jr_cc('nz', ref('kana_show_katakana')), // match questions ask for katakana
     ...showMessage(KANA_MESSAGES.prompt),
     ret(),
     label('kana_show_katakana'),
     ...showMessage(KANA_MESSAGES.katakana),
+    ret(),
+    label('kana_show_hurry'),
+    ...showMessage(KANA_MESSAGES.hurry),
     ret(),
 
     // =================================================================
