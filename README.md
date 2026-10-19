@@ -2,7 +2,7 @@
 
 > A tiny Game Boy Color ROM where a cat guides you through Japan — one kana at a time.
 
-You wander through five little locations — a train station, a street, a restaurant, a convenience store, and a park — chatting your way through short Japanese scenes and answering kana quizzes to keep going. Miss too many and it's game over. Nail them and watch your score climb.
+You wander through six little locations — a train station, a street, a shrine, a restaurant, a convenience store, and a park — chatting your way through short Japanese scenes and answering kana quizzes to keep going, to a little pentatonic soundtrack. Miss too many and it's game over (with a kana password to pick up where you left off). Nail them and watch your score climb.
 
 The whole thing is hand-assembled from TypeScript. No engine, no SDK — just raw opcodes wired into a 32 KB ROM.
 
@@ -10,23 +10,27 @@ The whole thing is hand-assembled from TypeScript. No engine, no SDK — just ra
 
 ## 🗾 Locations
 
-| Scene      | Name              | Vibe                   |
-| ---------- | ----------------- | ---------------------- |
-| えき       | Station           | Arriving somewhere new |
-| みち       | Street            | Wandering around town  |
-| レストラン | Restaurant        | Ordering food (poorly) |
-| コンビニ   | Convenience store | Late-night snack run   |
-| こうえん   | Park              | A quiet ending         |
+| Scene      | Name              | Vibe                     |
+| ---------- | ----------------- | ------------------------ |
+| えき       | Station           | Arriving somewhere new   |
+| みち       | Street            | Wandering around town    |
+| じんじゃ   | Shrine            | Praying, fortunes, a cat |
+| レストラン | Restaurant        | Ordering food (poorly)   |
+| コンビニ   | Convenience store | Late-night snack run     |
+| こうえん   | Park              | A quiet ending           |
 
 ## 🎮 How it works
 
-1. Press START on the title screen and arrive at the station
-2. Chat with the people you meet (in Japanese!): good replies earn points and hearts, rude ones cost a heart
+1. Pick はじめる on the title screen and arrive at the station
+2. Chat with the people you meet (in Japanese!): good replies earn points and hearts, rude ones cost a heart. Hold B to make the text appear faster
 3. After each conversation, a short kana quiz asks about phrases you just read: pick the missing kana with the d-pad
 4. Some replies have a kana missing (はい みえ□す!): pick one to say it and fill in the blank
 5. Gave a bad answer? Get the next kana right to win the heart back
 6. Each location ends with a review round, closing with a word to write in katakana; three first tries in a row pay a streak bonus
-7. Clear all five locations, then beat the clock in a speed round before the ending
+7. Between locations, the kana chart (かなの きろく) shows every kana you've answered right, the ones you've missed in red, and a password (あいことば) for the next location
+8. Clear all six locations, then beat the clock in a speed round, which asks about your missed kana first, before the ending
+
+From the title menu, つづき takes a password (game over gives you one too), and れんしゅう practices the kana you've missed, five at a time, with nothing at stake.
 
 ## 🖼️ Screenshots
 
@@ -88,7 +92,7 @@ The browser tests (`site-tests/`) use Playwright; install its browsers once with
 src/
   asm/           assembler, opcodes, macros, hardware defs
   game/          engines (dialogue, kana, HUD), fonts, screen helpers
-    scenes/      station, street, restaurant, conbini, park
+    scenes/      station, street, shrine, restaurant, conbini, park
   build.ts       ROM entry point
 test/            unit, integration, and emulator-driven tests
 scripts/         utility scripts (screenshots, the site build)
