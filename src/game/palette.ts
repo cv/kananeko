@@ -4,7 +4,7 @@
  * draws only from these, so the whole game reads as one book.
  */
 
-import { type Triple } from './fixed';
+import type { Triple } from './fixed';
 import { rgb } from './video';
 
 /** Light, mid, and dark shades layered on a palette's color 0 */

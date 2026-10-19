@@ -27,10 +27,10 @@ import {
   xor_r,
 } from '../asm/ops';
 import { type Op, ref, u8 } from '../asm/types';
-import { type SceneArt } from './backdrop';
+import type { SceneArt } from './backdrop';
 import { encodeGlyph } from './font';
 import { SCENERY, isProp } from './scenery';
-import { type TileAnimation } from './scenes/animations';
+import type { TileAnimation } from './scenes/animations';
 import { bgTileAddr, vramPut } from './video';
 
 const MAX_FRAMES = 16; // frame offset is computed with SWAP (frame * 16 < 256)

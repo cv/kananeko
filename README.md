@@ -89,17 +89,18 @@ The browser tests (`site-tests/`) use Playwright; install its browsers once with
 ## 📁 Project layout
 
 ```
-src/
+src/             the ROM, built in pure TypeScript (no Node or DOM APIs)
   asm/           assembler, opcodes, macros, hardware defs
   game/          engines (dialogue, kana, HUD), fonts, screen helpers
     scenes/      station, street, shrine, restaurant, conbini, park
-  build.ts       ROM entry point
 test/            unit, integration, and emulator-driven tests
-scripts/         utility scripts (screenshots, the site build)
+scripts/         Node scripts: the ROM build (build.ts), screenshots, the site build
 site/            the web player: page, styles, player source, vendored binjgb
 site-tests/      browser tests for the site (Playwright)
 build/           ROM and site output
 ```
+
+Each top-level directory has its own `tsconfig.json` (sharing `tsconfig.base.json`) with only the globals it runs with; `npm run typecheck` checks them all incrementally.
 
 ## 🤓 Nerd notes
 

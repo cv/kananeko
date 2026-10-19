@@ -1,0 +1,9 @@
+// Node build and tooling scripts.
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "tsBuildInfoFile": "../node_modules/.cache/tsc/scripts.tsbuildinfo"
+  },
+  "include": ["**/*.ts", "../test/types/*.d.ts"]
+}

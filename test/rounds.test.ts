@@ -8,13 +8,13 @@ import {
   REDEEM_KEY,
   planQuiz,
 } from '@game/rounds';
-import { type DialogueNode } from '@game/dialogue';
+import type { DialogueNode } from '@game/dialogue';
 import { CHAR_MAP } from '@game/font';
 import { phrasesOf } from '@game/quiz';
 import { type KanaQuestion, buildKanaData } from '@game/kana';
 import { BAD_PICK, END_OF_CONVERSATION } from '@game/state';
 import { BAD_CHOICE_FLAG } from '@game/dialogue-data';
-import { type SceneCast } from '@game/scenes/npcs';
+import type { SceneCast } from '@game/scenes/npcs';
 
 const q = (word: string): KanaQuestion => ({
   word,

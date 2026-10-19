@@ -49,7 +49,7 @@ import { CAT_FACES, type CatFace, catArt } from './cat-art';
 import { encodeGlyph } from './font';
 import { HUES, INK, PAPER } from './palette';
 import { OAM_X_OFFSET, OAM_Y_OFFSET, SPRITE_SLOT, oamField } from './sprites';
-import { type Palette } from './video';
+import type { Palette } from './video';
 
 export { CAT_FACES, type CatFace };
 

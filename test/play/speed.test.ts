@@ -5,7 +5,7 @@ import { CLOCK_POSITION, KANA_LAYOUT, KANA_MESSAGES, SPEED_SECONDS } from '@game
 import { SCENES, SPEED_ROUND } from '@game/scene';
 import { KanaMode, KanaState } from '@game/state';
 import { checkpoint, runnerAt } from '../helpers/checkpoints';
-import { type GameRunner } from '../helpers/game-runner';
+import type { GameRunner } from '../helpers/game-runner';
 import { readText, waitForPicture } from '../helpers/screen';
 
 const FRAMES_PER_SECOND = 60;

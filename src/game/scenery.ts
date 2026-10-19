@@ -28,12 +28,13 @@ export function isProp(scenery: Scenery): scenery is Prop {
 
 /** A small drawing surface for props */
 export class Canvas {
+  readonly width: number;
+  readonly height: number;
   private readonly pixels: Shade[][];
 
-  constructor(
-    readonly width: number,
-    readonly height: number,
-  ) {
+  constructor(width: number, height: number) {
+    this.width = width;
+    this.height = height;
     this.pixels = Array.from({ length: height }, () => Array<Shade>(width).fill('.'));
   }
 

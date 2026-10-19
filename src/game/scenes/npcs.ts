@@ -3,7 +3,7 @@
  * A segment with npc: null shows nobody (the player is looking around).
  */
 
-import { type NpcLook } from '../npc-art';
+import type { NpcLook } from '../npc-art';
 import { rgb } from '../video';
 import { INK } from '../palette';
 

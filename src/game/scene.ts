@@ -17,7 +17,7 @@ import {
 } from './rounds';
 import { textToTiles } from './font';
 import { SCENE_ICON_TILES } from './font-data';
-import { type Pair, type Quint } from './fixed';
+import type { Pair, Quint } from './fixed';
 import { type ColorScheme, attributeOfCell, buildPaletteSet } from './color';
 import { type PackedCast, packCast } from './npc';
 import { packAnimation } from './anim';

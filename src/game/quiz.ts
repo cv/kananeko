@@ -9,7 +9,7 @@
 
 import { CHAR_MAP } from './font';
 import { type KanaQuestion, MAX_KANA_WORD_LENGTH } from './kana';
-import { type DialogueNode } from './dialogue';
+import type { DialogueNode } from './dialogue';
 
 /** Anything with words in it: a dialogue node, or a reply */
 export type Line = Pick<DialogueNode, 'text'>;

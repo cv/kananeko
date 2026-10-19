@@ -18,7 +18,7 @@ repos:
 
       - id: typecheck
         name: typecheck
-        entry: bash -c '. "$NVM_DIR/nvm.sh" && node node_modules/.bin/tsc --noEmit'
+        entry: bash -c '. "$NVM_DIR/nvm.sh" && npm run --silent typecheck'
         language: system
         pass_filenames: false
         files: \.ts$

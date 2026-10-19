@@ -56,7 +56,7 @@ import {
 import { type Op, ref, u8, u16 } from '../asm/types';
 import { at, hi, lo } from '../asm/util';
 import { BAD_CHOICE_FLAG, NEXT_END, TEXT_END } from './dialogue-data';
-import { type Triple } from './fixed';
+import type { Triple } from './fixed';
 import { requireTile } from './font';
 import {
   DELTA_MINUS_5,

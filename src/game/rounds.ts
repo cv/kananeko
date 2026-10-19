@@ -10,12 +10,12 @@
  */
 
 import { hi, lo } from '../asm/util';
-import { type DialogueNode } from './dialogue';
+import type { DialogueNode } from './dialogue';
 import { choiceRating } from './dialogue-data';
 import { CAT_TILES } from './font-data';
 import { buildKanaData, type KanaQuestion } from './kana';
 import { type QuizHistory, generateQuestions, matchQuestionFor, phrasesOf } from './quiz';
-import { type SceneCast } from './scenes/npcs';
+import type { SceneCast } from './scenes/npcs';
 import { END_OF_CONVERSATION } from './state';
 
 /** Rounds per scene are tracked in one byte of "already played" flags */

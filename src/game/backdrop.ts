@@ -8,7 +8,7 @@
 import { at } from '../asm/util';
 import { sliceArt } from './art';
 import { TILE_COUNT, encodeGlyph } from './font';
-import { type Glyph } from './font-data';
+import type { Glyph } from './font-data';
 import { type Prop, SCENERY, isProp } from './scenery';
 import { SCREEN_COLS } from './tilemap';
 

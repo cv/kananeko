@@ -6,7 +6,7 @@
  */
 
 import { hi, lo } from '../asm/util';
-import { type TupleIndex } from './fixed';
+import type { TupleIndex } from './fixed';
 import { textToTiles } from './font';
 
 // ---------------------------------------------------------------------------

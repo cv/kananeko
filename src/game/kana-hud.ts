@@ -45,7 +45,7 @@ import { switchCases, zeroBytes } from '../asm/macros';
 import { at, hi, lo } from '../asm/util';
 import { requireTile, requireTiles } from './font';
 import { CAT_TILES } from './font-data';
-import { type Quad } from './fixed';
+import type { Quad } from './fixed';
 import { MAX_LIVES } from './state';
 import { tilemapAddr, type TilePosition } from './tilemap';
 import { vramPut } from './video';

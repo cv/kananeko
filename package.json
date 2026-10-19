@@ -10,9 +10,9 @@
     "node": ">=25"
   },
   "scripts": {
-    "build": "tsx src/build.ts",
+    "build": "tsx scripts/build.ts",
     "screenshots": "tsx scripts/screenshots.ts",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc -b . src site test scripts site-tests",
     "test": "vitest run",
     "test:slow": "vitest run --reporter=verbose --slowTestThreshold=1000",
     "test:coverage": "vitest run --coverage",

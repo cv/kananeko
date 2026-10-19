@@ -30,7 +30,7 @@ import { type Op, ref, u8 } from '../asm/types';
 import { sliceArt } from './art';
 import { encodeGlyph } from './font';
 import { type NpcLook, npcArt } from './npc-art';
-import { type SceneCast } from './scenes/npcs';
+import type { SceneCast } from './scenes/npcs';
 import { OAM_X_OFFSET, OAM_Y_OFFSET, SPRITE_SLOT, oamField } from './sprites';
 
 /** NPC_CURRENT when nobody is shown */

@@ -11,7 +11,7 @@
  *   S shop sign E shelf     k shop floor
  */
 
-import { type Backdrop } from '../backdrop';
+import type { Backdrop } from '../backdrop';
 
 /** A train waits at the platform; the city behind it */
 export const STATION_BACKDROP: Backdrop = [

@@ -1,29 +1,10 @@
+// Root config files. Type-check everything with `npm run typecheck`.
 {
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2022",
-    "module": "ES2022",
-    "moduleResolution": "bundler",
-    "strict": true,
+    "lib": ["ES2024", "DOM"],
     "types": ["node"],
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
-    "noImplicitReturns": true,
-    "noFallthroughCasesInSwitch": true,
-    "noPropertyAccessFromIndexSignature": true,
-    "esModuleInterop": true,
-    "outDir": "dist",
-    "paths": {
-      "@asm/*": ["./src/asm/*"],
-      "@game/*": ["./src/game/*"]
-    }
+    "tsBuildInfoFile": "./node_modules/.cache/tsc/root.tsbuildinfo"
   },
-  "include": [
-    "src/**/*.ts",
-    "test/**/*.ts",
-    "scripts/**/*.ts",
-    "site/src/**/*.ts",
-    "site-tests/**/*.ts",
-    "vitest.config.ts",
-    "playwright.config.ts"
-  ]
+  "include": ["vitest.config.ts", "playwright.config.ts"]
 }

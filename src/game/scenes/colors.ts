@@ -5,7 +5,7 @@
  * its paper (sky or wall) and hues; the ink is always the same.
  */
 
-import { type ColorScheme } from '../color';
+import type { ColorScheme } from '../color';
 import { HUES, INK, PAPER, inked } from '../palette';
 import { rgb } from '../video';
 

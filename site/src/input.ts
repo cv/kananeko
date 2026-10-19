@@ -42,16 +42,18 @@ export class Joypad {
   private readonly pressedAt = new Map<Button, number>();
   /** Buttons the emulator currently has down */
   private readonly applied = new Set<Button>();
+  private readonly apply: (button: Button, down: boolean) => void;
+  private readonly minHoldMs: number;
 
   /**
    * @param apply sets a button on the emulated joypad
    * @param minHoldMs keep every press down at least this long, so a quick tap can't
    *   come and go between two frames without the game seeing it
    */
-  constructor(
-    private readonly apply: (button: Button, down: boolean) => void,
-    private readonly minHoldMs = 50,
-  ) {}
+  constructor(apply: (button: Button, down: boolean) => void, minHoldMs = 50) {
+    this.apply = apply;
+    this.minHoldMs = minHoldMs;
+  }
 
   press(button: Button, source: string): void {
     const set = this.holders.get(button) ?? new Set<string>();

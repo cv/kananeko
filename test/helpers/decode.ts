@@ -30,11 +30,10 @@ export interface DecodedNode {
 }
 
 class Reader {
+  private readonly data: Uint8Array;
   private pos: number;
-  constructor(
-    private readonly data: Uint8Array,
-    start = 0,
-  ) {
+  constructor(data: Uint8Array, start = 0) {
+    this.data = data;
     this.pos = start;
   }
 

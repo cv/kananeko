@@ -5,7 +5,7 @@ import { CAT_TILES } from '@game/font-data';
 import { KANA_LAYOUT, KANA_MESSAGES, type KanaQuestion, STREAK_BONUS } from '@game/kana';
 import { SCENES, sceneRounds } from '@game/scene';
 import { checkpoint, runnerAt } from '../helpers/checkpoints';
-import { type GameRunner } from '../helpers/game-runner';
+import type { GameRunner } from '../helpers/game-runner';
 import { loseOneKanaLife } from '../helpers/play';
 import { readText, waitForPicture } from '../helpers/screen';
 

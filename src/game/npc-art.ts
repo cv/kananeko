@@ -8,7 +8,7 @@
  */
 
 import { mirrorHalf } from './art';
-import { type Triple } from './fixed';
+import type { Triple } from './fixed';
 
 type Art = readonly string[];
 

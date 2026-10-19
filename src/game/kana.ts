@@ -61,7 +61,7 @@ import {
 } from '../asm/ops';
 import { type Op, type TileIndex, ref, u8, u16 } from '../asm/types';
 import { at } from '../asm/util';
-import { type NonEmpty, type Quad, type Triple, type TupleIndex } from './fixed';
+import type { NonEmpty, Quad, Triple, TupleIndex } from './fixed';
 import { requireTile, requireTiles, textToTiles } from './font';
 import { CAT_TILES, UI_TILES } from './font-data';
 import {

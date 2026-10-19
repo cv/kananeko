@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { SCENES, sceneRounds } from '@game/scene';
 import { KanaState } from '@game/state';
 import { checkpoint, runnerAt } from '../helpers/checkpoints';
-import { type GameRunner } from '../helpers/game-runner';
+import type { GameRunner } from '../helpers/game-runner';
 
 const STATION = SCENES[0];
 const FIRST_BREAK = sceneRounds(STATION)[0];

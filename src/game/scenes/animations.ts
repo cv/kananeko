@@ -4,7 +4,7 @@
  * animate, so global tiles like the scene icons stay untouched for the ending.
  */
 
-import { type Glyph } from '../font-data';
+import type { Glyph } from '../font-data';
 import { SIGN } from '../scenery';
 
 export interface TileAnimation {

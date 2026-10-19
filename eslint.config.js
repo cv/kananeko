@@ -22,12 +22,15 @@ export default defineConfig(
       '@typescript-eslint/restrict-template-expressions': 'error',
       '@typescript-eslint/no-unnecessary-condition': 'error',
       '@typescript-eslint/prefer-nullish-coalescing': 'error',
+      // With verbatimModuleSyntax, `import { type X }` keeps an empty import at runtime
+      '@typescript-eslint/consistent-type-imports': ['error', { fixStyle: 'inline-type-imports' }],
+      '@typescript-eslint/no-import-type-side-effects': 'error',
       eqeqeq: ['error', 'always'],
       'no-console': ['error', { allow: ['warn', 'error'] }],
     },
   },
   {
-    files: ['src/build.ts', 'scripts/**/*.ts', 'site-tests/**/*.ts'],
+    files: ['scripts/**/*.ts', 'site-tests/**/*.ts'],
     rules: {
       'no-console': 'off',
     },

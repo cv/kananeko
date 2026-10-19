@@ -22,7 +22,7 @@ import {
 import { type Op, type U16, ref, u8, u16 } from '../asm/types';
 import { hi, lo } from '../asm/util';
 import { encodeGlyph, glyphOf } from './font';
-import { type Palette } from './video';
+import type { Palette } from './video';
 import { HUES, INK, PAPER } from './palette';
 import { UI_TILES } from './font-data';
 

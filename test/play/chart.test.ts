@@ -9,7 +9,7 @@ import { SCENES } from '@game/scene';
 import { DialogueState } from '@game/state';
 import { centerStartCol } from '@game/tilemap';
 import { checkpoint, runnerAt } from '../helpers/checkpoints';
-import { type GameRunner } from '../helpers/game-runner';
+import type { GameRunner } from '../helpers/game-runner';
 import { asSeenOnScreen, readText } from '../helpers/screen';
 
 const SETTLE = 8;

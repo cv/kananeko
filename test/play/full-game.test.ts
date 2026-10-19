@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { SCENES, sceneRounds } from '@game/scene';
 import { DialogueState, KanaState, MAX_LIVES } from '@game/state';
 import { checkpoint, runnerAt } from '../helpers/checkpoints';
-import { type GameRunner } from '../helpers/game-runner';
+import type { GameRunner } from '../helpers/game-runner';
 import { readText, waitForPicture } from '../helpers/screen';
 
 const ALL_SCENES = (1 << SCENES.length) - 1;

@@ -56,6 +56,9 @@ const SETTERS: Record<Button, (m: BinjgbModule, e: number, down: boolean) => voi
 };
 
 class Emulator {
+  private readonly module: BinjgbModule;
+  private readonly ctx: CanvasRenderingContext2D;
+  private readonly audio: AudioContext;
   private readonly e: number;
   private readonly romPtr: number;
   private readonly frame: Uint8ClampedArray;
@@ -70,11 +73,14 @@ class Emulator {
   readonly joypad: Joypad;
 
   constructor(
-    private readonly module: BinjgbModule,
+    module: BinjgbModule,
     rom: ArrayBuffer,
-    private readonly ctx: CanvasRenderingContext2D,
-    private readonly audio: AudioContext,
+    ctx: CanvasRenderingContext2D,
+    audio: AudioContext,
   ) {
+    this.module = module;
+    this.ctx = ctx;
+    this.audio = audio;
     // binjgb wants the ROM padded to a multiple of 32 KB
     const size = (rom.byteLength + 0x7fff) & ~0x7fff;
     this.romPtr = module._malloc(size);

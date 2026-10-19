@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { NPC_TILE_BASE } from '@game/npc';
 import { STATION_CAST } from '@game/scenes/npcs';
 import { checkpoint, runnerAt } from '../helpers/checkpoints';
-import { type GameRunner } from '../helpers/game-runner';
+import type { GameRunner } from '../helpers/game-runner';
 
 const OAM = 0xfe00;
 const NPC_SLOTS = [1, 2, 3, 4];

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { type DialogueNode } from '@game/dialogue';
+import type { DialogueNode } from '@game/dialogue';
 import {
   distractorsFor,
   generateQuestions,

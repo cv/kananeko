@@ -1,0 +1,10 @@
+// Playwright tests of the site.
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "tsBuildInfoFile": "../node_modules/.cache/tsc/site-tests.tsbuildinfo"
+  },
+  "include": ["**/*.ts"]
+}

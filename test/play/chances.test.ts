@@ -1,7 +1,7 @@
 /** One-question kana chances inside a conversation */
 
 import { describe, expect, it } from 'vitest';
-import { type DialogueNode } from '@game/dialogue';
+import type { DialogueNode } from '@game/dialogue';
 import { choiceRating } from '@game/dialogue-data';
 import { SCENES, sceneQuiz } from '@game/scene';
 import { FILL_IN_BLANK, REDEEM_KEY } from '@game/rounds';
@@ -9,7 +9,7 @@ import { DIALOGUE_LAYOUT } from '@game/dialogue';
 import { asSeenOnScreen, readText } from '../helpers/screen';
 import { KanaMode, KanaState, MAX_LIVES } from '@game/state';
 import { checkpoint, runnerAt } from '../helpers/checkpoints';
-import { type GameRunner } from '../helpers/game-runner';
+import type { GameRunner } from '../helpers/game-runner';
 
 const STATION = SCENES[0];
 const OPENING: DialogueNode = STATION.dialogue[0];

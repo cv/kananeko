@@ -39,7 +39,7 @@ import {
   xor_r,
 } from '../asm/ops';
 import { type Op, ref, u8, u16 } from '../asm/types';
-import { type Quad } from './fixed';
+import type { Quad } from './fixed';
 import { SCREEN_COLS, centerStartCol, tilemapAddr, tileRow } from './tilemap';
 
 /** Palette numbers every screen shares (see color.ts) */

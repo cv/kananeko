@@ -1,0 +1,9 @@
+// The browser player.
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "tsBuildInfoFile": "../node_modules/.cache/tsc/site.tsbuildinfo"
+  },
+  "include": ["src/**/*.ts"]
+}

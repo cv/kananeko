@@ -1,4 +1,4 @@
-import { type Op } from './types';
+import type { Op } from './types';
 import { at, hex } from './util';
 
 export const ROM_SIZE = 32 * 1024; // 32KB, single bank, no mapper
@@ -65,7 +65,10 @@ function writeHeader(rom: Uint8Array, header: ROMHeader): void {
   rom.set([0x00, 0xc3, PROGRAM_START & 0xff, PROGRAM_START >> 8], HEADER_START);
 
   rom.set(NINTENDO_LOGO, 0x0104);
-  rom.set(new TextEncoder().encode(header.title), TITLE_ADDR);
+  rom.set(
+    Array.from(header.title, (ch) => ch.charCodeAt(0)),
+    TITLE_ADDR,
+  ); // checked ASCII above
 
   rom[0x0143] = header.cgbFlag ?? 0x00;
   rom[0x0147] = header.cartridgeType ?? 0x00;

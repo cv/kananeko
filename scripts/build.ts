@@ -1,8 +1,8 @@
-import * as fs from 'fs';
-import * as path from 'path';
-import { formatSymbolFile } from './asm/assembler';
-import { hex } from './asm/util';
-import { buildRom } from './game/main';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { formatSymbolFile } from '../src/asm/assembler';
+import { hex } from '../src/asm/util';
+import { buildRom } from '../src/game/main';
 
 const outDir = path.join(import.meta.dirname, '..', 'build');
 fs.mkdirSync(outDir, { recursive: true });

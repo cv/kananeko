@@ -1,0 +1,10 @@
+// Vitest suites (DOM for the site's input tests).
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "tsBuildInfoFile": "../node_modules/.cache/tsc/test.tsbuildinfo"
+  },
+  "include": ["**/*.ts"]
+}

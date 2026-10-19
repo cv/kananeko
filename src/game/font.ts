@@ -4,7 +4,7 @@
  * This module handles tile encoding, character mapping, and data building.
  */
 
-import { type TileIndex } from '../asm/types';
+import type { TileIndex } from '../asm/types';
 import { ALL_GLYPHS, CAT_TILES, type Glyph } from './font-data';
 
 type TileTuple<T extends readonly string[]> = { [K in keyof T]: TileIndex };

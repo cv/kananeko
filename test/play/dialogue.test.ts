@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { DELTA_MINUS_5, DELTA_PLUS_10 } from '@game/kana-hud';
 import { DialogueState, END_OF_CONVERSATION, KanaState, MAX_LIVES } from '@game/state';
 import { checkpoint, runnerAt } from '../helpers/checkpoints';
-import { type GameRunner } from '../helpers/game-runner';
+import type { GameRunner } from '../helpers/game-runner';
 import { loseDialogueLives } from '../helpers/play';
 import { type ChoiceRating, type DialogueNode, choiceRating } from '@game/dialogue-data';
 import { SCENES } from '@game/scene';

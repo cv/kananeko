@@ -3,13 +3,13 @@
  */
 
 import { expect } from 'vitest';
-import { type DialogueNode } from '@game/dialogue';
+import type { DialogueNode } from '@game/dialogue';
 import { choiceRating } from '@game/dialogue-data';
 import { SCENES } from '@game/scene';
 import { DialogueState, END_OF_CONVERSATION, KanaState, MAX_LIVES } from '@game/state';
 import { FADE_STEPS, FADE_STEP_FRAMES } from '@game/video';
 import { STREAK_BONUS, STREAK_LENGTH } from '@game/kana';
-import { type GameRunner } from './game-runner';
+import type { GameRunner } from './game-runner';
 
 /** Frames for the game over screen to fade in (and out again after START) */
 const GAME_OVER_RESET_FRAMES = 2 * FADE_STEPS * FADE_STEP_FRAMES + 10;
