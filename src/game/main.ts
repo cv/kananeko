@@ -85,7 +85,14 @@ import {
 } from './kana-hud';
 import { centerStartCol, tilemapAddr } from './tilemap';
 import { SCENES, SPEED_ROUND, buildSceneData, dialogueCodec } from './scene';
-import { buildSoundData, buildSoundDriver, buildSoundInit, playSfx } from './sound';
+import {
+  type SongName,
+  buildSoundData,
+  buildSoundDriver,
+  buildSoundInit,
+  playMusic,
+  playSfx,
+} from './sound';
 import { BAD_PICK, END_OF_CONVERSATION, KanaMode, MAX_LIVES } from './state';
 import { REDEEM_KEY } from './rounds';
 import { type ColorScheme, buildPaletteSet, buildSharedPalettes, paletteOf } from './color';
@@ -374,11 +381,14 @@ interface ResultScreen {
   readonly face: CatFace;
   readonly title: string;
   readonly colors: ColorScheme;
+  /** The music it plays */
+  readonly song: SongName;
 }
 
 const ENDING: ResultScreen = {
   name: 'game_complete',
   face: 'happy',
+  song: 'ending',
   title: ENDING_TITLE,
   colors: ENDING_COLORS,
 };
@@ -386,6 +396,7 @@ const ENDING: ResultScreen = {
 const GAME_OVER: ResultScreen = {
   name: 'game_over',
   face: 'sad',
+  song: 'gameOver',
   title: 'ゲームオーバー',
   colors: GAME_OVER_COLORS,
 };
@@ -423,6 +434,7 @@ function buildResultScreen(screen: ResultScreen): Op[] {
     label(name),
     ...fadeOut(),
     ...screenOff(`${name}_vblank`),
+    ...playMusic(screen.song),
     ...clearScreen(),
     ...zeroBytes(MEM.TITLE_TIMER), // prompt starts visible
 
@@ -541,6 +553,7 @@ export function buildProgram(): Op[] {
 
     // ==== Title Screen (entered with the LCD off) ====
     label('title_screen'),
+    ...playMusic('title'),
     ...clearScreen(),
 
     // Reset title animation state so the prompt always starts visible.
@@ -665,6 +678,7 @@ export function buildProgram(): Op[] {
     label('scene_draw'),
     ...fadeOut(),
     ...screenOff('scene_vblank'),
+    ...playMusic('travel'), // (carries on if it was already playing)
     ...clearScreen(),
 
     // Backdrop above the dialogue box: the scene's own tiles, then its map

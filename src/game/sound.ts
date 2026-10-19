@@ -55,7 +55,7 @@ import {
   sub_n,
   xor_r,
 } from '../asm/ops';
-import { type Op, type U16, ref, u16, u8 } from '../asm/types';
+import { type Op, type U16, ioReg, ref, u16, u8 } from '../asm/types';
 import { copyBytes, storeByte } from '../asm/macros';
 
 // ---------------------------------------------------------------------------
@@ -191,6 +191,99 @@ export const SFX = {
 } as const satisfies Record<string, SoundEffect>;
 
 export type SfxName = keyof typeof SFX;
+
+// ---------------------------------------------------------------------------
+// Music
+// ---------------------------------------------------------------------------
+
+interface Song {
+  /** Pulse channel 2 */
+  readonly melody: string;
+  /** Wave channel 3, an octave below the notes written */
+  readonly bass: string;
+}
+
+/**
+ * The songs, in ID order: short tunes in the major pentatonic scale (C D E G A),
+ * plucked on the pulse channel over a soft bass. Melody and bass must last as long
+ * as each other, so they stay together when they loop.
+ */
+export const SONGS = {
+  /** A gentle, catchy theme */
+  title: {
+    melody: `w2 v73
+      l12 e5 g5 a5 g5 l24 e5 d5 l12 c5 d5 e5 g5 l48 d5
+      l12 e5 g5 a5 c6 l24 a5 g5 l12 a5 g5 e5 d5 l48 e5
+      l12 g5 a5 c6 a5 l24 g5 e5 l12 d5 e5 g5 e5 l24 d5 c5
+      l12 a4 c5 d5 e5 l24 g5 e5 l12 d5 c5 d5 e5 l48 c5 loop`,
+    bass: `v40 l24
+      c3 g3 c4 g3 g3 d4 g3 d4 a3 e4 a3 e4 c3 g3 c4 g3
+      f3 c4 f3 c4 g3 d4 g3 d4 a3 e4 a3 e4 g3 d4 c3:48 loop`,
+  },
+  /** For the conversations: calm and sparse, so it doesn't tire while reading */
+  travel: {
+    melody: `w1 v52
+      l14 g4 a4 c5 a4 l28 g4 e4 l14 d4 e4 g4 e4 l56 d4
+      l14 g4 a4 c5 d5 l28 e5 d5 l14 c5 a4 g4 a4 l56 c5
+      l14 e5 d5 c5 d5 l28 e5 g5 l14 a5 g5 e5 d5 l56 e5
+      l14 d5 c5 a4 c5 l28 d5 e5 l14 d5 c5 a4 g4 l56 c5 loop`,
+    bass: `v60 l28
+      c3 g3 c3 g3 g3 d4 g3 d4 a3 e4 a3 e4 f3 c4 c3:56
+      l28 c3 g3 c3 g3 a3 e4 a3 e4 f3 c4 g3 d4 c3 g3 c3:56 loop`,
+  },
+  /** For kana rounds: bouncy */
+  quiz: {
+    melody: `w2 v73
+      l10 c5 e5 g5 e5 a5 g5 e5 g5 l10 d5 e5 g5 a5 l20 g5 e5
+      l10 c5 e5 g5 e5 a5 c6 a5 g5 l10 e5 d5 c5 d5 l40 c5 loop`,
+    bass: `v40 l20
+      c3 g3 c3 g3 g3 d4 g3 d4 a3 e4 a3 e4 g3 d4 c3:40 loop`,
+  },
+  /** The ending: a happy fanfare */
+  ending: {
+    melody: `w2 v84
+      l12 g5 g5 a5 g5 l24 c6 a5 l12 g5 e5 d5 e5 l48 g5
+      l12 a5 a5 c6 a5 l24 g5 e5 l12 d5 e5 g5 d5 l48 c5 loop`,
+    bass: `v20 l24
+      c3 g3 c4 g3 c3 g3 g3 d4 f3 c4 f3 c4 g3 d4 c3:48 loop`,
+  },
+  /** Game over: a short, sad phrase, then quiet */
+  gameOver: {
+    melody: 'w1 v64 l18 a4 g4 e4 d4 l48 e4 r:1',
+    bass: 'v40 l36 a3 e3 l48 a3 r:1',
+  },
+} as const satisfies Record<string, Song>;
+
+export type SongName = keyof typeof SONGS;
+
+const SONG_NAMES = Object.keys(SONGS) as SongName[];
+
+/** MUSIC_ID when nothing plays (at boot) */
+export const MUSIC_NONE = 0;
+
+/** A song's ID (1-based; MUSIC_NONE is silence) */
+export function songId(name: SongName): number {
+  return SONG_NAMES.indexOf(name) + 1;
+}
+
+/** Play a song, unless it's already playing. Preserves every register and the flags. */
+export function playMusic(name: SongName): Op[] {
+  return [push('af'), ld_r_n('a', u8(songId(name))), call(ref('music_play')), pop('af')];
+}
+
+/** How many frames a sequence lasts, up to its end or loop */
+export function sequenceFrames(source: string): number {
+  let length = 0;
+  let frames = 0;
+  const bytes = encodeSequence(source);
+  for (let i = 0; i < bytes.length; i++) {
+    const b = bytes[i] ?? SEQ.END;
+    if (b === SEQ.ENVELOPE || b === SEQ.DUTY) i++;
+    else if (b >= SEQ.LENGTH && b < SEQ.ENVELOPE) length = b & MAX_LENGTH;
+    else if (b <= SEQ.REST) frames += length;
+  }
+  return frames;
+}
 
 const SFX_NAMES = Object.keys(SFX) as SfxName[];
 
@@ -434,6 +527,55 @@ export function buildSoundDriver(): Op[] {
     pop('de'),
     pop('bc'),
     ret(),
+
+    // music_play: A = song ID (MUSIC_NONE: silence); does nothing if it's playing.
+    // Clobbers A, preserves BC, DE, HL.
+    label('music_play'),
+    push('bc'),
+    push('de'),
+    push('hl'),
+    ld_rr_nn('hl', MEM.MUSIC_ID),
+    cp_r('hl_ptr'),
+    jr_cc('z', ref('music_done')),
+    ld_r_r('hl_ptr', 'a'),
+    ld_r_r('c', 'a'),
+    // Stop both music voices and quiet their channels
+    xor_r('a'),
+    ld_nn_a(voiceField(0, 'PTR_HI')),
+    ld_nn_a(voiceField(1, 'PTR_HI')),
+    ldh_n_a(ioReg(0x17)), // NR22: channel 2's volume
+    ldh_n_a(ioReg(0x1c)), // NR32: channel 3's output level
+    ld_r_r('a', 'c'),
+    or_r('a'),
+    jr_cc('z', ref('music_done')),
+    // HL = the song's two sequence addresses (4 bytes per song, from ID 1)
+    dec_r('a'),
+    add_r('a'),
+    add_r('a'),
+    ld_r_r('e', 'a'),
+    ld_r_n('d', u8(0)),
+    ld_rr_nn('hl', ref('music_table')),
+    add_hl_rr('de'),
+    ...[0, 1].flatMap((voice) => [
+      ldi_a_hl(),
+      ld_r_r('e', 'a'),
+      ldi_a_hl(),
+      ld_r_r('d', 'a'),
+      ld_r_r('a', 'e'),
+      ld_nn_a(voiceField(voice, 'PTR_LO')),
+      ld_nn_a(voiceField(voice, 'START_LO')),
+      ld_r_r('a', 'd'),
+      ld_nn_a(voiceField(voice, 'START_HI')),
+      ld_r_n('a', u8(1)),
+      ld_nn_a(voiceField(voice, 'TIMER')),
+      ld_r_r('a', 'd'),
+      ld_nn_a(voiceField(voice, 'PTR_HI')), // last: the voice starts now
+    ]),
+    label('music_done'),
+    pop('hl'),
+    pop('de'),
+    pop('bc'),
+    ret(),
   ];
 }
 
@@ -452,6 +594,15 @@ export function buildSoundData(): Op[] {
     ...SFX_NAMES.flatMap((name) => [
       label(`sfx_data_${name}`),
       db(encodeSequence(SFX[name].sequence)),
+    ]),
+    // Song n is at entry n - 1: melody, then bass
+    label('music_table'),
+    ...SONG_NAMES.flatMap((name) => [dw(ref(`song_${name}_melody`)), dw(ref(`song_${name}_bass`))]),
+    ...SONG_NAMES.flatMap((name) => [
+      label(`song_${name}_melody`),
+      db(encodeSequence(SONGS[name].melody)),
+      label(`song_${name}_bass`),
+      db(encodeSequence(SONGS[name].bass)),
     ]),
   ];
 }

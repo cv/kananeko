@@ -5,7 +5,7 @@
  * game scenarios instead of raw frame counts and hex addresses.
  */
 
-import { SFX, SFX_NONE, type SfxName } from '@game/sound';
+import { MUSIC_NONE, SFX, SFX_NONE, SONGS, type SfxName, type SongName } from '@game/sound';
 import Gameboy from 'serverboy';
 import { MEM } from '@asm/hardware';
 import { CAT_FACES, type CatFace, faceTile } from '@game/cat';
@@ -38,6 +38,7 @@ export interface GameRunnerSnapshot {
 }
 
 const SFX_ORDER = Object.keys(SFX) as SfxName[];
+const SONG_ORDER = Object.keys(SONGS) as SongName[];
 
 function patchRomForServerboy(sourceRom: Uint8Array): Buffer {
   const patchedRom = Buffer.from(sourceRom);
@@ -158,6 +159,12 @@ export class GameRunner {
   get sfx(): SfxName | 'none' {
     const id = this.readMem(MEM.SFX_ID);
     return id === SFX_NONE ? 'none' : (SFX_ORDER[id - 1] ?? 'none');
+  }
+
+  /** The song playing ('none' for silence) */
+  get music(): SongName | 'none' {
+    const id = this.readMem(MEM.MUSIC_ID);
+    return id === MUSIC_NONE ? 'none' : (SONG_ORDER[id - 1] ?? 'none');
   }
 
   readMem(addr: number): number {

@@ -20,6 +20,10 @@ import {
   SEQ,
   SFX,
   SFX_VOICE,
+  SONGS,
+  SEQ as STEP,
+  songId,
+  sequenceFrames,
   buildSoundData,
   buildSoundDriver,
   buildSoundInit,
@@ -189,6 +193,52 @@ describe('Given a sound effect starts', () => {
     // heartDown: 5 + 5 + 12 frames, plus the frame its first note waits for
     const memory = runSound([...play('heartDown'), ...ticks(23), ...play('blip')], 1);
     expect(memory[MEM.SFX_ID]).toBe(sfxId('blip'));
+  });
+});
+
+describe('Given the songs', () => {
+  it.each(Object.entries(SONGS))('keeps the melody and bass of %s together', (_, song) => {
+    expect(sequenceFrames(song.melody)).toBe(sequenceFrames(song.bass));
+  });
+
+  it('loops every song but the game over phrase, which ends quiet', () => {
+    for (const [name, song] of Object.entries(SONGS)) {
+      for (const part of [song.melody, song.bass]) {
+        const bytes = encodeSequence(part);
+        if (name === 'gameOver') expect(bytes.slice(-2)).toEqual([STEP.REST, STEP.END]);
+        else expect(bytes.at(-1)).toBe(STEP.LOOP);
+      }
+    }
+  });
+});
+
+const playSong = (id: number): Op[] => [ld_r_n('a', u8(id)), call(ref('music_play'))];
+
+describe('Given a song starts', () => {
+  it('plays its melody and bass on the music voices', () => {
+    const memory = runSound(playSong(songId('quiz')), 1);
+    expect(memory[MEM.MUSIC_ID]).toBe(songId('quiz'));
+    expect(memory[voiceField(0, 'PTR_HI')]).not.toBe(0);
+    expect(memory[voiceField(1, 'PTR_HI')]).not.toBe(0);
+    expect(memory[voiceField(0, 'LENGTH')]).toBe(10); // quiz: l10
+    expect(memory[voiceField(1, 'LENGTH')]).toBe(20); // its bass: l20
+  });
+
+  it('carries on, rather than restarting, when asked for again', () => {
+    const memory = runSound(
+      [...playSong(songId('quiz')), ...ticks(15), ...playSong(songId('quiz'))],
+      1,
+    );
+    // Notes start on frames 1 and 11, so 16 frames in the second has 5 left (a
+    // restart would show a fresh first note's 10)
+    expect(memory[voiceField(0, 'TIMER')]).toBe(5);
+  });
+
+  it('stops both voices and goes quiet for song 0', () => {
+    const memory = runSound([...playSong(songId('title')), ...ticks(5), ...playSong(0)], 1);
+    expect(memory[voiceField(0, 'PTR_HI')]).toBe(0);
+    expect(memory[voiceField(1, 'PTR_HI')]).toBe(0);
+    expect(memory[0xff17]).toBe(0); // NR22
   });
 });
 

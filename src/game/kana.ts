@@ -20,7 +20,7 @@
  *   0x00 sentinel (word_length = 0)
  */
 
-import { playSfx } from './sound';
+import { playMusic, playSfx } from './sound';
 import { HW, JOY, MEM } from '../asm/hardware';
 import {
   countDownOrReturn,
@@ -359,6 +359,7 @@ export function buildKanaEngine(): Op[] {
     // kana_start — DE = question data pointer.
     // =================================================================
     label('kana_start'),
+    ...playMusic('quiz'),
     ...storePointer('de', MEM.KANA_DATA_LO, MEM.KANA_DATA_HI),
 
     // Score persists across scenes — initialized at game start only.

@@ -9,6 +9,30 @@ import { loseOneKanaLife } from '../helpers/play';
 /** A few frames for the HUD and the sound to catch up */
 const SETTLE = 4;
 
+describe('Given each screen', () => {
+  it('plays the title theme on the title screen', () => {
+    expect(new GameRunner().boot().frames(10).music).toBe('title');
+  });
+
+  it('plays the travel tune in conversations and the quiz tune in kana rounds', () => {
+    expect(runnerAt(checkpoint.sceneStart(0)).music).toBe('travel');
+    expect(runnerAt(checkpoint.kanaStart(0)).music).toBe('quiz');
+  });
+
+  it('goes back to the travel tune when the next scene starts', () => {
+    const runner = runnerAt(checkpoint.kanaStart(0)).completeKanaQuestions(0);
+    runner.waitForDialogueChoices();
+    expect(runner.music).toBe('travel');
+  });
+
+  it('plays the fanfare at the ending, and the sad phrase at game over', () => {
+    expect(runnerAt(checkpoint.gameComplete).music).toBe('ending');
+    const runner = runnerAt(checkpoint.kanaStart(0)).setLives(1);
+    loseOneKanaLife(runner);
+    runner.waitUntil(() => runner.music === 'gameOver', 'the game over music');
+  });
+});
+
 describe('Given the title screen', () => {
   it('is quiet until START, which plays a jingle', () => {
     const runner = new GameRunner().boot();
