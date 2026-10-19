@@ -14,6 +14,7 @@ import { SPRITE_SLOT, SPRITE_TILE, oamField } from './sprites';
 import { centerStartCol } from './tilemap';
 import { writeCenteredRow } from './video';
 import { MENU_DRAW, MENU_UPDATE } from './labels';
+import { gameModule } from '../asm/program';
 
 // Labels placed in this module
 const MENU_NO_PICK = new Label('menu_no_pick');
@@ -108,3 +109,5 @@ export function buildMenuRoutines(): Op[] {
     ret(),
   ];
 }
+
+export const menuModule = gameModule({ name: 'menu', code: buildMenuRoutines });

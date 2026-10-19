@@ -87,6 +87,7 @@ import {
   KANA_START,
   KANA_UPDATE,
 } from './labels';
+import { gameModule } from '../asm/program';
 
 // Labels placed in this module
 const KANA_LIVES_OK = new Label('kana_lives_ok');
@@ -726,3 +727,5 @@ export function buildKanaEngine(): Op[] {
     ret(),
   ];
 }
+
+export const kanaModule = gameModule({ name: 'kana', code: buildKanaEngine });

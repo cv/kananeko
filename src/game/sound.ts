@@ -44,6 +44,7 @@ import {
 import { type Op, type U16, ioReg, u16, Label, labelFamily, routine } from '../asm/types';
 import { copyBytes, storeByte } from '../asm/macros';
 import { SOUND_TICK, SFX_PLAY, MUSIC_PLAY } from './labels';
+import { gameModule } from '../asm/program';
 
 // Labels placed in this module
 const VOICE_TICK = routine('voice_tick', { clobbers: ['a', 'bc', 'de', 'hl'] });
@@ -611,3 +612,10 @@ export function buildSoundData(): Op[] {
     ]),
   ];
 }
+
+export const soundModule = gameModule({
+  name: 'sound',
+  init: buildSoundInit,
+  code: buildSoundDriver,
+  data: buildSoundData,
+});

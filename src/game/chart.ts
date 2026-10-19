@@ -58,6 +58,8 @@ import {
   CHART_BIT,
   CHART_SHOW,
 } from './labels';
+import { gameModule } from '../asm/program';
+import { CHART_FADE } from './labels';
 
 // Labels placed in this module
 const CHART_OF_TILE = new Label('chart_of_tile');
@@ -331,3 +333,9 @@ export function buildChartRoutines(fade: Label): Op[] {
     ret(),
   ];
 }
+
+export const chartModule = gameModule({
+  name: 'chart',
+  code: () => buildChartRoutines(CHART_FADE),
+  data: buildChartData,
+});

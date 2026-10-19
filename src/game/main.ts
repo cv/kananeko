@@ -7,6 +7,24 @@
 import { type AssembleResult, type ROMHeader, assemble } from '../asm/assembler';
 import { HW, JOY } from '../asm/hardware';
 import { BUFFERS, MEM, STACK_TOP, VARIABLES } from './ram';
+import { type GameModule, gameModule, link } from '../asm/program';
+import { CHART_FADE, SPEED_ROUND_DATA, TITLE_FADE } from './labels';
+import type { PackedScene } from './scene';
+import { animModule } from './anim';
+import { catModule } from './cat';
+import { chartModule } from './chart';
+import { dialogueModule } from './dialogue';
+import { joypadModule } from './joypad';
+import { kanaModule } from './kana';
+import { hudModule } from './kana-hud';
+import { menuModule } from './menu';
+import { npcModule } from './npc';
+import { passwordModule } from './password';
+import { practiceModule } from './practice';
+import { sceneTableModule } from './scene-table';
+import { soundModule } from './sound';
+import { spritesModule } from './sprites';
+import { videoModule } from './video';
 import {
   copyBlock,
   expandOneBit,
@@ -37,24 +55,14 @@ import {
   push,
   ret,
   sla,
-  pool,
   xor,
 } from '../asm/sm83';
 import { type Op, type U16, u16, Label, labelFamily, routine } from '../asm/types';
 import { SCENE_TILE_BASE } from './backdrop';
-import { buildSpriteData, buildSpriteInit, buildSpriteRoutines, runDma } from './sprites';
-import {
-  CAT_SPOTS,
-  type CatFace,
-  buildCatData,
-  buildCatInit,
-  buildCatRoutines,
-  catFace,
-  placeCat,
-} from './cat';
-import { NPC_NONE, NPC_TILE_BASE, buildNpcRoutines } from './npc';
-import { buildAnimRoutines } from './anim';
-import { DIALOGUE_LAYOUT, buildDialogueEngine, buildTextNext } from './dialogue';
+import { runDma } from './sprites';
+import { CAT_SPOTS, type CatFace, catFace, placeCat } from './cat';
+import { NPC_NONE, NPC_TILE_BASE } from './npc';
+import { DIALOGUE_LAYOUT } from './dialogue';
 import {
   ONE_BIT_TILES,
   TILE_COUNT,
@@ -64,58 +72,23 @@ import {
   textToTiles,
 } from './font';
 import { UI_TILES } from './font-data';
-import { buildReadJoypad } from './joypad';
-import { buildKanaData, buildKanaEngine } from './kana';
-import {
-  buildDrawHudOps,
-  buildDrawScoreDigits,
-  buildScoreDigits,
-  buildScoreRoutines,
-  SCORE_DIGIT_COUNT,
-} from './kana-hud';
+import { buildKanaData } from './kana';
+import { buildDrawScoreDigits, SCORE_DIGIT_COUNT } from './kana-hud';
 import { centerStartCol, tilemapAddr } from './tilemap';
 import { SCENES, SPEED_ROUND, buildSceneData, dialogueCodec } from './scene';
-import { buildMenuRoutines, menuPick } from './menu';
-import {
-  PASSWORD_LABEL,
-  buildPasswordData,
-  buildPasswordRoutines,
-  buildPasswordScreen,
-  passwordLineCol,
-} from './password';
-import {
-  type SongName,
-  buildSoundData,
-  buildSoundDriver,
-  buildSoundInit,
-  playMusic,
-  playSfx,
-} from './sound';
+import { menuPick } from './menu';
+import { PASSWORD_LABEL, passwordLineCol } from './password';
+import { type SongName, playMusic, playSfx } from './sound';
 import { BAD_PICK, END_OF_CONVERSATION, KanaMode, MAX_LIVES } from './state';
 import { REDEEM_KEY } from './rounds';
 import { type ColorScheme, buildPaletteSet, buildSharedPalettes, paletteOf } from './color';
 import { LOGO_ROWS } from './logo';
-import {
-  buildSceneTable,
-  buildSceneTableRoutines,
-  copySceneBlock,
-  sceneByte,
-  sceneWord,
-} from './scene-table';
+import { buildSceneTable, copySceneBlock, sceneByte, sceneWord } from './scene-table';
 import { CHART_COLORS, ENDING_COLORS, GAME_OVER_COLORS, TITLE_COLORS } from './scenes/colors';
-import { buildChartData, buildChartRoutines } from './chart';
-import { buildPracticeData, buildPracticeLoop, buildPracticeRoutines } from './practice';
 import { BACKDROP } from './backdrop';
 import {
   bgTileAddr,
-  buildFrameWait,
-  buildDrawTiles,
   tileList,
-  buildDrawRuns,
-  buildClearScreen,
-  buildFadeData,
-  buildFadeRoutines,
-  buildVramPut,
   cgbAttributes,
   clearScreen,
   fadeIn,
@@ -279,9 +252,6 @@ export function castLabels(sceneIndex: number): { tiles: Label; palettes: Label;
   };
 }
 
-const SPEED_ROUND_LABEL = new Label('speed_round');
-const TITLE_FADE = new Label('title_fade');
-const CHART_FADE = new Label('chart_fade');
 const resultFadeLabel = labelFamily((screen: ResultScreen) => `${screen.entry.toString()}_fade`);
 const SCENE_DLG_LOOP = new Label('scene_dlg_loop');
 
@@ -560,9 +530,8 @@ function buildTitleBlink(): Op[] {
 // Program builder
 // ---------------------------------------------------------------------------
 
-export function buildProgram(): Op[] {
-  const packedScenes = buildSceneData();
-
+/** Boot: the CPU, RAM and the font, with the LCD off, before the modules' inits */
+function buildBoot(): Op[] {
   return [
     // ==== Init ====
     di(),
@@ -596,11 +565,12 @@ export function buildProgram(): Op[] {
         segment.data.length,
       ),
     ),
+  ];
+}
 
-    ...buildSpriteInit(),
-    ...buildCatInit(),
-    ...buildSoundInit(),
-
+/** The game: the title screen, the scenes and their rounds, and the result screens */
+function buildMain(): Op[] {
+  return [
     // Enable the VBlank interrupt so HALT wakes once per frame (fades and game loops);
     // its handler counts frames (see buildFrameWait).
     ...storeByte(MEM.IE, 0x01), // bit 0 = VBlank
@@ -741,188 +711,189 @@ export function buildProgram(): Op[] {
 
     // ==== Game Over ====
     ...buildResultScreen(GAME_OVER_SCREEN),
+  ];
+}
 
-    // ==== Subroutines ====
-    // scene_draw — fade out, draw the current scene (backdrop, cast, HUD, empty box, name), fade in
-    label(SCENE_DRAW),
-    ...fadeOut(),
-    ...screenOff(),
-    ...playMusic('travel'), // (carries on if it was already playing)
-    ...clearScreen(),
+/** The routines and data of the game's flow: scenes, the title, the result screens */
+function gameFlow(packedScenes: readonly PackedScene[]): GameModule {
+  return gameModule({
+    name: 'game',
+    code: () => [
+      // scene_draw — fade out, draw the current scene (backdrop, cast, HUD, empty box, name), fade in
+      label(SCENE_DRAW),
+      ...fadeOut(),
+      ...screenOff(),
+      ...playMusic('travel'), // (carries on if it was already playing)
+      ...clearScreen(),
 
-    // Backdrop above the dialogue box: the scene's own tiles, then its map
-    ...copySceneBlock(u16(bgTileAddr(SCENE_TILE_BASE)), 'tiles', 'tilesLength'),
-    ...sceneWord('backdrop'),
-    ld('d', 'h'),
-    ld('e', 'l'),
-    ld('hl', u16(tilemapAddr(BACKDROP.top, 0))),
-    call(DRAW_RUNS),
-
-    // The cast: sprite tiles, GBC sprite palettes 1..n, who speaks when, where they stand
-    ...copySceneBlock(u16(MEM.OBJ_TILES + NPC_TILE_BASE * 16), 'castTiles', 'castTilesLength'),
-    ld('a', 0x80 | 8),
-    ldh([HW.OCPS], 'a'),
-    ...sceneByte('castPaletteBytes'),
-    push('af'),
-    ...sceneWord('castPalettes'),
-    pop('af'),
-    ld('b', 'a'),
-    label(SCENE_CAST_PALETTE),
-    ld('a', ['hl+']),
-    ldh([HW.OCPD], 'a'),
-    dec('b'),
-    jr('nz', SCENE_CAST_PALETTE),
-    ...sceneWord('castTable'),
-    ...storePointer('hl', MEM.NPC_TABLE),
-    ...storeByte(MEM.NPC_CURRENT, NPC_NONE),
-    ...sceneByte('stageX'),
-    ld([MEM.NPC_X], 'a'),
-    ...sceneByte('stageY'),
-    ld([MEM.NPC_Y], 'a'),
-
-    // The animated tile
-    ...sceneWord('animation'),
-    ...storePointer('hl', MEM.ANIM),
-    ...zeroBytes(MEM.ANIM_TIMER, MEM.ANIM_FRAME),
-
-    // GBC colors of the backdrop
-    ...cgbAttributes([
-      ...sceneWord('colors'),
+      // Backdrop above the dialogue box: the scene's own tiles, then its map
+      ...copySceneBlock(u16(bgTileAddr(SCENE_TILE_BASE)), 'tiles', 'tilesLength'),
+      ...sceneWord('backdrop'),
       ld('d', 'h'),
       ld('e', 'l'),
       ld('hl', u16(tilemapAddr(BACKDROP.top, 0))),
       call(DRAW_RUNS),
-    ]),
-    call(KANA_DRAW_HUD), // hearts + score on row 0
-    call(DLG_DRAW_BOX),
-    // Location name as a label in the box's top border: ┌─── えき ─┐
-    ...sceneWord('nameTiles'),
-    push('hl'),
-    ...sceneWord('nameAddress'),
-    pop('de'),
-    call(DRAW_TILES),
-    ...sceneWord('fade'),
-    call(FADE_IN),
-    ...catFace(CAT_REST, 'neutral'),
-    ...placeCat(CAT_SPOTS.dialogue),
-    ret(),
-    ...buildRoundRoutines(),
-    ...buildSceneTableRoutines(),
-    ...buildReadJoypad(),
-    ...buildTitleBlink(),
-    ...buildCatRoutines(),
-    ...buildSpriteRoutines(),
-    ...buildDrawStartBox(),
-    ...buildMenuRoutines(),
-    ...buildPasswordRoutines(SCENES.length),
-    ...buildPasswordScreen(TITLE_FADE),
-    ...buildChartRoutines(CHART_FADE),
-    ...buildPracticeRoutines(SPEED_ROUND_LABEL),
-    ...buildPracticeLoop(),
-    ...buildDrawStamps(),
-    ...buildDialogueEngine(),
-    ...buildTextNext(dialogueCodec().base),
-    ...buildKanaEngine(),
-    ...buildDrawHudOps(),
-    ...buildScoreRoutines(),
-    ...buildScoreDigits(),
-    ...buildVramPut(),
-    ...buildFrameWait(),
-    ...buildSoundDriver(),
-    ...buildDrawTiles(),
-    ...buildFadeRoutines(),
-    ...buildClearScreen(),
-    ...buildDrawRuns(),
-    ...buildNpcRoutines(),
-    ...buildAnimRoutines(),
 
-    // ==== Data ====
-    ...buildSpriteData(),
-    ...buildCatData(),
-    ...buildFadeData(),
-    ...buildSoundData(),
-    ...buildPasswordData(),
-    ...buildChartData(),
-    ...buildPracticeData(),
-    label(CHART_FADE),
-    db(buildPaletteSet(CHART_COLORS)),
-    ...FONT_SEGMENTS.flatMap((segment) => [label(segment.label), db(segment.data)]),
+      // The cast: sprite tiles, GBC sprite palettes 1..n, who speaks when, where they stand
+      ...copySceneBlock(u16(MEM.OBJ_TILES + NPC_TILE_BASE * 16), 'castTiles', 'castTilesLength'),
+      ld('a', 0x80 | 8),
+      ldh([HW.OCPS], 'a'),
+      ...sceneByte('castPaletteBytes'),
+      push('af'),
+      ...sceneWord('castPalettes'),
+      pop('af'),
+      ld('b', 'a'),
+      label(SCENE_CAST_PALETTE),
+      ld('a', ['hl+']),
+      ldh([HW.OCPD], 'a'),
+      dec('b'),
+      jr('nz', SCENE_CAST_PALETTE),
+      ...sceneWord('castTable'),
+      ...storePointer('hl', MEM.NPC_TABLE),
+      ...storeByte(MEM.NPC_CURRENT, NPC_NONE),
+      ...sceneByte('stageX'),
+      ld([MEM.NPC_X], 'a'),
+      ...sceneByte('stageY'),
+      ld([MEM.NPC_Y], 'a'),
 
-    label(SPEED_ROUND_LABEL),
-    db(buildKanaData(SPEED_ROUND)),
+      // The animated tile
+      ...sceneWord('animation'),
+      ...storePointer('hl', MEM.ANIM),
+      ...zeroBytes(MEM.ANIM_TIMER, MEM.ANIM_FRAME),
 
-    // Per-scene dialogue and kana data
-    ...packedScenes.flatMap((scene, i) => [
-      label(sceneDialogueLabel(i)),
-      db(scene.dialogueData),
-      label(sceneRoundsLabel(i)),
-      db(scene.roundsData),
-      label(sceneChancesLabel(i)),
-      db(scene.chancesData),
-      label(sceneBackdropLabel(i)),
-      db(scene.backdropData),
-      label(sceneTilesLabel(i)),
-      db(scene.sceneTileData),
-    ]),
+      // GBC colors of the backdrop
+      ...cgbAttributes([
+        ...sceneWord('colors'),
+        ld('d', 'h'),
+        ld('e', 'l'),
+        ld('hl', u16(tilemapAddr(BACKDROP.top, 0))),
+        call(DRAW_RUNS),
+      ]),
+      call(KANA_DRAW_HUD), // hearts + score on row 0
+      call(DLG_DRAW_BOX),
+      // Location name as a label in the box's top border: ┌─── えき ─┐
+      ...sceneWord('nameTiles'),
+      push('hl'),
+      ...sceneWord('nameAddress'),
+      pop('de'),
+      call(DRAW_TILES),
+      ...sceneWord('fade'),
+      call(FADE_IN),
+      ...catFace(CAT_REST, 'neutral'),
+      ...placeCat(CAT_SPOTS.dialogue),
+      ret(),
+      ...buildRoundRoutines(),
+      ...buildTitleBlink(),
+      ...buildDrawStartBox(),
+      ...buildDrawStamps(),
+    ],
+    data: () => [
+      label(CHART_FADE),
+      db(buildPaletteSet(CHART_COLORS)),
+      ...FONT_SEGMENTS.flatMap((segment) => [label(segment.label), db(segment.data)]),
 
-    // GBC palette sets (also drive the fades) and backdrop palette maps
-    label(TITLE_FADE),
-    db(buildPaletteSet(TITLE_COLORS)),
-    ...packedScenes.flatMap((packed, i) => [
-      label(sceneFadeLabel(i)),
-      db(packed.paletteSet),
-      label(sceneColorsLabel(i)),
-      db(packed.backdropAttributes),
-      label(castLabels(i).tiles),
-      db(packed.cast.tiles),
-      label(castLabels(i).palettes),
-      db(packed.cast.palettes),
-      label(castLabels(i).table),
-      db(packed.cast.table),
-      label(sceneAnimationLabel(i)),
-      db(packed.animation),
-    ]),
-    ...[ENDING, GAME_OVER_SCREEN].flatMap((screen) => [
-      label(resultFadeLabel(screen)),
-      db(buildPaletteSet(screen.colors)),
-    ]),
-    // Dialogue compression dictionary: two bytes per code (text-codec.ts)
-    label(TEXT_DICT),
-    db(dialogueCodec().pairs.flat()),
+      label(SPEED_ROUND_DATA),
+      db(buildKanaData(SPEED_ROUND)),
 
-    // GBC palettes every screen shares (the palette sets hold only their own)
-    label(SHARED_PALETTES),
-    db(buildSharedPalettes()),
+      // Per-scene dialogue and kana data
+      ...packedScenes.flatMap((scene, i) => [
+        label(sceneDialogueLabel(i)),
+        db(scene.dialogueData),
+        label(sceneRoundsLabel(i)),
+        db(scene.roundsData),
+        label(sceneChancesLabel(i)),
+        db(scene.chancesData),
+        label(sceneBackdropLabel(i)),
+        db(scene.backdropData),
+        label(sceneTilesLabel(i)),
+        db(scene.sceneTileData),
+      ]),
 
-    // Everything the engine loads per scene (scene-table.ts)
-    ...buildSceneTable(
-      packedScenes.map((packed, i) => ({
-        dialogue: sceneDialogueLabel(i),
-        rounds: sceneRoundsLabel(i),
-        chances: sceneChancesLabel(i),
-        fade: sceneFadeLabel(i),
-        tiles: sceneTilesLabel(i),
-        tilesLength: u16(packed.sceneTileData.length),
-        backdrop: sceneBackdropLabel(i),
-        castTiles: castLabels(i).tiles,
-        castTilesLength: u16(packed.cast.tiles.length),
-        castPalettes: castLabels(i).palettes,
-        castTable: castLabels(i).table,
-        animation: sceneAnimationLabel(i),
-        colors: sceneColorsLabel(i),
-        nameTiles: tileList([NAME_TAG_LEFT, ...packed.nameRow, NAME_TAG_RIGHT]),
-        nameAddress: u16(
-          tilemapAddr(DIALOGUE_LAYOUT.boxTop, DIALOGUE_LAYOUT.nameCol(packed.nameRow.length)),
-        ),
-        castPaletteBytes: packed.cast.palettes.length,
-        stageX: packed.cast.stage.x,
-        stageY: packed.cast.stage.y,
-        flag: 1 << i,
-      })),
-    ),
-    // Tile lists drawn by draw_tiles (collected while generating the code above)
-    pool(), // tile lists (see tileList)
-  ];
+      // GBC palette sets (also drive the fades) and backdrop palette maps
+      label(TITLE_FADE),
+      db(buildPaletteSet(TITLE_COLORS)),
+      ...packedScenes.flatMap((packed, i) => [
+        label(sceneFadeLabel(i)),
+        db(packed.paletteSet),
+        label(sceneColorsLabel(i)),
+        db(packed.backdropAttributes),
+        label(castLabels(i).tiles),
+        db(packed.cast.tiles),
+        label(castLabels(i).palettes),
+        db(packed.cast.palettes),
+        label(castLabels(i).table),
+        db(packed.cast.table),
+        label(sceneAnimationLabel(i)),
+        db(packed.animation),
+      ]),
+      ...[ENDING, GAME_OVER_SCREEN].flatMap((screen) => [
+        label(resultFadeLabel(screen)),
+        db(buildPaletteSet(screen.colors)),
+      ]),
+      // Dialogue compression dictionary: two bytes per code (text-codec.ts)
+      label(TEXT_DICT),
+      db(dialogueCodec().pairs.flat()),
+
+      // GBC palettes every screen shares (the palette sets hold only their own)
+      label(SHARED_PALETTES),
+      db(buildSharedPalettes()),
+
+      // Everything the engine loads per scene (scene-table.ts)
+      ...buildSceneTable(
+        packedScenes.map((packed, i) => ({
+          dialogue: sceneDialogueLabel(i),
+          rounds: sceneRoundsLabel(i),
+          chances: sceneChancesLabel(i),
+          fade: sceneFadeLabel(i),
+          tiles: sceneTilesLabel(i),
+          tilesLength: u16(packed.sceneTileData.length),
+          backdrop: sceneBackdropLabel(i),
+          castTiles: castLabels(i).tiles,
+          castTilesLength: u16(packed.cast.tiles.length),
+          castPalettes: castLabels(i).palettes,
+          castTable: castLabels(i).table,
+          animation: sceneAnimationLabel(i),
+          colors: sceneColorsLabel(i),
+          nameTiles: tileList([NAME_TAG_LEFT, ...packed.nameRow, NAME_TAG_RIGHT]),
+          nameAddress: u16(
+            tilemapAddr(DIALOGUE_LAYOUT.boxTop, DIALOGUE_LAYOUT.nameCol(packed.nameRow.length)),
+          ),
+          castPaletteBytes: packed.cast.palettes.length,
+          stageX: packed.cast.stage.x,
+          stageY: packed.cast.stage.y,
+          flag: 1 << i,
+        })),
+      ),
+    ],
+  });
+}
+
+/** Every engine, in the order their code and data go in the ROM */
+const ENGINES: readonly GameModule[] = [
+  spritesModule,
+  catModule,
+  soundModule,
+  sceneTableModule,
+  joypadModule,
+  menuModule,
+  passwordModule,
+  chartModule,
+  practiceModule,
+  dialogueModule(() => dialogueCodec().base),
+  kanaModule,
+  hudModule,
+  videoModule,
+  npcModule,
+  animModule,
+];
+
+export function buildProgram(): Op[] {
+  const packedScenes = buildSceneData();
+  return link({
+    boot: buildBoot(),
+    main: buildMain(),
+    modules: [gameFlow(packedScenes), ...ENGINES],
+  });
 }
 
 /** Assemble the complete game ROM. */

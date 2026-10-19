@@ -50,6 +50,8 @@ import {
   SPEED_FILL,
   PRACTICE_START,
 } from './labels';
+import { gameModule } from '../asm/program';
+import { SPEED_ROUND_DATA } from './labels';
 
 // Labels placed in this module
 const PRACTICE_TABLE = new Label('practice_table');
@@ -304,3 +306,9 @@ export function buildPracticeLoop(): Op[] {
     jp(TITLE_SCREEN),
   ];
 }
+
+export const practiceModule = gameModule({
+  name: 'practice',
+  code: () => [...buildPracticeRoutines(SPEED_ROUND_DATA), ...buildPracticeLoop()],
+  data: buildPracticeData,
+});

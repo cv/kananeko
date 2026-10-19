@@ -16,6 +16,7 @@ import { label, ld, ldh, cpl, and, or, swap, ret } from '../asm/sm83';
 import { HW } from '../asm/hardware';
 import { MEM } from './ram';
 import { JOY_READ } from './labels';
+import { gameModule } from '../asm/program';
 
 // Labels placed in this module
 
@@ -69,3 +70,5 @@ export function buildReadJoypad(): Op[] {
     ret(),
   ];
 }
+
+export const joypadModule = gameModule({ name: 'joypad', code: buildReadJoypad });

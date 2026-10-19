@@ -27,6 +27,7 @@ import { MAX_LIVES } from './state';
 import { tilemapAddr, type TilePosition } from './tilemap';
 import { vramPut } from './video';
 import { SCORE_DIGITS, HUD_UPDATE, KANA_DRAW_HUD } from './labels';
+import { gameModule } from '../asm/program';
 
 // Labels placed in this module
 const SCORE_ADD = routine('score_add', { clobbers: ['a', 'b'] });
@@ -373,3 +374,8 @@ export function buildDrawHudOps(): Op[] {
     ret(),
   ];
 }
+
+export const hudModule = gameModule({
+  name: 'hud',
+  code: () => [...buildDrawHudOps(), ...buildScoreRoutines(), ...buildScoreDigits()],
+});

@@ -26,6 +26,7 @@ import { HUES, INK, PAPER } from './palette';
 import { OAM_X_OFFSET, OAM_Y_OFFSET, SPRITE_SLOT, oamField } from './sprites';
 import type { Palette } from './video';
 import { CAT_REST, CAT_REACT, CAT_TICK } from './labels';
+import { gameModule } from '../asm/program';
 
 // Labels placed in this module
 const CAT_TILES = new Label('cat_tiles');
@@ -216,3 +217,10 @@ export function buildCatRoutines(): Op[] {
     jp(CAT_SET_FACE),
   ];
 }
+
+export const catModule = gameModule({
+  name: 'cat',
+  init: buildCatInit,
+  code: buildCatRoutines,
+  data: buildCatData,
+});

@@ -141,6 +141,7 @@ function buildLoseLife(): Op[] {
 
   It also works out the deepest the stack can go. `npm run contracts` suggests contracts from what the code does.
 
+- **Modules** (`src/asm/program.ts`): each engine exports a `gameModule({ name, init, code, data })`. `main.ts` only lists the modules and says what the game does, and `link()` lays out the boot code, the inits, the main program, then every module's code and data.
 - **Jumps**: `jp` becomes a 2-byte `JR` wherever it reaches, and loads from HRAM become `LDH`.
 
 ## 🤓 Nerd notes

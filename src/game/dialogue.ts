@@ -72,6 +72,7 @@ import {
   DLG_OPEN_TREE,
   DLG_OPEN_NODE,
 } from './labels';
+import { type GameModule, gameModule } from '../asm/program';
 
 // Labels placed in this module
 const DLG_ORDER_TWO = new Label('dlg_order_two');
@@ -728,4 +729,12 @@ export function buildDialogueEngine(): Op[] {
     ...buildDrawTextbox(),
     ...buildClearTextbox(),
   ];
+}
+
+/** The dialogue engine, for text compressed with a dictionary whose codes start at \`codeBase\` */
+export function dialogueModule(codeBase: () => number): GameModule {
+  return gameModule({
+    name: 'dialogue',
+    code: () => [...buildDialogueEngine(), ...buildTextNext(codeBase())],
+  });
 }

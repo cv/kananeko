@@ -11,6 +11,7 @@ import { add, call, db, dec, dw, inc, jr, label, ld, or, pop, push, ret } from '
 import { type Op, type Target, type U16, Label, routine } from '../asm/types';
 import { at } from '../asm/util';
 import { SCENE_DESC } from './labels';
+import { gameModule } from '../asm/program';
 
 // Labels placed in this module
 const SCENE_TABLE = new Label('scene_table');
@@ -142,3 +143,5 @@ export function copySceneBlock(dst: U16, source: SceneWord, length: SceneWord): 
     call(COPY_BLOCK),
   ];
 }
+
+export const sceneTableModule = gameModule({ name: 'scene table', code: buildSceneTableRoutines });

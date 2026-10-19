@@ -42,6 +42,7 @@ import {
   FADE_IN,
   OAM_DMA,
 } from './labels';
+import { gameModule } from '../asm/program';
 
 // Labels placed in this module
 const FRAME_WAIT = routine('frame_wait', { keepsFlags: true });
@@ -526,3 +527,16 @@ export function buildFadeRoutines(): Op[] {
 export function buildFadeData(): Op[] {
   return [label(FADE_BGP), db([...FADE_BGP_SHADES])];
 }
+
+export const videoModule = gameModule({
+  name: 'video',
+  code: () => [
+    ...buildVramPut(),
+    ...buildFrameWait(),
+    ...buildDrawTiles(),
+    ...buildFadeRoutines(),
+    ...buildClearScreen(),
+    ...buildDrawRuns(),
+  ],
+  data: buildFadeData,
+});

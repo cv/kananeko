@@ -14,6 +14,7 @@ import type { Palette } from './video';
 import { HUES, INK, PAPER } from './palette';
 import { UI_TILES } from './font-data';
 import { OAM_DMA, SPRITES_OFF } from './labels';
+import { gameModule } from '../asm/program';
 
 // Labels placed in this module
 const SPRITE_COPY_DMA = new Label('sprite_copy_dma');
@@ -105,3 +106,10 @@ export function buildSpriteRoutines(): Op[] {
 export function runDma(): Op[] {
   return [call(OAM_DMA)];
 }
+
+export const spritesModule = gameModule({
+  name: 'sprites',
+  init: buildSpriteInit,
+  code: buildSpriteRoutines,
+  data: buildSpriteData,
+});

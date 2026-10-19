@@ -13,6 +13,7 @@ import { SCENERY, isProp } from './scenery';
 import type { TileAnimation } from './scenes/animations';
 import { bgTileAddr, vramPut } from './video';
 import { ANIM_TICK } from './labels';
+import { gameModule } from '../asm/program';
 
 // Labels placed in this module
 const ANIM_FRAME_OK = new Label('anim_frame_ok');
@@ -100,3 +101,5 @@ export function buildAnimRoutines(): Op[] {
     ret(),
   ];
 }
+
+export const animModule = gameModule({ name: 'anim', code: buildAnimRoutines });

@@ -14,6 +14,7 @@ import { type NpcLook, npcArt } from './npc-art';
 import type { SceneCast } from './scenes/npcs';
 import { OAM_X_OFFSET, OAM_Y_OFFSET, SPRITE_SLOT, oamField } from './sprites';
 import { NPC_SELECT, NPC_UPDATE, NPC_HIDE } from './labels';
+import { gameModule } from '../asm/program';
 
 // Labels placed in this module
 const NPC_SCAN = new Label('npc_scan');
@@ -148,3 +149,5 @@ export function buildNpcRoutines(): Op[] {
     ret(),
   ];
 }
+
+export const npcModule = gameModule({ name: 'npc', code: buildNpcRoutines });

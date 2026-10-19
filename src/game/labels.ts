@@ -8,6 +8,11 @@
 import { type ExternalRoutine, Label, routine } from '../asm/types';
 import { MEM } from './ram';
 
+// Palette sets and data placed by main.ts that engines refer to
+export const TITLE_FADE = new Label('title_fade');
+export const CHART_FADE = new Label('chart_fade');
+export const SPEED_ROUND_DATA = new Label('speed_round');
+
 /** The OAM DMA routine once boot has copied it to HRAM (see sprites.ts): it uses A and F */
 export const OAM_DMA: ExternalRoutine = {
   name: 'oam_dma',

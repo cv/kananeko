@@ -68,6 +68,9 @@ import {
   PASS_DRAW,
   PASSWORD_SCREEN,
 } from './labels';
+import { gameModule } from '../asm/program';
+import { SCENES } from './scene';
+import { TITLE_FADE } from './labels';
 
 // Labels placed in this module
 const PASS_CHECK = routine('pass_check', { out: ['a'], clobbers: ['b'] });
@@ -542,3 +545,9 @@ export const PASSWORD_LABEL = 'あいことば';
 export function passwordLineCol(): number {
   return centerStartCol(Array.from(PASSWORD_LABEL).length + 1 + PASSWORD_LENGTH);
 }
+
+export const passwordModule = gameModule({
+  name: 'password',
+  code: () => [...buildPasswordRoutines(SCENES.length), ...buildPasswordScreen(TITLE_FADE)],
+  data: buildPasswordData,
+});
