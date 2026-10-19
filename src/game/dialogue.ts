@@ -255,8 +255,6 @@ function buildInitChoiceOrder(): Op[] {
     label(DLG_ORDER_THREE_DISPATCH),
     ...switchCases(THREE_CHOICE_ORDERS.map(writeChoiceOrder), {
       name: 'dlg_order_perm',
-      branch: 'jr',
-      exit: 'jp',
     }),
 
     label(done),

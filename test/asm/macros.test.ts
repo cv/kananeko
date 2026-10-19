@@ -174,7 +174,7 @@ describe('switchCases', () => {
           add_r('b'),
           ld_nn_a(at(1)),
         ]),
-        { name: 'sw', branch: 'jp', exit: 'jp' },
+        { name: 'sw' },
       ),
     ]);
     expect(mem[SCRATCH]).toBe(expected);

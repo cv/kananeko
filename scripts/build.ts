@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { formatSymbolFile } from '../src/asm/assembler';
+import { PROGRAM_START, formatSymbolFile } from '../src/asm/assembler';
 import { hex } from '../src/asm/util';
 import { buildRom } from '../src/game/main';
 import { ramSymbols } from '../src/game/ram';
@@ -8,7 +8,7 @@ import { ramSymbols } from '../src/game/ram';
 const outDir = path.join(import.meta.dirname, '..', 'build');
 fs.mkdirSync(outDir, { recursive: true });
 
-const { rom, symbols, unreferenced } = buildRom();
+const { rom, symbols, unreferenced, programBytes } = buildRom();
 
 const romPath = path.join(outDir, 'kananeko.gb');
 fs.writeFileSync(romPath, rom);
@@ -19,6 +19,9 @@ fs.writeFileSync(
 );
 
 console.log(`ROM written to ${romPath} (${String(rom.length)} bytes)`);
+console.log(
+  `Program: ${String(programBytes)} bytes, ${String(rom.length - PROGRAM_START - programBytes)} free`,
+);
 console.log(`Symbols: ${String(symbols.size)}`);
 for (const [name, address] of symbols) {
   console.log(`  $${hex(address, 4)} ${name}`);

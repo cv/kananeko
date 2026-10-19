@@ -164,9 +164,21 @@ export type Target = Label | Pooled;
 // Operations
 // ---------------------------------------------------------------------------
 
+/** Instruction bytes, with any references the assembler fills in */
+export interface InstOp {
+  readonly kind: 'inst';
+  readonly bytes: readonly number[];
+  readonly refs?: readonly OpRef[];
+}
+
 /** An operation in the program */
 export type Op =
-  | { readonly kind: 'inst'; readonly bytes: readonly number[]; readonly refs?: readonly OpRef[] }
+  | InstOp
+  /**
+   * A jump to a label the assembler encodes as `short` (JR) when the target is in
+   * range and as `long` (JP) otherwise: see jp() and jp_cc()
+   */
+  | { readonly kind: 'jump'; readonly target: Label; readonly short: InstOp; readonly long: InstOp }
   | { readonly kind: 'label'; readonly label: Label }
   | { readonly kind: 'data'; readonly bytes: Uint8Array }
   | { readonly kind: 'org'; readonly address: number }

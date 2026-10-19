@@ -108,6 +108,36 @@ describe('opcode encoding', () => {
   });
 });
 
+describe('jumps to labels', () => {
+  it.each([
+    ['JP', op.jp(X), 0x18, 0xc3],
+    ['JP NZ', op.jp_cc('nz', X), 0x20, 0xc2],
+    ['JP Z', op.jp_cc('z', X), 0x28, 0xca],
+    ['JP NC', op.jp_cc('nc', X), 0x30, 0xd2],
+    ['JP C', op.jp_cc('c', X), 0x38, 0xda],
+  ])('%s leaves the assembler a JR or a JP', (_m, instruction, jrOpcode, jpOpcode) => {
+    expect(instruction).toEqual({
+      kind: 'jump',
+      target: X,
+      short: {
+        kind: 'inst',
+        bytes: [jrOpcode, 0x00],
+        refs: [{ type: 'rel8', offset: 1, target: X }],
+      },
+      long: {
+        kind: 'inst',
+        bytes: [jpOpcode, 0x00, 0x00],
+        refs: [{ type: 'imm16', offset: 1, target: X }],
+      },
+    });
+  });
+
+  it('jumps to a fixed address with JP', () => {
+    expect(bytes(op.jp(u16(0x1234)))).toEqual([0xc3, 0x34, 0x12]);
+    expect(bytes(op.jp_cc('c', u16(0x1234)))).toEqual([0xda, 0x34, 0x12]);
+  });
+});
+
 describe('label references', () => {
   it.each([
     ['JR', op.jr(X), 0x18],
@@ -124,8 +154,7 @@ describe('label references', () => {
   });
 
   it.each([
-    ['JP', op.jp(X), 0xc3],
-    ['JP Z', op.jp_cc('z', X), 0xca],
+    ['JP (always long)', op.jp_long(X), 0xc3],
     ['CALL', op.call(X), 0xcd],
     ['LD HL', op.ld_rr_nn('hl', X), 0x21],
   ])('%s emits an imm16 placeholder', (_m, instruction, opcode) => {

@@ -495,8 +495,6 @@ export function buildKanaEngine(): Op[] {
     ld_a_nn(MEM.KANA_CORRECT_POS),
     ...switchCases(ANSWER_LAYOUTS.map(buildAnswerLayout), {
       name: 'kana_layout',
-      branch: 'jr',
-      exit: 'jp',
     }),
 
     // A fresh screen fades in, with the cat beside it

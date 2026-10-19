@@ -41,6 +41,8 @@ export interface AssembleResult {
   symbols: Map<string, number>;
   /** Names of labels nothing refers to (dead code, or just markers), in program order */
   unreferenced: string[];
+  /** Bytes of code and data the program occupies (excluding the header) */
+  programBytes: number;
 }
 
 type Emitting = Extract<Op, { kind: 'inst' | 'data' }>;
@@ -120,9 +122,61 @@ function expandPool(program: readonly Op[]): { ops: Op[]; pooled: Map<string, La
   return { ops, pooled: new Map([...entries].map(([key, { label }]) => [key, label])) };
 }
 
+/**
+ * Pass 0b: encode each jump to a label as a JR when the label is in range, else a JP.
+ * Every jump starts short, and the ones that can't reach are lengthened until none
+ * change. Lengthening only moves code apart, so this always settles.
+ */
+function chooseJumps(ops: readonly Op[]): Op[] {
+  const long = new Set<number>();
+  for (;;) {
+    const labels = new Map<Label, number>();
+    const jumps: { index: number; address: number; target: Label }[] = [];
+    let pc = PROGRAM_START;
+    for (const [index, op] of ops.entries()) {
+      switch (op.kind) {
+        case 'label':
+          labels.set(op.label, pc);
+          break;
+        case 'org':
+          pc = op.address;
+          break;
+        case 'jump':
+          if (!long.has(index)) jumps.push({ index, address: pc, target: op.target });
+          pc += (long.has(index) ? op.long : op.short).bytes.length;
+          break;
+        case 'inst':
+        case 'data':
+          pc += op.bytes.length;
+          break;
+        case 'pool':
+          break;
+      }
+    }
+
+    let changed = false;
+    for (const { index, address, target } of jumps) {
+      const to = labels.get(target);
+      if (to === undefined) continue; // reported as undefined when emitting
+      const offset = to - (address + 2);
+      if (offset < -128 || offset > 127) {
+        long.add(index);
+        changed = true;
+      }
+    }
+    if (!changed) {
+      return ops.map((op, index) =>
+        op.kind === 'jump' ? (long.has(index) ? op.long : op.short) : op,
+      );
+    }
+  }
+}
+
 /** Pass 1: assign addresses, place labels, and reject overlapping or out-of-range output. */
 function layout(program: readonly Op[]): Layout {
-  const { ops, pooled } = expandPool(program);
+  const expanded = expandPool(program);
+  const { pooled } = expanded;
+  const ops = chooseJumps(expanded.ops);
   const addresses = new Map<Label, number>();
   const names = new Set<string>();
   const positioned: Positioned[] = [];
@@ -149,7 +203,8 @@ function layout(program: readonly Op[]): Layout {
         pc += op.bytes.length;
         break;
       case 'pool':
-        throw new Error('pool() left after expandPool'); // unreachable
+      case 'jump':
+        throw new Error(`${op.kind} left after expandPool and chooseJumps`); // unreachable
     }
   }
 
@@ -270,6 +325,7 @@ export function assemble(program: readonly Op[], header: ROMHeader): AssembleRes
     rom,
     symbols: new Map(placed.map(([label, address]) => [label.name, address])),
     unreferenced: placed.filter(([label]) => !referenced.has(label)).map(([label]) => label.name),
+    programBytes: laidOut.positioned.reduce((sum, { op }) => sum + op.bytes.length, 0),
   };
 }
 

@@ -10,7 +10,7 @@ import {
   globalChecksum,
   headerChecksum,
 } from '@asm/assembler';
-import { call, db, dw, jp, jr, jr_cc, label, ld_rr_nn, nop, org, pool, ret } from '@asm/ops';
+import { call, db, dw, jp, jp_cc, jr, jr_cc, label, ld_rr_nn, nop, org, pool, ret } from '@asm/ops';
 import { type Op, Label, Pooled, labelFamily, u16 } from '@asm/types';
 
 // Labels placed in this module
@@ -57,6 +57,42 @@ describe('label resolution', () => {
     const { rom, symbols } = build([org(u16(0x4000)), label(BLOB), db([0xde, 0xad])]);
     expect(symbols.get('blob')).toBe(0x4000);
     expect([rom[0x4000], rom[0x4001]]).toEqual([0xde, 0xad]);
+  });
+});
+
+describe('jump relaxation', () => {
+  it('makes a JP a JR when the label is in range', () => {
+    const { rom } = build([jp(TARGET), nop(), label(TARGET)]);
+    expect(Array.from(rom.slice(PROGRAM_START, PROGRAM_START + 3))).toEqual([0x18, 0x01, 0x00]);
+  });
+
+  it('keeps a JP when the label is out of JR range', () => {
+    const { rom } = build([jp_cc('z', FAR), db(new Uint8Array(200)), label(FAR)]);
+    const far = PROGRAM_START + 3 + 200;
+    expect(Array.from(rom.slice(PROGRAM_START, PROGRAM_START + 3))).toEqual([
+      0xca,
+      far & 0xff,
+      far >> 8,
+    ]);
+  });
+
+  it('lengthens jumps that a lengthened jump pushes out of range', () => {
+    // Exactly in range while the inner jump is short; its growth to a JP pushes TARGET a byte too far
+    const { rom, symbols } = build([
+      jp(TARGET),
+      jp(FAR),
+      db(new Uint8Array(125)),
+      label(TARGET),
+      db(new Uint8Array(200)),
+      label(FAR),
+    ]);
+    expect(rom[PROGRAM_START]).toBe(0xc3);
+    expect(rom[PROGRAM_START + 3]).toBe(0xc3);
+    expect(symbols.get('target')).toBe(PROGRAM_START + 6 + 125);
+  });
+
+  it('still reports a jump to an undefined label', () => {
+    expect(() => build([jp(NOWHERE)])).toThrow(/Undefined label: "nowhere"/);
   });
 });
 

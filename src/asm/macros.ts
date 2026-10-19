@@ -14,7 +14,6 @@ import {
   inc_rr,
   jp,
   jp_cc,
-  jr,
   jr_cc,
   label,
   ld_a_de,
@@ -214,10 +213,8 @@ export interface SwitchOptions {
    * Not called for the last case, which is the fall-through default.
    */
   readonly compare?: (i: number) => Op[];
-  /** Jump used to skip a non-matching case (`jr` is shorter but limited to ±127 bytes). */
-  readonly branch?: 'jr' | 'jp';
-  /** Jump used to leave a case body, or 'none' when every body ends on its own (e.g. RET). */
-  readonly exit?: 'jr' | 'jp' | 'none';
+  /** 'none' when every body ends on its own (e.g. RET), so none jumps to the end. */
+  readonly exit?: 'jump' | 'none';
 }
 
 /**
@@ -225,7 +222,7 @@ export interface SwitchOptions {
  * falling through to the last case when none of the others match.
  */
 export function switchCases(cases: readonly (readonly Op[])[], options: SwitchOptions): Op[] {
-  const { name, compare = (i): Op[] => [cp_n(u8(i))], branch = 'jr', exit = 'jr' } = options;
+  const { name, compare = (i): Op[] => [cp_n(u8(i))], exit = 'jump' } = options;
   const done = new Label(`${name}_done`);
   const ops: Op[] = [];
 
@@ -236,10 +233,9 @@ export function switchCases(cases: readonly (readonly Op[])[], options: SwitchOp
       return;
     }
     const next = new Label(`${name}_case${String(i + 1)}`);
-    ops.push(...compare(i), branch === 'jr' ? jr_cc('nz', next) : jp_cc('nz', next), ...body);
-    if (exit !== 'none') {
-      ops.push(exit === 'jr' ? jr(done) : jp(done));
-    }
+    // The assembler makes these JRs when the case is short enough
+    ops.push(...compare(i), jp_cc('nz', next), ...body);
+    if (exit !== 'none') ops.push(jp(done));
     ops.push(label(next));
   });
 

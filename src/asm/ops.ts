@@ -279,14 +279,36 @@ export function jr_cc(cc: CCName, target: Label): Op {
   return instRel8(0x20 + CC[cc] * 8, target);
 }
 
-/** JP nn (unconditional absolute jump) */
-export function jp(target: U16 | Label): Op {
-  return instImm16(0xc3, target);
+/** A jump the assembler makes a JR (2 bytes, faster) when the label is in range, else a JP */
+function jump(jrOpcode: number, jpOpcode: number, target: Label): Op {
+  return {
+    kind: 'jump',
+    target,
+    short: { kind: 'inst', bytes: [jrOpcode, 0x00], refs: [{ type: 'rel8', offset: 1, target }] },
+    long: {
+      kind: 'inst',
+      bytes: [jpOpcode, 0x00, 0x00],
+      refs: [{ type: 'imm16', offset: 1, target }],
+    },
+  };
 }
 
-/** JP cc, nn */
+/** JP nn (unconditional absolute jump); to a label, a JR when it's in range */
+export function jp(target: U16 | Label): Op {
+  return target instanceof Label ? jump(0x18, 0xc3, target) : instImm16(0xc3, target);
+}
+
+/** JP cc, nn; to a label, a JR cc when it's in range */
 export function jp_cc(cc: CCName, target: U16 | Label): Op {
-  return instImm16(0xc2 + CC[cc] * 8, target);
+  const jpOpcode = 0xc2 + CC[cc] * 8;
+  return target instanceof Label
+    ? jump(0x20 + CC[cc] * 8, jpOpcode, target)
+    : instImm16(jpOpcode, target);
+}
+
+/** JP nn always, even when a JR would reach (e.g. for a table of fixed-size entries) */
+export function jp_long(target: U16 | Label): Op {
+  return instImm16(0xc3, target);
 }
 
 // ---------------------------------------------------------------------------
