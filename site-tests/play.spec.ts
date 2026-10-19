@@ -1,6 +1,7 @@
 /** The player in real browsers: desktop Chrome, and WebKit on an iPhone-sized touch screen. */
 
 import { type Page, expect, test } from '@playwright/test';
+import { MEM } from '../src/game/ram';
 
 /** Average color of a band of the game screen (rows y0..y1 of 144) */
 async function bandColor(
@@ -188,11 +189,13 @@ test('keeps every frame on time while playing (no missed VBlanks)', async ({ pag
     await page.keyboard.press(keys[i % keys.length] ?? 'x');
     await page.waitForTimeout(250);
   }
-  // Addresses from src/asm/hardware.ts: FRAME_COUNT ($C094), FRAMES_MISSED ($C096)
-  const [frames, missed] = await page.evaluate(() => {
-    const k = (window as unknown as { kananeko: { readMemory: (a: number) => number } }).kananeko;
-    return [k.readMemory(0xc094), k.readMemory(0xc096)];
-  });
+  const [frames, missed] = await page.evaluate(
+    ({ frameCount, framesMissed }) => {
+      const k = (window as unknown as { kananeko: { readMemory: (a: number) => number } }).kananeko;
+      return [k.readMemory(frameCount), k.readMemory(framesMissed)];
+    },
+    { frameCount: MEM.FRAME_COUNT, framesMissed: MEM.FRAMES_MISSED },
+  );
   expect(frames, 'the VBlank handler counts frames').not.toBe(0);
   expect(missed).toBe(0);
 });
