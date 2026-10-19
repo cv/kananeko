@@ -27,7 +27,8 @@ import {
   swap,
   ret,
 } from '../asm/ops';
-import { HW, MEM } from '../asm/hardware';
+import { HW } from '../asm/hardware';
+import { MEM } from './ram';
 import { JOY_READ } from './labels';
 
 // Labels placed in this module

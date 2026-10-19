@@ -1,7 +1,8 @@
 /** Boot, title screen, and joypad input. */
 
 import { describe, expect, it } from 'vitest';
-import { JOY, MEM } from '@asm/hardware';
+import { JOY } from '@asm/hardware';
+import { MEM } from '@game/ram';
 import { DialogueState } from '@game/state';
 import { TILE_COUNT, buildTileData } from '@game/font';
 import { bgTileAddr } from '@game/video';

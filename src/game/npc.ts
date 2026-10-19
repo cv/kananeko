@@ -4,7 +4,7 @@
  * speaker is chosen per dialogue node from the scene's segment table.
  */
 
-import { MEM } from '../asm/hardware';
+import { MEM } from './ram';
 import { loadPointer, storeByte, zeroBytes } from '../asm/macros';
 import {
   add_n,

@@ -1,7 +1,7 @@
 /** The kana chart between scenes and before the ending. */
 
 import { describe, expect, it } from 'vitest';
-import { MEM } from '@asm/hardware';
+import { MEM } from '@game/ram';
 import { CHART_KANA, CHART_PASSWORD_ROW, CHART_TITLE, chartCell, chartIndexOf } from '@game/chart';
 import { CHAR_MAP } from '@game/font';
 import { PASSWORD_LABEL, PASSWORD_LENGTH, decodePassword, passwordLineCol } from '@game/password';

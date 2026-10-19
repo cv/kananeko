@@ -2,7 +2,8 @@
  * Screen helpers shared by the title screen, scenes, and engines.
  */
 
-import { HW, LCDC, MEM } from '../asm/hardware';
+import { HW, LCDC } from '../asm/hardware';
+import { MEM } from './ram';
 import { lcdOff, lcdOn, loadPointer, storePointer, zeroPages } from '../asm/macros';
 import {
   add_n,

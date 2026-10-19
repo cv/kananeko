@@ -3,7 +3,8 @@
  * one. Up and down move it (wrapping); A or START picks it.
  */
 
-import { JOY, MEM } from '../asm/hardware';
+import { JOY } from '../asm/hardware';
+import { MEM } from './ram';
 import {
   add_n,
   add_r,

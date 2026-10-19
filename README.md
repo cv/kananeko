@@ -90,8 +90,8 @@ The browser tests (`site-tests/`) use Playwright; install its browsers once with
 
 ```
 src/             the ROM, built in pure TypeScript (no Node or DOM APIs)
-  asm/           assembler, opcodes, macros, hardware defs
-  game/          engines (dialogue, kana, HUD), fonts, screen helpers
+  asm/           assembler, opcodes, macros, RAM allocator, hardware defs
+  game/          engines (dialogue, kana, HUD), fonts, screen helpers, RAM map (ram.ts)
     scenes/      station, street, shrine, restaurant, conbini, park
 test/            unit, integration, and emulator-driven tests
 scripts/         Node scripts: the ROM build (build.ts), screenshots, the site build

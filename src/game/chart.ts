@@ -7,7 +7,8 @@
  * Every kana answer counts toward its basic hiragana: カ, が and ガ all count as か.
  */
 
-import { JOY, MEM } from '../asm/hardware';
+import { JOY } from '../asm/hardware';
+import { MEM } from './ram';
 import {
   add_hl_rr,
   and_n,

@@ -5,7 +5,7 @@
  * (scene_word, scene_byte), instead of switching on the scene for every load.
  */
 
-import { MEM } from '../asm/hardware';
+import { MEM } from './ram';
 import { loadPointer, storePointer } from '../asm/macros';
 import {
   add_hl_rr,

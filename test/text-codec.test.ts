@@ -1,7 +1,7 @@
 /** Dialogue compression: the codec, the game's dictionary, and the engine's decoder */
 
 import { describe, expect, it } from 'vitest';
-import { MEM } from '@asm/hardware';
+import { MEM } from '@game/ram';
 import { storePointer, zeroBytes } from '@asm/macros';
 import { call, cp_n, db, jr_cc, label, ld_a_nn, ld_nn_a, ld_rr_nn, ldi_hl_a } from '@asm/ops';
 import { u8, u16, Label } from '@asm/types';

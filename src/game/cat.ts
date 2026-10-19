@@ -13,7 +13,8 @@
  *   cat_tick   once per frame: count down a reaction, blink
  */
 
-import { HW, MEM } from '../asm/hardware';
+import { HW } from '../asm/hardware';
+import { MEM } from './ram';
 import { copyBlock, storeByte, zeroBytes } from '../asm/macros';
 import {
   add_n,

@@ -1,7 +1,7 @@
 /** The sound driver: notes, the sequence notation, and voices stepping in the emulator. */
 
 import { describe, expect, it } from 'vitest';
-import { MEM } from '@asm/hardware';
+import { MEM } from '@game/ram';
 import {
   call,
   db,

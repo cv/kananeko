@@ -1,7 +1,7 @@
 /** The title menu, the password at game over, and typing it back in. */
 
 import { describe, expect, it } from 'vitest';
-import { MEM } from '@asm/hardware';
+import { MEM } from '@game/ram';
 import { MENU_TEXT_COL, MENU_TOP_ROW, TITLE_MENU } from '@game/menu';
 import {
   PASSWORD_LABEL,

@@ -5,7 +5,8 @@
  */
 
 import { type AssembleResult, type ROMHeader, assemble } from '../asm/assembler';
-import { HW, JOY, MEM } from '../asm/hardware';
+import { HW, JOY } from '../asm/hardware';
+import { MEM, VARIABLES } from './ram';
 import {
   copyBlock,
   expandOneBit,
@@ -586,9 +587,9 @@ export function buildProgram(): Op[] {
     label(INIT_NOT_CGB),
     ld_rr_nn('sp', u16(0xfffe)),
     // WRAM starts with random contents on real hardware (and in accurate emulators):
-    // zero every game variable ($C000-$C0FF), keeping the GBC flag across
+    // zero every game variable (all of page $C0), keeping the GBC flag across
     push('af'),
-    ...zeroPages('init_wram', u16(0xc000), 1),
+    ...zeroPages('init_wram', u16(VARIABLES.start), 1),
     pop('af'),
     ld_nn_a(MEM.IS_CGB),
 

@@ -8,7 +8,8 @@
  * line of dialogue it appears in.
  */
 
-import { HW, MEM } from '../asm/hardware';
+import { HW } from '../asm/hardware';
+import { MEM } from './ram';
 import {
   add_n,
   cpl,

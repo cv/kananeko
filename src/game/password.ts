@@ -11,7 +11,8 @@
  * decodePassword are the reference; the game's routines do the same in assembly.
  */
 
-import { JOY, MEM } from '../asm/hardware';
+import { JOY } from '../asm/hardware';
+import { MEM } from './ram';
 import {
   add_hl_rr,
   bit,

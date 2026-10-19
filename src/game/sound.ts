@@ -19,7 +19,8 @@
  * sound effects (pulse channel 1), so effects never interrupt the tune.
  */
 
-import { HW, MEM } from '../asm/hardware';
+import { HW } from '../asm/hardware';
+import { MEM } from './ram';
 import {
   add_hl_rr,
   add_n,

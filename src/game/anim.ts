@@ -3,7 +3,7 @@
  * into the tile's VRAM, so every copy of it on screen animates at once.
  */
 
-import { MEM } from '../asm/hardware';
+import { MEM } from './ram';
 import { loadPointer } from '../asm/macros';
 import {
   add_hl_rr,

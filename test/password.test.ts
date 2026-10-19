@@ -1,7 +1,7 @@
 /** Kana passwords: the reference codec, and the game's routines agreeing with it. */
 
 import { describe, expect, it } from 'vitest';
-import { MEM } from '@asm/hardware';
+import { MEM } from '@game/ram';
 import { call, ld_nn_a } from '@asm/ops';
 import { u16 } from '@asm/types';
 import { storeByte } from '@asm/macros';

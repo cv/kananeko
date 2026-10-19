@@ -11,7 +11,8 @@
  */
 
 import { playSfx } from './sound';
-import { MEM, HW, JOY } from '../asm/hardware';
+import { HW, JOY } from '../asm/hardware';
+import { MEM } from './ram';
 import {
   countDownOrReturn,
   loadPointer,

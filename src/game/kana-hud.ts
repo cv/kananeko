@@ -40,7 +40,7 @@ import {
   sub_n,
   sub_r,
 } from '../asm/ops';
-import { MEM } from '../asm/hardware';
+import { MEM } from './ram';
 import { switchCases, zeroBytes } from '../asm/macros';
 import { at, hi, lo } from '../asm/util';
 import { requireTile, requireTiles } from './font';

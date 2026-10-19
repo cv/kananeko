@@ -1,7 +1,7 @@
 /** Score arithmetic subroutines, run in the emulator. */
 
 import { describe, expect, it } from 'vitest';
-import { MEM } from '@asm/hardware';
+import { MEM } from '@game/ram';
 import { storeByte } from '@asm/macros';
 import { call } from '@asm/ops';
 import {} from '@asm/types';

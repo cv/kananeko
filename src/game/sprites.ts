@@ -3,7 +3,8 @@
  * frame (right after HALT, inside VBlank). Writing the shadow is always safe.
  */
 
-import { HW, MEM } from '../asm/hardware';
+import { HW } from '../asm/hardware';
+import { MEM } from './ram';
 import { copyBytes, zeroPages } from '../asm/macros';
 import {
   call,
@@ -32,8 +33,8 @@ const SPRITE_COPY_DMA = new Label('sprite_copy_dma');
 const DMA_ROUTINE = new Label('dma_routine');
 const SPRITE_TILES = new Label('sprite_tiles');
 
-/** Shadow OAM: 40 sprites x 4 bytes, page-aligned for DMA */
-export const SHADOW_OAM = u16(0xc100);
+/** Shadow OAM: 40 sprites x 4 bytes, page-aligned for DMA (see SHADOW_OAM_REGION) */
+export const SHADOW_OAM = MEM.SHADOW_OAM;
 /** HRAM address the DMA routine is copied to (the CPU can only run from HRAM during DMA) */
 const DMA_HRAM = u16(0xff80);
 /** OAM coordinates are offset from the screen's top-left corner */

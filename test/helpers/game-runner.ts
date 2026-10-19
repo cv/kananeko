@@ -9,7 +9,7 @@ import { CHAR_MAP } from '@game/font';
 import { PASSWORD_ALPHABET } from '@game/password';
 import { MUSIC_NONE, SFX, SFX_NONE, SONGS, type SfxName, type SongName } from '@game/sound';
 import Gameboy from 'serverboy';
-import { MEM } from '@asm/hardware';
+import { MEM } from '@game/ram';
 import { CAT_FACES, type CatFace, faceTile } from '@game/cat';
 import { SPRITE_SLOT, oamField } from '@game/sprites';
 import { buildRom } from '@game/main';
