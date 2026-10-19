@@ -14,7 +14,7 @@ import { MAX_KANA_WORD_LENGTH, buildKanaData, defineKanaQuestion } from '@game/k
 import { type DialogueNode, buildDialogueTree } from '@game/dialogue';
 import { packScene, SCENES } from '@game/scene';
 import { centerStartCol, tilemapAddr, tilePos } from '@game/tilemap';
-import { bgTileAddr, encodeAttributeRuns, rgb } from '@game/video';
+import { bgTileAddr, encodeRuns, rgb } from '@game/video';
 import { HUD_PALETTE, INK, UI_PALETTE, inked } from '@game/palette';
 import {
   PAL,
@@ -258,10 +258,10 @@ describe('buildPaletteSet', () => {
   });
 });
 
-describe('encodeAttributeRuns', () => {
+describe('encodeRuns', () => {
   it('run-length encodes palettes and ends with a zero count', () => {
-    expect([...encodeAttributeRuns([0, 0, 0, 2, 2, 5])]).toEqual([3, 0, 2, 2, 1, 5, 0]);
-    expect([...encodeAttributeRuns(Array<number>(300).fill(1))]).toEqual([255, 1, 45, 1, 0]);
+    expect([...encodeRuns([0, 0, 0, 2, 2, 5])]).toEqual([3, 0, 2, 2, 1, 5, 0]);
+    expect([...encodeRuns(Array<number>(300).fill(1))]).toEqual([255, 1, 45, 1, 0]);
   });
 });
 

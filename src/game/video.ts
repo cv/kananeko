@@ -241,10 +241,10 @@ export function clearScreen(): Op[] {
 }
 
 /**
- * Run-length encode per-cell palettes for rows of SCREEN_COLS cells:
- * [count, palette] pairs, ended by a 0 count.
+ * Run-length encode cells (tiles or palettes) for rows of SCREEN_COLS cells:
+ * [count, value] pairs, ended by a 0 count (see draw_runs).
  */
-export function encodeAttributeRuns(palettes: readonly number[]): Uint8Array {
+export function encodeRuns(palettes: readonly number[]): Uint8Array {
   const out: number[] = [];
   for (let i = 0; i < palettes.length;) {
     const value = palettes[i] ?? 0;
@@ -258,39 +258,39 @@ export function encodeAttributeRuns(palettes: readonly number[]): Uint8Array {
 }
 
 /**
- * Subroutine attr_runs: DE = runs (see encodeAttributeRuns), HL = first cell.
- * Writes rows of SCREEN_COLS cells. Call inside cgbAttributes, LCD off.
+ * Subroutine draw_runs: DE = runs (see encodeRuns), HL = first cell. Writes rows of
+ * SCREEN_COLS cells, LCD off: backdrop tiles, or (inside cgbAttributes) their palettes.
  */
-export function buildAttributeRuns(): Op[] {
+export function buildDrawRuns(): Op[] {
   return [
-    label('attr_runs'),
+    label('draw_runs'),
     ld_r_n('c', u8(SCREEN_COLS)),
-    label('attr_runs_next'),
+    label('draw_runs_next'),
     ld_a_de(),
     inc_rr('de'),
     cp_n(u8(0)),
     ret_cc('z'),
     ld_r_r('b', 'a'), // run length
     ld_a_de(),
-    inc_rr('de'), // A = palette
-    label('attr_runs_cell'),
+    inc_rr('de'), // A = tile or palette
+    label('draw_runs_cell'),
     ldi_hl_a(),
     dec_r('c'),
-    jr_cc('nz', ref('attr_runs_same_row')),
+    jr_cc('nz', ref('draw_runs_same_row')),
     // End of a visible row: skip to the next tilemap row
     push('af'),
     ld_r_r('a', 'l'),
     add_n(u8(32 - SCREEN_COLS)),
     ld_r_r('l', 'a'),
-    jr_cc('nc', ref('attr_runs_nc')),
+    jr_cc('nc', ref('draw_runs_nc')),
     inc_r('h'),
-    label('attr_runs_nc'),
+    label('draw_runs_nc'),
     pop('af'),
     ld_r_n('c', u8(SCREEN_COLS)),
-    label('attr_runs_same_row'),
+    label('draw_runs_same_row'),
     dec_r('b'),
-    jr_cc('nz', ref('attr_runs_cell')),
-    jr(ref('attr_runs_next')),
+    jr_cc('nz', ref('draw_runs_cell')),
+    jr(ref('draw_runs_next')),
   ];
 }
 

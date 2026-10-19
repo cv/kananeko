@@ -51,7 +51,7 @@ import {
   xor_r,
 } from '../asm/ops';
 import { type Op, type U16, ref, u8, u16 } from '../asm/types';
-import { SCENE_TILE_BASE, buildCopyRows } from './backdrop';
+import { SCENE_TILE_BASE } from './backdrop';
 import { buildSpriteData, buildSpriteInit, buildSpriteRoutines, runDma } from './sprites';
 import {
   CAT_SPOTS,
@@ -104,7 +104,7 @@ import {
   buildTileLists,
   resetTileLists,
   tileListLabel,
-  buildAttributeRuns,
+  buildDrawRuns,
   buildClearScreen,
   buildFadeData,
   buildFadeRoutines,
@@ -661,8 +661,7 @@ export function buildProgram(): Op[] {
     ld_r_r('d', 'h'),
     ld_r_r('e', 'l'),
     ld_rr_nn('hl', u16(tilemapAddr(BACKDROP.top, 0))),
-    ld_r_n('b', u8(BACKDROP.rows)),
-    call(ref('copy_rows')),
+    call(ref('draw_runs')),
 
     // The cast: sprite tiles, GBC sprite palettes 1..n, who speaks when, where they stand
     ...copySceneBlock(u16(MEM.OBJ_TILES + NPC_TILE_BASE * 16), 'castTiles', 'castTilesLength'),
@@ -697,7 +696,7 @@ export function buildProgram(): Op[] {
       ld_r_r('d', 'h'),
       ld_r_r('e', 'l'),
       ld_rr_nn('hl', u16(tilemapAddr(BACKDROP.top, 0))),
-      call(ref('attr_runs')),
+      call(ref('draw_runs')),
     ]),
     call(ref('kana_draw_hud')), // hearts + score on row 0
     call(ref('dlg_draw_box')),
@@ -725,12 +724,11 @@ export function buildProgram(): Op[] {
     ...buildDrawHudOps(),
     ...buildScoreRoutines(),
     ...buildScoreDigits(),
-    ...buildCopyRows(),
     ...buildVramPut(),
     ...buildDrawTiles(),
     ...buildFadeRoutines(),
     ...buildClearScreen(),
-    ...buildAttributeRuns(),
+    ...buildDrawRuns(),
     ...buildNpcRoutines(),
     ...buildAnimRoutines(),
 

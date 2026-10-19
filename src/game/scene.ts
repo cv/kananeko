@@ -37,7 +37,7 @@ import {
   STREET_CAST,
   type SceneCast,
 } from './scenes/npcs';
-import { encodeAttributeRuns } from './video';
+import { encodeRuns } from './video';
 import { STATION_DIALOGUE } from './scenes/station';
 import { STREET_DIALOGUE } from './scenes/street';
 import { RESTAURANT_DIALOGUE } from './scenes/restaurant';
@@ -196,7 +196,7 @@ export interface PackedScene {
   readonly animation: Uint8Array;
   /** GBC palette set (see buildPaletteSet) */
   readonly paletteSet: Uint8Array;
-  /** Run-length encoded backdrop palettes (see encodeAttributeRuns) */
+  /** Run-length encoded backdrop palettes (see encodeRuns) */
   readonly backdropAttributes: Uint8Array;
 }
 
@@ -208,12 +208,12 @@ export function packScene(scene: Scene): PackedScene {
     dialogueData: buildDialogueTree(quiz.dialogue),
     roundsData: buildRoundsData(quiz.rounds),
     chancesData: buildQuestionTable(quiz.chances),
-    backdropData: art.backdrop,
+    backdropData: encodeRuns(Array.from(art.backdrop)),
     sceneTileData: art.tileData,
     cast: packCast(scene.cast),
     animation: packAnimation(scene.animation, art),
     paletteSet: buildPaletteSet(scene.colors),
-    backdropAttributes: encodeAttributeRuns(
+    backdropAttributes: encodeRuns(
       scene.backdrop.flatMap((row) =>
         Array.from(row).map((cell) => attributeOfCell(scene.colors, cell)),
       ),

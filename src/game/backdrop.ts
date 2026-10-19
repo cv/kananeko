@@ -5,20 +5,6 @@
  * font: each scene loads the ones it uses.
  */
 
-import {
-  dec_r,
-  inc_r,
-  inc_rr,
-  jr_cc,
-  label,
-  ld_a_de,
-  ld_r_n,
-  ld_r_r,
-  ldi_hl_a,
-  add_n,
-  ret,
-} from '../asm/ops';
-import { type Op, ref, u8 } from '../asm/types';
 import { at } from '../asm/util';
 import { sliceArt } from './art';
 import { TILE_COUNT, encodeGlyph } from './font';
@@ -118,34 +104,4 @@ export function buildSceneArt(map: Backdrop, capacity = SCENE_TILE_CAPACITY): Sc
     tileOfCell,
     tileData: Uint8Array.from(tiles.flatMap((glyph) => Array.from(encodeGlyph(glyph)))),
   };
-}
-
-/** Tilemap row stride minus the visible width */
-const ROW_SKIP = 32 - SCREEN_COLS;
-
-/**
- * Subroutine copy_rows: copy B rows of SCREEN_COLS tiles from [DE] to the
- * tilemap at HL (LCD off). Clobbers A, BC, DE, HL.
- */
-export function buildCopyRows(): Op[] {
-  return [
-    label('copy_rows'),
-    ld_r_n('c', u8(SCREEN_COLS)),
-    label('copy_rows_col'),
-    ld_a_de(),
-    inc_rr('de'),
-    ldi_hl_a(),
-    dec_r('c'),
-    jr_cc('nz', ref('copy_rows_col')),
-    // HL += ROW_SKIP to reach the next tilemap row
-    ld_r_r('a', 'l'),
-    add_n(u8(ROW_SKIP)),
-    ld_r_r('l', 'a'),
-    jr_cc('nc', ref('copy_rows_nc')),
-    inc_r('h'),
-    label('copy_rows_nc'),
-    dec_r('b'),
-    jr_cc('nz', ref('copy_rows')),
-    ret(),
-  ];
 }
