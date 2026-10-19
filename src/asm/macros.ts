@@ -152,6 +152,29 @@ export function copyBlock(name: string, dst: U16, src: U16 | LabelRef, count: nu
   ];
 }
 
+/**
+ * Copy `count` (1-65535) bytes of 1bpp tile data to `dst`, writing each byte twice
+ * (both bit planes), so set pixels become color 3. Clobbers A, BC, DE, HL.
+ */
+export function expandOneBit(name: string, dst: U16, src: U16 | LabelRef, count: number): Op[] {
+  if (count < 1 || count > 0xffff)
+    throw new RangeError(`expandOneBit count must be 1-65535, got ${String(count)}`);
+  return [
+    ld_rr_nn('hl', dst),
+    ld_rr_nn('de', src),
+    ld_rr_nn('bc', u16(count)),
+    label(name),
+    ld_a_de(),
+    inc_rr('de'),
+    ldi_hl_a(),
+    ldi_hl_a(),
+    dec_rr('bc'),
+    ld_r_r('a', 'b'),
+    or_r('c'),
+    jr_cc('nz', ref(name)),
+  ];
+}
+
 /** Copy `pages` × 256 bytes from `src` to `dst`. Clobbers A, BC, DE, HL. */
 export function copyPages(name: string, dst: U16, src: U16 | LabelRef, pages: number): Op[] {
   return [

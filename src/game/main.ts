@@ -7,7 +7,8 @@
 import { type AssembleResult, type ROMHeader, assemble } from '../asm/assembler';
 import { HW, JOY, MEM } from '../asm/hardware';
 import {
-  copyPages,
+  copyBlock,
+  expandOneBit,
   loadPointer,
   storeByte,
   storePointer,
@@ -65,7 +66,14 @@ import {
 import { buildNpcRoutines, loadCast } from './npc';
 import { buildAnimRoutines, loadAnimation } from './anim';
 import { DIALOGUE_LAYOUT, buildDialogueEngine } from './dialogue';
-import { buildTileData, requireTile, requireTiles, textToTiles } from './font';
+import {
+  ONE_BIT_TILES,
+  TILE_COUNT,
+  buildPackedTileData,
+  requireTile,
+  requireTiles,
+  textToTiles,
+} from './font';
 import { UI_TILES } from './font-data';
 import { buildReadJoypad } from './joypad';
 import { buildKanaData, buildKanaEngine } from './kana';
@@ -85,6 +93,7 @@ import { LOGO_ROWS } from './logo';
 import { ENDING_COLORS, GAME_OVER_COLORS, TITLE_COLORS } from './scenes/colors';
 import { BACKDROP } from './backdrop';
 import {
+  bgTileAddr,
   buildAttributeRuns,
   buildClearScreen,
   buildFadeData,
@@ -130,6 +139,40 @@ const NAME_TAG_RIGHT = requireTile(UI_TILES.TAG_RIGHT);
 const ENDING_TITLE = 'おめでとう!';
 const ENDING_SCORE_LABEL = 'とくてん ';
 const ENDING_ROWS = { cat: 2, title: 6, stamps: 8, score: 10 } as const;
+
+// ---------------------------------------------------------------------------
+// Font in ROM: 1-bit tiles first (expanded at boot), then 2-bit tiles, each split
+// at tile 128, where $8800 addressing moves from $9000 to $8800
+// ---------------------------------------------------------------------------
+
+interface FontSegment {
+  readonly label: string;
+  readonly first: number;
+  readonly oneBit: boolean;
+  readonly data: Uint8Array;
+}
+
+const FONT_SEGMENTS: readonly FontSegment[] = ((): FontSegment[] => {
+  const { oneBit, twoBit } = buildPackedTileData();
+  const total = TILE_COUNT + 1;
+  const split = 128;
+  const ranges = [
+    { label: 'font_1bpp_low', first: 0, end: Math.min(ONE_BIT_TILES, split), oneBit: true },
+    { label: 'font_1bpp_high', first: split, end: ONE_BIT_TILES, oneBit: true },
+    { label: 'font_2bpp_low', first: ONE_BIT_TILES, end: Math.min(total, split), oneBit: false },
+    { label: 'font_2bpp_high', first: Math.max(ONE_BIT_TILES, split), end: total, oneBit: false },
+  ];
+  return ranges
+    .filter((r) => r.end > r.first)
+    .map(({ label, first, end, oneBit: isOne }) => ({
+      label,
+      first,
+      oneBit: isOne,
+      data: isOne
+        ? oneBit.slice(first * 8, end * 8)
+        : twoBit.slice((first - ONE_BIT_TILES) * 16, (end - ONE_BIT_TILES) * 16),
+    }));
+})();
 
 // ---------------------------------------------------------------------------
 // Program helpers
@@ -446,7 +489,6 @@ function buildTitleBlink(): Op[] {
 // ---------------------------------------------------------------------------
 
 export function buildProgram(): Op[] {
-  const tileData = buildTileData();
   const packedScenes = buildSceneData();
 
   return [
@@ -468,13 +510,14 @@ export function buildProgram(): Op[] {
 
     // Copy all tile data to VRAM with the LCD off
     ...screenOff('init_vblank'),
-    // BG tiles 0-127 go to $9000 and 128+ to $8800 ($8800 addressing)
-    ...copyPages('init_copy_low', MEM.BG_TILES_LOW, ref('tileData'), 2048 / 256),
-    ...copyPages(
-      'init_copy_high',
-      MEM.BG_TILES_HIGH,
-      ref('tileDataHigh'),
-      Math.ceil((tileData.length - 2048) / 256),
+    // BG tiles 0-127 go to $9000 and 128+ to $8800 ($8800 addressing); 1-bit tiles expand
+    ...FONT_SEGMENTS.flatMap((segment) =>
+      (segment.oneBit ? expandOneBit : copyBlock)(
+        `${segment.label}_copy`,
+        u16(bgTileAddr(segment.first)),
+        ref(segment.label),
+        segment.data.length,
+      ),
     ),
 
     ...buildSpriteInit(),
@@ -689,10 +732,7 @@ export function buildProgram(): Op[] {
     ...buildSpriteData(),
     ...buildCatData(),
     ...buildFadeData(),
-    label('tileData'),
-    db(tileData.slice(0, 2048)),
-    label('tileDataHigh'),
-    db(tileData.slice(2048)),
+    ...FONT_SEGMENTS.flatMap((segment) => [label(segment.label), db(segment.data)]),
 
     label(SPEED_ROUND_LABEL),
     db(buildKanaData(SPEED_ROUND)),

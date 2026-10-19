@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { ROM_SIZE, globalChecksum, headerChecksum } from '@asm/assembler';
-import { buildTileData } from '@game/font';
+import { ONE_BIT_TILES, buildPackedTileData } from '@game/font';
 import {
   sceneBackdropLabel,
   sceneDialogueLabel,
@@ -47,15 +47,16 @@ describe('Given the ROM has been assembled', () => {
       'kana_update',
       'kana_draw_hud',
       'hud_update',
-      'tileData',
+      'font_1bpp_low',
     ]) {
       expect(symbols.has(name), name).toBe(true);
     }
   });
 
-  it('embeds the font tiles at tileData', () => {
-    const tiles = buildTileData();
-    expect(bytesAt('tileData', tiles.length)).toEqual(tiles);
+  it('stores two-shade font tiles at one bit per pixel', () => {
+    const { oneBit } = buildPackedTileData();
+    expect(bytesAt('font_1bpp_low', 128 * 8)).toEqual(oneBit.slice(0, 128 * 8));
+    expect(oneBit.length).toBe(ONE_BIT_TILES * 8);
   });
 
   it("embeds every scene's dialogue and kana data at its labels", () => {

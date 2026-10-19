@@ -30,8 +30,21 @@ export function encodeGlyph(glyph: Glyph): Uint8Array {
   return tile;
 }
 
-// Build CHAR_ORDER from all defined glyphs (deterministic order)
-const CHAR_ORDER = Object.keys(ALL_GLYPHS);
+/** Whether a glyph uses only paper and ink, so it can be stored at 1 bit per pixel */
+export function isOneBit(glyph: readonly string[]): boolean {
+  return glyph.every((row) => /^[.#]*$/u.test(row));
+}
+
+// Tile order: the 1-bit glyphs first (after the blank tile), then the rest; stable otherwise
+const ONE_BIT_CHARS = Object.entries(ALL_GLYPHS)
+  .filter(([, glyph]) => isOneBit(glyph))
+  .map(([ch]) => ch);
+const CHAR_ORDER = [
+  ...ONE_BIT_CHARS,
+  ...Object.entries(ALL_GLYPHS)
+    .filter(([, glyph]) => !isOneBit(glyph))
+    .map(([ch]) => ch),
+];
 
 // Validate: tile indices must not collide with sentinels
 if (CHAR_ORDER.length + 1 > 0xfe) {
@@ -88,6 +101,20 @@ export function buildTileData(): Uint8Array {
     data.set(tile, i * 16);
   });
   return data;
+}
+
+/** Tiles stored at 1 bit per pixel: the blank tile 0 and every two-shade glyph */
+export const ONE_BIT_TILES = 1 + ONE_BIT_CHARS.length;
+
+/**
+ * The font as stored in ROM: tiles 0 to ONE_BIT_TILES - 1 at 8 bytes each (one plane;
+ * copied to both, so set pixels are ink), then the rest as normal 2bpp tiles.
+ */
+export function buildPackedTileData(): { oneBit: Uint8Array; twoBit: Uint8Array } {
+  const full = buildTileData();
+  // A 1-bit tile's two planes are equal: keep the first byte of each pair
+  const oneBit = full.slice(0, ONE_BIT_TILES * 16).filter((_, i) => i % 2 === 0);
+  return { oneBit, twoBit: full.slice(ONE_BIT_TILES * 16) };
 }
 
 /** Convert a text string to an array of tile indices. Throws on unknown characters. */

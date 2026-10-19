@@ -3,6 +3,8 @@
 import { describe, expect, it } from 'vitest';
 import { JOY, MEM } from '@asm/hardware';
 import { DialogueState } from '@game/state';
+import { TILE_COUNT, buildTileData } from '@game/font';
+import { bgTileAddr } from '@game/video';
 import { GameRunner } from '../helpers/game-runner';
 import { checkpoint, runnerAt } from '../helpers/checkpoints';
 
@@ -34,6 +36,20 @@ describe('Given the ROM boots in the emulator', () => {
     const runner = new GameRunner().boot().start();
     expect(runner.sceneId).toBe(0);
     expect(runner.dlgState).not.toBe(DialogueState.IDLE);
+  });
+});
+
+describe('Given the game has booted', () => {
+  it('has every font tile in VRAM, the 1-bit ones expanded to ink', () => {
+    const runner = new GameRunner().boot();
+    const memory = runner.getMemory();
+    const tiles = buildTileData();
+    for (let tile = 0; tile <= TILE_COUNT; tile++) {
+      const address = bgTileAddr(tile);
+      expect(Array.from(memory.slice(address, address + 16)), `tile ${String(tile)}`).toEqual(
+        Array.from(tiles.slice(tile * 16, tile * 16 + 16)),
+      );
+    }
   });
 });
 

@@ -6,6 +6,7 @@ import {
   copyBytes,
   copyPages,
   countDownOrReturn,
+  expandOneBit,
   loadPointer,
   storeByte,
   storePointer,
@@ -125,6 +126,21 @@ describe('copyBlock', () => {
     expect(Array.from(mem.slice(SCRATCH, SCRATCH + 300))).toEqual(source);
     expect(mem[SCRATCH + 300]).not.toBe(0xee);
     expect(() => copyBlock('x', at(0), ref('src'), 0)).toThrow(RangeError);
+  });
+});
+
+describe('expandOneBit', () => {
+  it('writes every byte twice, filling both bit planes', () => {
+    const source = [0x81, 0x7e, 0x00, 0xff];
+    const mem = runProgram(
+      [...expandOneBit('one', at(0), ref('src'), source.length)],
+      [label('src'), db(source)],
+    );
+    expect(Array.from(mem.slice(SCRATCH, SCRATCH + 8))).toEqual([
+      0x81, 0x81, 0x7e, 0x7e, 0x00, 0x00, 0xff, 0xff,
+    ]);
+    expect(() => expandOneBit('x', at(0), ref('src'), 0)).toThrow(RangeError);
+    expect(() => expandOneBit('x', at(0), ref('src'), 0x10000)).toThrow(RangeError);
   });
 });
 
