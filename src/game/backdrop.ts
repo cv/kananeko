@@ -6,7 +6,6 @@
  */
 
 import {
-  call,
   dec_r,
   inc_r,
   inc_rr,
@@ -19,16 +18,13 @@ import {
   add_n,
   ret,
 } from '../asm/ops';
-import { ld_rr_nn } from '../asm/ops';
-import { type Op, ref, u8, u16 } from '../asm/types';
-import { copyBlock } from '../asm/macros';
+import { type Op, ref, u8 } from '../asm/types';
 import { at } from '../asm/util';
 import { sliceArt } from './art';
 import { TILE_COUNT, encodeGlyph } from './font';
 import { type Glyph } from './font-data';
 import { type Prop, SCENERY, isProp } from './scenery';
-import { SCREEN_COLS, tilemapAddr } from './tilemap';
-import { bgTileAddr } from './video';
+import { SCREEN_COLS } from './tilemap';
 
 /** Where backdrops sit: rows 1-8, between the HUD and the dialogue box */
 export const BACKDROP = { top: 1, rows: 8, cols: SCREEN_COLS } as const;
@@ -151,20 +147,5 @@ export function buildCopyRows(): Op[] {
     dec_r('b'),
     jr_cc('nz', ref('copy_rows')),
     ret(),
-  ];
-}
-
-/** Load a scene's own tiles (LCD off). */
-export function loadSceneTiles(name: string, dataLabel: string, bytes: number): Op[] {
-  return copyBlock(name, u16(bgTileAddr(SCENE_TILE_BASE)), ref(dataLabel), bytes);
-}
-
-/** Draw the backdrop stored at `dataLabel` (LCD off). */
-export function drawBackdrop(dataLabel: string): Op[] {
-  return [
-    ld_rr_nn('de', ref(dataLabel)),
-    ld_rr_nn('hl', u16(tilemapAddr(BACKDROP.top, 0))),
-    ld_r_n('b', u8(BACKDROP.rows)),
-    call(ref('copy_rows')),
   ];
 }

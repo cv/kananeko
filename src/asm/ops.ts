@@ -33,6 +33,12 @@ function instImm16(opcode: number, value: U16 | LabelRef): Op {
   return inst([opcode, lo(value), hi(value)]);
 }
 
+/** A 16-bit data word (little-endian), e.g. a label's address in a pointer table */
+export function dw(value: U16 | LabelRef): Op {
+  if (isRef(value)) return inst([0x00, 0x00], [{ offset: 0, label: value.name, type: 'imm16' }]);
+  return inst([lo(value), hi(value)]);
+}
+
 /** Opcode followed by a signed 8-bit offset to a label */
 function instRel8(opcode: number, target: LabelRef): Op {
   return inst([opcode, 0x00], [{ offset: 1, label: target.name, type: 'rel8' }]);

@@ -143,6 +143,10 @@ export const MEM = {
   CAT_TIMER: u16(0xc08e), // frames left in a reaction
   CAT_BLINK: u16(0xc08f), // blink cycle counter
 
+  // WRAM — the current scene's entry in scene_table (see scene-table.ts)
+  SCENE_DESC_LO: u16(0xc090),
+  SCENE_DESC_HI: u16(0xc091),
+
   // WRAM — scene system
   SCENE_ID: u16(0xc050), // Current scene index (0-4, 0xFF = title)
   SCENE_FLAGS: u16(0xc051), // Per-scene completion bitfield

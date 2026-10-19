@@ -12,7 +12,6 @@ import {
   loadPointer,
   storeByte,
   storePointer,
-  switchCases,
   waitFrame,
   zeroBytes,
 } from '../asm/macros';
@@ -52,7 +51,7 @@ import {
   xor_r,
 } from '../asm/ops';
 import { type Op, type U16, ref, u8, u16 } from '../asm/types';
-import { buildCopyRows, drawBackdrop, loadSceneTiles } from './backdrop';
+import { SCENE_TILE_BASE, buildCopyRows } from './backdrop';
 import { buildSpriteData, buildSpriteInit, buildSpriteRoutines, runDma } from './sprites';
 import {
   CAT_SPOTS,
@@ -63,8 +62,8 @@ import {
   catFace,
   placeCat,
 } from './cat';
-import { buildNpcRoutines, loadCast } from './npc';
-import { buildAnimRoutines, loadAnimation } from './anim';
+import { NPC_NONE, NPC_TILE_BASE, buildNpcRoutines } from './npc';
+import { buildAnimRoutines } from './anim';
 import { DIALOGUE_LAYOUT, buildDialogueEngine } from './dialogue';
 import {
   ONE_BIT_TILES,
@@ -85,11 +84,18 @@ import {
   SCORE_DIGIT_COUNT,
 } from './kana-hud';
 import { centerStartCol, tilemapAddr } from './tilemap';
-import { type PackedScene, type Scene, SCENES, SPEED_ROUND, buildSceneData } from './scene';
+import { SCENES, SPEED_ROUND, buildSceneData } from './scene';
 import { BAD_PICK, END_OF_CONVERSATION, KanaMode, MAX_LIVES } from './state';
 import { REDEEM_KEY } from './rounds';
 import { type ColorScheme, buildPaletteSet, paletteOf } from './color';
 import { LOGO_ROWS } from './logo';
+import {
+  buildSceneTable,
+  buildSceneTableRoutines,
+  copySceneBlock,
+  sceneByte,
+  sceneWord,
+} from './scene-table';
 import { ENDING_COLORS, GAME_OVER_COLORS, TITLE_COLORS } from './scenes/colors';
 import { BACKDROP } from './backdrop';
 import {
@@ -97,6 +103,7 @@ import {
   buildDrawTiles,
   buildTileLists,
   resetTileLists,
+  tileListLabel,
   buildAttributeRuns,
   buildClearScreen,
   buildFadeData,
@@ -224,22 +231,6 @@ export function sceneTilesLabel(sceneIndex: number): string {
 
 export function sceneBackdropLabel(sceneIndex: number): string {
   return `scene${String(sceneIndex)}_backdrop`;
-}
-
-/**
- * Run per-scene ops based on SCENE_ID. `name` must be unique per call site.
- */
-function sceneSwitch(
-  name: string,
-  getOps: (scene: Scene, packed: PackedScene, index: number) => Op[],
-  packedScenes: readonly PackedScene[],
-): Op[] {
-  const cases = packedScenes.map((packed, i) => {
-    const scene = SCENES[i];
-    if (scene === undefined) throw new RangeError(`No scene at index ${String(i)}`);
-    return getOps(scene, packed, i);
-  });
-  return [ld_a_nn(MEM.SCENE_ID), ...switchCases(cases, { name, branch: 'jp', exit: 'jp' })];
 }
 
 /** Reset score, delta flash, streak, and lives (plus any extra bytes to zero) for a new run. */
@@ -593,27 +584,18 @@ export function buildProgram(): Op[] {
 
     // ==== Scene load ====
     label('scene_load'),
+    call(ref('scene_desc')), // everything below reads this scene's entry in scene_table
     ...storeByte(MEM.ROUNDS_DONE, 0),
-    ...sceneSwitch(
-      'scene_rounds_ptr',
-      (_s, _p, i) => [ld_rr_nn('hl', ref(sceneRoundsLabel(i)))],
-      packedScenes,
-    ),
+    ...sceneWord('rounds'),
     ...storePointer('hl', MEM.ROUNDS_LO, MEM.ROUNDS_HI),
-    ...sceneSwitch(
-      'scene_chances_ptr',
-      (_s, _p, i) => [ld_rr_nn('hl', ref(sceneChancesLabel(i)))],
-      packedScenes,
-    ),
+    ...sceneWord('chances'),
     ...storePointer('hl', MEM.CHANCES_LO, MEM.CHANCES_HI),
     call(ref('scene_draw')),
 
     // ==== Dialogue, with a kana round after each conversation ====
-    ...sceneSwitch(
-      'scene_dlg_ptr',
-      (_s, _p, i) => [ld_rr_nn('de', ref(sceneDialogueLabel(i)))],
-      packedScenes,
-    ),
+    ...sceneWord('dialogue'),
+    ld_r_r('d', 'h'),
+    ld_r_r('e', 'l'),
     call(ref('dlg_open_tree')), // initialize tree and open node 0
 
     // Process nodes until the conversation ends
@@ -643,7 +625,8 @@ export function buildProgram(): Op[] {
 
     label('scene_complete'),
     // ==== Scene complete — set completion flag and advance ====
-    ...sceneSwitch('scene_flag', (_s, _p, i) => [ld_r_n('b', u8(1 << i))], packedScenes),
+    ...sceneByte('flag'),
+    ld_r_r('b', 'a'),
     ld_a_nn(MEM.SCENE_FLAGS),
     or_r('b'),
     ld_nn_a(MEM.SCENE_FLAGS),
@@ -672,53 +655,65 @@ export function buildProgram(): Op[] {
     ...screenOff('scene_vblank'),
     ...clearScreen(),
 
-    // Backdrop above the dialogue box
-    ...sceneSwitch(
-      'scene_backdrop',
-      (_s, packed, i) => [
-        ...loadSceneTiles(
-          `scene${String(i)}_tile_copy`,
-          sceneTilesLabel(i),
-          packed.sceneTileData.length,
-        ),
-        ...drawBackdrop(sceneBackdropLabel(i)),
-        ...loadCast(`scene${String(i)}_cast`, castLabels(i), packed.cast),
-        ...loadAnimation(sceneAnimationLabel(i)),
-        ...cgbAttributes(`scene${String(i)}_colors`, [
-          ld_rr_nn('hl', u16(tilemapAddr(BACKDROP.top, 0))),
-          ld_rr_nn('de', ref(sceneColorsLabel(i))),
-          call(ref('attr_runs')),
-        ]),
-      ],
-      packedScenes,
-    ),
+    // Backdrop above the dialogue box: the scene's own tiles, then its map
+    ...copySceneBlock(u16(bgTileAddr(SCENE_TILE_BASE)), 'tiles', 'tilesLength'),
+    ...sceneWord('backdrop'),
+    ld_r_r('d', 'h'),
+    ld_r_r('e', 'l'),
+    ld_rr_nn('hl', u16(tilemapAddr(BACKDROP.top, 0))),
+    ld_r_n('b', u8(BACKDROP.rows)),
+    call(ref('copy_rows')),
+
+    // The cast: sprite tiles, GBC sprite palettes 1..n, who speaks when, where they stand
+    ...copySceneBlock(u16(MEM.OBJ_TILES + NPC_TILE_BASE * 16), 'castTiles', 'castTilesLength'),
+    ld_r_n('a', u8(0x80 | 8)),
+    ldh_n_a(HW.OCPS),
+    ...sceneByte('castPaletteBytes'),
+    push('af'),
+    ...sceneWord('castPalettes'),
+    pop('af'),
+    ld_r_r('b', 'a'),
+    label('scene_cast_palette'),
+    ldi_a_hl(),
+    ldh_n_a(HW.OCPD),
+    dec_r('b'),
+    jr_cc('nz', ref('scene_cast_palette')),
+    ...sceneWord('castTable'),
+    ...storePointer('hl', MEM.NPC_TABLE_LO, MEM.NPC_TABLE_HI),
+    ...storeByte(MEM.NPC_CURRENT, NPC_NONE),
+    ...sceneByte('stageX'),
+    ld_nn_a(MEM.NPC_X),
+    ...sceneByte('stageY'),
+    ld_nn_a(MEM.NPC_Y),
+
+    // The animated tile
+    ...sceneWord('animation'),
+    ...storePointer('hl', MEM.ANIM_LO, MEM.ANIM_HI),
+    ...zeroBytes(MEM.ANIM_TIMER, MEM.ANIM_FRAME),
+
+    // GBC colors of the backdrop
+    ...cgbAttributes('scene_colors', [
+      ...sceneWord('colors'),
+      ld_r_r('d', 'h'),
+      ld_r_r('e', 'l'),
+      ld_rr_nn('hl', u16(tilemapAddr(BACKDROP.top, 0))),
+      call(ref('attr_runs')),
+    ]),
     call(ref('kana_draw_hud')), // hearts + score on row 0
     call(ref('dlg_draw_box')),
     // Location name as a label in the box's top border: ┌─── えき ─┐
-    ...sceneSwitch(
-      'scene_name',
-      (_, packed) => [
-        ld_rr_nn(
-          'hl',
-          u16(tilemapAddr(DIALOGUE_LAYOUT.boxTop, DIALOGUE_LAYOUT.nameCol(packed.nameRow.length))),
-        ),
-        ...[NAME_TAG_LEFT, ...packed.nameRow, NAME_TAG_RIGHT].flatMap((tile) => [
-          ld_r_n('a', u8(tile)),
-          ldi_hl_a(),
-        ]),
-      ],
-      packedScenes,
-    ),
-    ...sceneSwitch(
-      'scene_fade',
-      (_s, _p, i) => [ld_rr_nn('hl', ref(sceneFadeLabel(i)))],
-      packedScenes,
-    ),
+    ...sceneWord('nameTiles'),
+    push('hl'),
+    ...sceneWord('nameAddress'),
+    pop('de'),
+    call(ref('draw_tiles')),
+    ...sceneWord('fade'),
     call(ref('fade_in')),
     ...catFace('cat_rest', 'neutral'),
     ...placeCat(CAT_SPOTS.dialogue),
     ret(),
     ...buildRoundRoutines(),
+    ...buildSceneTableRoutines(),
     ...buildReadJoypad(),
     ...buildTitleBlink(),
     ...buildCatRoutines(),
@@ -783,6 +778,32 @@ export function buildProgram(): Op[] {
       label(resultFadeLabel(screen)),
       db(buildPaletteSet(screen.colors)),
     ]),
+    // Everything the engine loads per scene (scene-table.ts)
+    ...buildSceneTable(
+      packedScenes.map((packed, i) => ({
+        dialogue: sceneDialogueLabel(i),
+        rounds: sceneRoundsLabel(i),
+        chances: sceneChancesLabel(i),
+        fade: sceneFadeLabel(i),
+        tiles: sceneTilesLabel(i),
+        tilesLength: u16(packed.sceneTileData.length),
+        backdrop: sceneBackdropLabel(i),
+        castTiles: castLabels(i).tiles,
+        castTilesLength: u16(packed.cast.tiles.length),
+        castPalettes: castLabels(i).palettes,
+        castTable: castLabels(i).table,
+        animation: sceneAnimationLabel(i),
+        colors: sceneColorsLabel(i),
+        nameTiles: tileListLabel([NAME_TAG_LEFT, ...packed.nameRow, NAME_TAG_RIGHT]),
+        nameAddress: u16(
+          tilemapAddr(DIALOGUE_LAYOUT.boxTop, DIALOGUE_LAYOUT.nameCol(packed.nameRow.length)),
+        ),
+        castPaletteBytes: packed.cast.palettes.length,
+        stageX: packed.cast.stage.x,
+        stageY: packed.cast.stage.y,
+        flag: 1 << i,
+      })),
+    ),
     // Tile lists drawn by draw_tiles (collected while generating the code above)
     ...buildTileLists(),
   ];

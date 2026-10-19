@@ -4,8 +4,8 @@
  * speaker is chosen per dialogue node from the scene's segment table.
  */
 
-import { HW, MEM } from '../asm/hardware';
-import { copyBlock, loadPointer, storeByte, storePointer, zeroBytes } from '../asm/macros';
+import { MEM } from '../asm/hardware';
+import { loadPointer, storeByte, zeroBytes } from '../asm/macros';
 import {
   add_n,
   add_r,
@@ -21,21 +21,21 @@ import {
   ld_nn_a,
   ld_r_n,
   ld_r_r,
-  ld_rr_nn,
-  ldh_n_a,
   ldi_a_hl,
   and_n,
   ret,
   ret_cc,
 } from '../asm/ops';
-import { type Op, ref, u8, u16 } from '../asm/types';
+import { type Op, ref, u8 } from '../asm/types';
 import { sliceArt } from './art';
 import { encodeGlyph } from './font';
 import { type NpcLook, npcArt } from './npc-art';
 import { type SceneCast } from './scenes/npcs';
 import { OAM_X_OFFSET, OAM_Y_OFFSET, SPRITE_SLOT, oamField } from './sprites';
 
-const NONE = 0xff;
+/** NPC_CURRENT when nobody is shown */
+export const NPC_NONE = 0xff;
+const NONE = NPC_NONE;
 /** First sprite tile of the cast (tile 0 is the cursor) */
 export const NPC_TILE_BASE = 1;
 /** GBC OBJ palettes 1-6 are free (0 is the cursor's, 7 the cat's) */
@@ -84,44 +84,6 @@ export function packCast(cast: SceneCast): PackedCast {
     table: Uint8Array.from([...table, NONE]),
     stage: { x: x + OAM_X_OFFSET, y: y + OAM_Y_OFFSET },
   };
-}
-
-/** At scene load (LCD off): copy the cast's tiles and palettes and select its table. */
-export function loadCast(
-  name: string,
-  labels: { tiles: string; palettes: string; table: string },
-  cast: PackedCast,
-): Op[] {
-  return [
-    ...copyBlock(
-      `${name}_tiles`,
-      u16(MEM.OBJ_TILES + NPC_TILE_BASE * 16),
-      ref(labels.tiles),
-      cast.tiles.length,
-    ),
-    // GBC OBJ palettes 1..n (ignored on DMG)
-    ld_r_n('a', u8(0x80 | 8)),
-    ldh_n_a(HW.OCPS),
-    ...copyBlockToPort(`${name}_pal`, labels.palettes, cast.palettes.length),
-    ld_rr_nn('hl', ref(labels.table)),
-    ...storePointer('hl', MEM.NPC_TABLE_LO, MEM.NPC_TABLE_HI),
-    ...storeByte(MEM.NPC_CURRENT, NONE),
-    ...storeByte(MEM.NPC_X, cast.stage.x),
-    ...storeByte(MEM.NPC_Y, cast.stage.y),
-  ];
-}
-
-/** Write `count` bytes from ROM to OCPD (LCD off). */
-function copyBlockToPort(name: string, src: string, count: number): Op[] {
-  return [
-    ld_rr_nn('hl', ref(src)),
-    ld_r_n('b', u8(count)),
-    label(name),
-    ldi_a_hl(),
-    ldh_n_a(HW.OCPD),
-    dec_r('b'),
-    jr_cc('nz', ref(name)),
-  ];
 }
 
 /** Subroutines npc_select (show the speaker for DLG_NODE_ID), npc_update (bob), npc_hide. */

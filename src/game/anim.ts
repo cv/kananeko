@@ -4,7 +4,7 @@
  */
 
 import { MEM } from '../asm/hardware';
-import { loadPointer, storePointer, zeroBytes } from '../asm/macros';
+import { loadPointer } from '../asm/macros';
 import {
   add_hl_rr,
   and_r,
@@ -18,7 +18,6 @@ import {
   ld_nn_a,
   ld_r_n,
   ld_r_r,
-  ld_rr_nn,
   ldi_a_hl,
   pop,
   push,
@@ -64,15 +63,6 @@ export function packAnimation(animation: TileAnimation | undefined, art: SceneAr
     period - 1,
     ...all.flatMap((glyph) => Array.from(encodeGlyph(glyph))),
   ]);
-}
-
-/** At scene load: point the animator at this scene's animation. */
-export function loadAnimation(dataLabel: string): Op[] {
-  return [
-    ld_rr_nn('hl', ref(dataLabel)),
-    ...storePointer('hl', MEM.ANIM_LO, MEM.ANIM_HI),
-    ...zeroBytes(MEM.ANIM_TIMER, MEM.ANIM_FRAME),
-  ];
 }
 
 /** Subroutine anim_tick: advance the scene's tile animation (call once per frame, LCD on). */
