@@ -185,6 +185,20 @@ test('keeps every frame on time while playing (no missed VBlanks)', async ({ pag
   expect(missed).toBe(0);
 });
 
+test('starts loading the emulator and the ROM early, fetching each just once', async ({
+  page,
+  isMobile,
+}) => {
+  const fetched: string[] = [];
+  page.on('request', (request) => fetched.push(new URL(request.url()).pathname));
+  await play(page, isMobile);
+  const count = (suffix: string): number => fetched.filter((p) => p.endsWith(suffix)).length;
+  expect(count('/binjgb.wasm')).toBe(1);
+  expect(count('/kananeko.gb')).toBe(1);
+  // ...started by the page's head, before the player's script runs
+  expect(await page.evaluate(() => 'kananekoEarly' in window)).toBe(true);
+});
+
 test('remembers the sound setting', async ({ page, isMobile }) => {
   await play(page, isMobile);
   const mute = page.locator('#mute');

@@ -26,6 +26,7 @@ const CGB_COLOR_CURVE = 2;
 /** kananeko.gb with a version query, so a new ROM is never read from a stale cache (build-site.ts) */
 const ROM_URL = __ROM_URL__;
 const MUTED_KEY = 'kananeko:muted';
+const WASM_URL = 'vendor/binjgb.wasm';
 
 const SETTERS: Record<Button, (m: BinjgbModule, e: number, down: boolean) => void> = {
   up: (m, e, d) => {
@@ -320,10 +321,27 @@ function main(): void {
   const ctx = canvas.getContext('2d');
   if (ctx === null) throw new Error('No 2D canvas');
 
-  // Load the emulator and the ROM right away, so the first tap starts the game at once
+  // Load the emulator and the ROM right away, so the first tap starts the game at once,
+  // using the downloads the page's head already started when there are any
+  const early = window.kananekoEarly;
+  const wasmResponse = early?.wasm ?? fetch(WASM_URL);
   const loading = Promise.all([
-    Binjgb(),
-    fetch(ROM_URL).then((response) => {
+    Binjgb({
+      instantiateWasm: (imports, done) => {
+        void wasmResponse
+          .then((response) =>
+            WebAssembly.instantiateStreaming(response.clone(), imports).catch(() =>
+              // e.g. served without the application/wasm type: compile from the bytes
+              response.arrayBuffer().then((bytes) => WebAssembly.instantiate(bytes, imports)),
+            ),
+          )
+          .then((result) => {
+            done(result.instance);
+          });
+        return {};
+      },
+    }),
+    (early?.rom ?? fetch(ROM_URL)).then((response) => {
       if (!response.ok) throw new Error(`Could not load ${ROM_URL}`);
       return response.arrayBuffer();
     }),

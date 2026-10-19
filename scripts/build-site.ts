@@ -75,10 +75,15 @@ export async function buildSite(): Promise<void> {
   const css = fs.readFileSync(path.join(SITE, 'style.css'));
   const stylesheet = hashed('style.css', css);
   fs.writeFileSync(path.join(OUT, stylesheet), css);
+  // Start downloading the emulator and the ROM with the page, not after play.js runs. The
+  // player takes over these very requests (link preloads are only hints: WebKit fetched
+  // the wasm twice), so each file is fetched exactly once.
+  const preloads = `<script>window.kananekoEarly = { wasm: fetch('vendor/binjgb.wasm'), rom: fetch('kananeko.gb?v=${romVersion}') };</script>`;
   const html = fs
     .readFileSync(path.join(SITE, 'index.html'), 'utf8')
     .replace('href="style.css"', `href="${stylesheet}"`)
-    .replace('src="play.js"', `src="${script}"`);
+    .replace('src="play.js"', `src="${script}"`)
+    .replace('</head>', `  ${preloads}\n  </head>`);
   fs.writeFileSync(path.join(OUT, 'index.html'), html);
   for (const file of fs.readdirSync(path.join(SITE, 'vendor'))) {
     fs.copyFileSync(path.join(SITE, 'vendor', file), path.join(OUT, 'vendor', file));

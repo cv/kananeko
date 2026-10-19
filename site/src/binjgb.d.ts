@@ -33,5 +33,18 @@ interface BinjgbModule {
 /** Set at build time (scripts/build-site.ts) */
 declare const __ROM_URL__: string;
 
+interface BinjgbOptions {
+  /** Emscripten's hook for supplying the compiled module ourselves */
+  instantiateWasm?: (
+    imports: WebAssembly.Imports,
+    done: (instance: WebAssembly.Instance) => void,
+  ) => object;
+}
+
 /** Defined by vendor/binjgb.js */
-declare function Binjgb(): Promise<BinjgbModule>;
+declare function Binjgb(options?: BinjgbOptions): Promise<BinjgbModule>;
+
+/** Started by an inline script in the page's head (scripts/build-site.ts) */
+interface Window {
+  kananekoEarly?: { wasm: Promise<Response>; rom: Promise<Response> };
+}
