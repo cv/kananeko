@@ -118,7 +118,7 @@ export const TEXT_END = 0xfe;
  * Pack a dialogue tree into ROM data with an offset table for random access.
  *
  * Per node:
- *   [text_tiles...] 0xFE
+ *   [text_tiles...] 0xFE                 ← compressed (text-codec.ts) in the ROM
  *   [choice_count]
  *   [next_node × choice_count]           ← bits 0-6: node (NEXT_END = end),
  *                                           bit 7: BAD_CHOICE_FLAG
@@ -129,7 +129,14 @@ export const TEXT_END = 0xfe;
  *   [choice_1_text...] 0xFE
  *   ...
  */
-export function buildDialogueTree(tree: DialogueTree): Uint8Array {
+/**
+ * @param encode compresses each text's tiles (see text-codec.ts); the default stores
+ *   them as they are
+ */
+export function buildDialogueTree(
+  tree: DialogueTree,
+  encode: (tiles: readonly number[]) => readonly number[] = (tiles) => tiles,
+): Uint8Array {
   if (tree.length >= NEXT_END) {
     throw new RangeError(`Dialogue trees are limited to ${String(NEXT_END)} nodes`);
   }
@@ -137,10 +144,7 @@ export function buildDialogueTree(tree: DialogueTree): Uint8Array {
   for (const node of tree) {
     const chunk: number[] = [];
     // NPC text, null-terminated
-    for (const tile of textToTiles(node.text)) {
-      chunk.push(tile);
-    }
-    chunk.push(TEXT_END);
+    chunk.push(...encode(textToTiles(node.text)), TEXT_END);
 
     // Choice count
     chunk.push(node.choices.length);
@@ -156,10 +160,7 @@ export function buildDialogueTree(tree: DialogueTree): Uint8Array {
 
     // Choice texts, each null-terminated
     for (const choice of node.choices) {
-      for (const tile of textToTiles(choice.text)) {
-        chunk.push(tile);
-      }
-      chunk.push(TEXT_END);
+      chunk.push(...encode(textToTiles(choice.text)), TEXT_END);
     }
 
     nodeChunks.push(chunk);

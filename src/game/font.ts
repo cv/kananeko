@@ -5,7 +5,7 @@
  */
 
 import { type TileIndex } from '../asm/types';
-import { ALL_GLYPHS, type Glyph } from './font-data';
+import { ALL_GLYPHS, CAT_TILES, type Glyph } from './font-data';
 
 type TileTuple<T extends readonly string[]> = { [K in keyof T]: TileIndex };
 
@@ -39,10 +39,13 @@ export function isOneBit(glyph: readonly string[]): boolean {
 const ONE_BIT_CHARS = Object.entries(ALL_GLYPHS)
   .filter(([, glyph]) => isOneBit(glyph))
   .map(([ch]) => ch);
+// The quiz blank is the one 2-bit tile dialogue uses (fill-in replies): first after the
+// 1-bit tiles, so text tiles end low and leave more codes for compression (text-codec.ts)
 const CHAR_ORDER = [
   ...ONE_BIT_CHARS,
+  CAT_TILES.BLANK,
   ...Object.entries(ALL_GLYPHS)
-    .filter(([, glyph]) => !isOneBit(glyph))
+    .filter(([ch, glyph]) => !isOneBit(glyph) && ch !== CAT_TILES.BLANK)
     .map(([ch]) => ch),
 ];
 

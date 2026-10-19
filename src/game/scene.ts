@@ -38,6 +38,7 @@ import {
   type SceneCast,
 } from './scenes/npcs';
 import { encodeRuns } from './video';
+import { type TextCodec, buildTextCodec } from './text-codec';
 import { STATION_DIALOGUE } from './scenes/station';
 import { STREET_DIALOGUE } from './scenes/street';
 import { RESTAURANT_DIALOGUE } from './scenes/restaurant';
@@ -205,7 +206,7 @@ export function packScene(scene: Scene): PackedScene {
   const quiz = sceneQuiz(scene);
   return {
     nameRow: textToTiles(scene.name),
-    dialogueData: buildDialogueTree(quiz.dialogue),
+    dialogueData: buildDialogueTree(quiz.dialogue, dialogueCodec().encode),
     roundsData: buildRoundsData(quiz.rounds),
     chancesData: buildQuestionTable(quiz.chances),
     backdropData: encodeRuns(Array.from(art.backdrop)),
@@ -222,6 +223,22 @@ export function packScene(scene: Scene): PackedScene {
 }
 
 /** When the scene's kana rounds and chances happen and what they ask */
+let codec: TextCodec | undefined;
+
+/** The dictionary all scenes' dialogue is compressed with (learned from all of it) */
+export function dialogueCodec(): TextCodec {
+  if (codec === undefined) {
+    const strings = SCENES.flatMap((scene) =>
+      sceneQuiz(scene).dialogue.flatMap((node) => [
+        textToTiles(node.text),
+        ...node.choices.map((choice) => textToTiles(choice.text)),
+      ]),
+    );
+    codec = buildTextCodec(strings);
+  }
+  return codec;
+}
+
 export function sceneQuiz(scene: Scene): QuizPlan {
   return planQuiz(scene.cast, scene.dialogue, scene.kanaQuestions);
 }

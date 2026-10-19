@@ -36,7 +36,6 @@ import {
   jr,
   jr_cc,
   label,
-  ld_a_de,
   ld_a_nn,
   ld_nn_a,
   ld_r_n,
@@ -49,6 +48,8 @@ import {
   ret_cc,
   sub_n,
   or_r,
+  pop,
+  push,
   xor_r,
 } from '../asm/ops';
 import { type Op, ref, u8, u16 } from '../asm/types';
@@ -279,6 +280,68 @@ function buildClearTextbox(): Op[] {
  * dlg_update: Call each frame. When state returns to idle, check DLG_NODE_ID:
  *   END_OF_CONVERSATION = conversation over, else = next node to open.
  */
+/**
+ * Subroutine text_next: A = the next tile of the text at DLG_STR, expanding dictionary
+ * codes (`base` and up, see text-codec.ts) through TEXT_STACK; TEXT_END comes through
+ * as is. Advances DLG_STR. Preserves BC, DE, HL.
+ */
+export function buildTextNext(base: number): Op[] {
+  return [
+    label('text_next'),
+    push('bc'),
+    push('de'),
+    push('hl'),
+    ld_a_nn(MEM.TEXT_SP),
+    or_r('a'),
+    jr_cc('z', ref('text_next_raw')),
+    // A right half waiting on the stack comes first
+    dec_r('a'),
+    ld_nn_a(MEM.TEXT_SP),
+    ld_r_r('e', 'a'),
+    ld_r_n('d', u8(0)),
+    ld_rr_nn('hl', MEM.TEXT_STACK),
+    add_hl_rr('de'),
+    ld_r_r('a', 'hl_ptr'),
+    jr(ref('text_next_expand')),
+    label('text_next_raw'),
+    ...loadPointer('hl', MEM.DLG_STR_LO, MEM.DLG_STR_HI),
+    ldi_a_hl(),
+    ld_r_r('b', 'a'),
+    ...storePointer('hl', MEM.DLG_STR_LO, MEM.DLG_STR_HI),
+    ld_r_r('a', 'b'),
+    label('text_next_expand'),
+    cp_n(u8(base)),
+    jr_cc('c', ref('text_next_done')), // a tile
+    cp_n(u8(TEXT_END)),
+    jr_cc('z', ref('text_next_done')),
+    // A code: push its right half, go on with its left half
+    sub_n(u8(base)),
+    ld_r_r('l', 'a'),
+    ld_r_n('h', u8(0)),
+    add_hl_rr('hl'),
+    ld_rr_nn('de', ref('text_dict')),
+    add_hl_rr('de'),
+    ldi_a_hl(),
+    ld_r_r('b', 'a'), // left half
+    ld_r_r('c', 'hl_ptr'), // right half
+    ld_a_nn(MEM.TEXT_SP),
+    ld_r_r('e', 'a'),
+    inc_r('a'),
+    ld_nn_a(MEM.TEXT_SP),
+    ld_r_n('d', u8(0)),
+    ld_rr_nn('hl', MEM.TEXT_STACK),
+    add_hl_rr('de'),
+    ld_r_r('hl_ptr', 'c'),
+    ld_r_r('a', 'b'),
+    jr(ref('text_next_expand')),
+    label('text_next_done'),
+    pop('hl'),
+    pop('de'),
+    pop('bc'),
+    ret(),
+  ];
+}
+
 export function buildDialogueEngine(): Op[] {
   return [
     // =================================================================
@@ -288,8 +351,9 @@ export function buildDialogueEngine(): Op[] {
     label('dlg_open'),
     call(ref('dlg_clear_box')),
 
-    // Store node data pointer
+    // Store node data pointer; no compressed text is half-read
     ...storePointer('de', MEM.DLG_STR_LO, MEM.DLG_STR_HI),
+    ...zeroBytes(MEM.TEXT_SP),
 
     // Set VRAM write position to the start of the text area (inside border)
     ...storeByte(MEM.DLG_VRAM_LO, lo(tilemapAddr(TEXT_START))),
@@ -327,12 +391,8 @@ export function buildDialogueEngine(): Op[] {
     ...countDownOrReturn(MEM.DLG_DELAY),
     ...storeByte(MEM.DLG_DELAY, REVEAL_DELAY),
 
-    // Read the next tile and advance the string pointer
-    ...loadPointer('hl', MEM.DLG_STR_LO, MEM.DLG_STR_HI),
-    ldi_a_hl(),
-    ld_r_r('b', 'a'), // save tile in B
-    ...storePointer('hl', MEM.DLG_STR_LO, MEM.DLG_STR_HI),
-    ld_r_r('a', 'b'), // restore tile
+    // Read the next tile (expanding the compression) and advance the string pointer
+    call(ref('text_next')),
 
     // Check for text terminator (not 0x00, because tile 0 = space)
     cp_n(u8(TEXT_END)),
@@ -377,8 +437,7 @@ export function buildDialogueEngine(): Op[] {
     ...storeByte(MEM.DLG_STATE, DialogueState.CHOOSING),
     ...buildInitChoiceOrder(),
 
-    // Draw each choice on its shuffled row
-    ...loadPointer('de', MEM.DLG_STR_LO, MEM.DLG_STR_HI),
+    // Draw each choice on its shuffled row (DLG_STR walks through their texts)
 
     ld_a_nn(MEM.DLG_CHOICE_CNT),
     ld_r_r('c', 'a'), // C = remaining choices
@@ -388,10 +447,9 @@ export function buildDialogueEngine(): Op[] {
     // HL = text position of the display row showing logical choice B
     ...buildLoadChoicePositionForLogicalChoice('dlg_choice_pos'),
 
-    // Copy tiles from [DE] to [HL] until the text terminator
+    // Copy the choice's tiles to [HL] until the text terminator
     label('dlg_choice_char'),
-    ld_a_de(),
-    inc_rr('de'),
+    call(ref('text_next')),
     cp_n(u8(TEXT_END)),
     jr_cc('z', ref('dlg_choice_str_done')),
     ...vramPut(),

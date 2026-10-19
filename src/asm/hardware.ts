@@ -147,6 +147,10 @@ export const MEM = {
   SCENE_DESC_LO: u16(0xc090),
   SCENE_DESC_HI: u16(0xc091),
 
+  // WRAM — dialogue text decompression (see text_next in dialogue.ts)
+  TEXT_SP: u16(0xc092), // right halves of codes waiting on TEXT_STACK
+  TEXT_STACK: u16(0xc0a0), // TEXT_STACK_SIZE bytes ($C0A0-$C0AF)
+
   // WRAM — scene system
   SCENE_ID: u16(0xc050), // Current scene index (0-4, 0xFF = title)
   SCENE_FLAGS: u16(0xc051), // Per-scene completion bitfield

@@ -64,7 +64,7 @@ import {
 } from './cat';
 import { NPC_NONE, NPC_TILE_BASE, buildNpcRoutines } from './npc';
 import { buildAnimRoutines } from './anim';
-import { DIALOGUE_LAYOUT, buildDialogueEngine } from './dialogue';
+import { DIALOGUE_LAYOUT, buildDialogueEngine, buildTextNext } from './dialogue';
 import {
   ONE_BIT_TILES,
   TILE_COUNT,
@@ -84,7 +84,7 @@ import {
   SCORE_DIGIT_COUNT,
 } from './kana-hud';
 import { centerStartCol, tilemapAddr } from './tilemap';
-import { SCENES, SPEED_ROUND, buildSceneData } from './scene';
+import { SCENES, SPEED_ROUND, buildSceneData, dialogueCodec } from './scene';
 import { BAD_PICK, END_OF_CONVERSATION, KanaMode, MAX_LIVES } from './state';
 import { REDEEM_KEY } from './rounds';
 import { type ColorScheme, buildPaletteSet, buildSharedPalettes, paletteOf } from './color';
@@ -720,6 +720,7 @@ export function buildProgram(): Op[] {
     ...buildDrawStartBox(),
     ...buildDrawStamps(),
     ...buildDialogueEngine(),
+    ...buildTextNext(dialogueCodec().base),
     ...buildKanaEngine(),
     ...buildDrawHudOps(),
     ...buildScoreRoutines(),
@@ -776,6 +777,10 @@ export function buildProgram(): Op[] {
       label(resultFadeLabel(screen)),
       db(buildPaletteSet(screen.colors)),
     ]),
+    // Dialogue compression dictionary: two bytes per code (text-codec.ts)
+    label('text_dict'),
+    db(dialogueCodec().pairs.flat()),
+
     // GBC palettes every screen shares (the palette sets hold only their own)
     label('shared_palettes'),
     db(buildSharedPalettes()),
