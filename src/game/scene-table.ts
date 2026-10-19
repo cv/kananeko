@@ -7,11 +7,12 @@
 
 import { MEM } from './ram';
 import { loadPointer, storePointer } from '../asm/macros';
-import { add, call, db, dec, dw, inc, jr, label, ld, or, pop, push, ret } from '../asm/sm83';
-import { type Op, type Target, type U16, Label, routine } from '../asm/types';
+import { add, call, dec, dw, inc, jr, label, ld, or, pop, push, ret } from '../asm/sm83';
+import { type Op, type U16, Label, routine } from '../asm/types';
 import { at } from '../asm/util';
 import { SCENE_DESC } from './labels';
 import { gameModule } from '../asm/program';
+import { type FieldsOf, type RecordOf, byte, struct, word } from '../asm/struct';
 
 // Labels placed in this module
 const SCENE_TABLE = new Label('scene_table');
@@ -19,37 +20,33 @@ const SCENE_WORD = routine('scene_word', { out: ['hl'], clobbers: ['a', 'de'] })
 const SCENE_BYTE = routine('scene_byte', { out: ['a'], clobbers: ['de', 'hl'] });
 const COPY_BLOCK = routine('copy_block', { clobbers: ['a', 'bc', 'de', 'hl'] });
 
-/** Word fields (2 bytes each), then byte fields */
-const WORDS = [
-  'dialogue',
-  'rounds',
-  'chances',
-  'fade',
-  'tiles',
-  'tilesLength',
-  'backdrop',
-  'castTiles',
-  'castTilesLength',
-  'castPalettes',
-  'castTable',
-  'animation',
-  'colors',
-  'nameTiles',
-  'nameAddress',
-] as const;
-const BYTES = ['castPaletteBytes', 'stageX', 'stageY', 'flag'] as const;
+/** One scene's entry in scene_table: what the engine loads for it */
+export const SCENE_ENTRY = struct('scene entry', {
+  dialogue: word(),
+  rounds: word(),
+  chances: word(),
+  fade: word(),
+  tiles: word(),
+  tilesLength: word(),
+  backdrop: word(),
+  castTiles: word(),
+  castTilesLength: word(),
+  castPalettes: word(),
+  castTable: word(),
+  animation: word(),
+  colors: word(),
+  nameTiles: word(),
+  nameAddress: word(),
+  castPaletteBytes: byte(),
+  stageX: byte(),
+  stageY: byte(),
+  flag: byte(),
+});
 
-export type SceneWord = (typeof WORDS)[number];
-export type SceneByte = (typeof BYTES)[number];
-
-/** Byte offset of each field in an entry */
-export const SCENE_FIELD: Readonly<Record<SceneWord | SceneByte, number>> = Object.fromEntries([
-  ...WORDS.map((name, i) => [name, i * 2] as const),
-  ...BYTES.map((name, i) => [name, WORDS.length * 2 + i] as const),
-]) as Record<SceneWord | SceneByte, number>;
-
-export type SceneEntry = Readonly<Record<SceneWord, U16 | Target>> &
-  Readonly<Record<SceneByte, number>>;
+type SceneFields = typeof SCENE_ENTRY.fields;
+export type SceneWord = FieldsOf<SceneFields, 'word'>;
+export type SceneByte = FieldsOf<SceneFields, 'byte'>;
+export type SceneEntry = RecordOf<SceneFields>;
 
 /** The table: scene_table lists each entry's address; entries follow */
 export function buildSceneTable(entries: readonly SceneEntry[]): Op[] {
@@ -57,11 +54,7 @@ export function buildSceneTable(entries: readonly SceneEntry[]): Op[] {
   return [
     label(SCENE_TABLE),
     ...labels.map((l) => dw(l)),
-    ...entries.flatMap((entry, i) => [
-      label(at(labels, i)),
-      ...WORDS.map((name) => dw(entry[name])),
-      db(BYTES.map((name) => entry[name])),
-    ]),
+    ...entries.flatMap((entry, i) => [label(at(labels, i)), ...SCENE_ENTRY.encode(entry)]),
   ];
 }
 
@@ -119,12 +112,12 @@ export function buildSceneTableRoutines(): Op[] {
 
 /** HL = a word field of the current scene */
 export function sceneWord(field: SceneWord): Op[] {
-  return [ld('a', SCENE_FIELD[field]), call(SCENE_WORD)];
+  return [ld('a', SCENE_ENTRY.offset[field]), call(SCENE_WORD)];
 }
 
 /** A = a byte field of the current scene */
 export function sceneByte(field: SceneByte): Op[] {
-  return [ld('a', SCENE_FIELD[field]), call(SCENE_BYTE)];
+  return [ld('a', SCENE_ENTRY.offset[field]), call(SCENE_BYTE)];
 }
 
 /**

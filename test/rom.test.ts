@@ -10,6 +10,7 @@ import {
   sceneTilesLabel,
 } from '@game/main';
 import { SCENES, buildSceneData } from '@game/scene';
+import { SCENE_ENTRY } from '@game/scene-table';
 import type { Label } from '@asm/types';
 import { rom, symbols, unreferenced } from './helpers/game-runner';
 
@@ -79,6 +80,18 @@ describe('Given the ROM has been assembled', () => {
       );
     });
     expect(SCENES).toHaveLength(6);
+  });
+
+  it("points each scene's scene_table entry at its data", () => {
+    const table = symbols.get('scene_table') ?? 0;
+    SCENES.forEach((_, i) => {
+      const entryAddress = (rom[table + 2 * i] ?? 0) | ((rom[table + 2 * i + 1] ?? 0) << 8);
+      const entry = SCENE_ENTRY.decode(rom, entryAddress);
+      expect(entry.dialogue).toBe(symbols.get(String(sceneDialogueLabel(i))));
+      expect(entry.rounds).toBe(symbols.get(String(sceneRoundsLabel(i))));
+      expect(entry.backdrop).toBe(symbols.get(String(sceneBackdropLabel(i))));
+      expect(entry.flag).toBe(1 << i);
+    });
   });
 
   // The game is a single 32 KB bank (no mapper). This floor keeps headroom for

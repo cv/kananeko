@@ -15,6 +15,7 @@ import { HUES, INK, PAPER } from './palette';
 import { UI_TILES } from './font-data';
 import { OAM_DMA, SPRITES_OFF } from './labels';
 import { gameModule } from '../asm/program';
+import { byte, struct } from '../asm/struct';
 
 // Labels placed in this module
 const SPRITE_COPY_DMA = new Label('sprite_copy_dma');
@@ -37,11 +38,12 @@ export const SPRITE_TILE = { cursor: 0 } as const;
 /** Glyphs copied into sprite tile memory at boot, in SPRITE_TILE order */
 const SPRITE_GLYPHS = [UI_TILES.PAW] as const;
 
-const FIELD_OFFSET = { y: 0, x: 1, tile: 2, attr: 3 } as const;
+/** One sprite's entry in OAM (and in the shadow copy) */
+const OAM_ENTRY = struct('OAM entry', { y: byte(), x: byte(), tile: byte(), attr: byte() });
 
 /** Shadow OAM address of one field of a sprite */
-export function oamField(slot: number, field: keyof typeof FIELD_OFFSET): U16 {
-  return u16(SHADOW_OAM + slot * 4 + FIELD_OFFSET[field]);
+export function oamField(slot: number, field: keyof typeof OAM_ENTRY.offset): U16 {
+  return u16(SHADOW_OAM + slot * OAM_ENTRY.size + OAM_ENTRY.offset[field]);
 }
 
 /** Start OAM DMA from the shadow page, then wait the 160 M-cycles it takes. */

@@ -45,6 +45,7 @@ import { type Op, type U16, ioReg, u16, Label, labelFamily, routine } from '../a
 import { copyBytes, storeByte } from '../asm/macros';
 import { SOUND_TICK, SFX_PLAY, MUSIC_PLAY } from './labels';
 import { gameModule } from '../asm/program';
+import { byte, struct } from '../asm/struct';
 
 // Labels placed in this module
 const VOICE_TICK = routine('voice_tick', { clobbers: ['a', 'bc', 'de', 'hl'] });
@@ -313,18 +314,20 @@ export function playSfx(name: SfxName): Op[] {
 // The driver
 // ---------------------------------------------------------------------------
 
+/** A voice's state in SND_VOICES (voice_tick walks it with HL, so the order matters) */
+const VOICE = struct('voice', {
+  PTR_LO: byte(), // where it is in its sequence
+  PTR_HI: byte(),
+  TIMER: byte(),
+  LENGTH: byte(),
+  ENVELOPE: byte(),
+  DUTY: byte(),
+  START_LO: byte(), // where its sequence loops back to
+  START_HI: byte(),
+});
+
 /** Bytes of state per voice */
-export const VOICE_SIZE = 8;
-const VOICE = {
-  PTR_LO: 0,
-  PTR_HI: 1,
-  TIMER: 2,
-  LENGTH: 3,
-  ENVELOPE: 4,
-  DUTY: 5,
-  START_LO: 6,
-  START_HI: 7,
-} as const;
+export const VOICE_SIZE = VOICE.size;
 
 /** Each voice's channel, by its first register ($FF10, $FF15, $FF1A) */
 const VOICE_CHANNELS = [0x15, 0x1a, 0x10] as const;
@@ -332,8 +335,8 @@ export const SOUND_VOICES = VOICE_CHANNELS.length;
 export const SFX_VOICE = 2;
 
 /** WRAM address of a voice's field */
-export function voiceField(voice: number, field: keyof typeof VOICE): U16 {
-  return MEM.SND_VOICES.at(voice * VOICE_SIZE + VOICE[field]);
+export function voiceField(voice: number, field: keyof typeof VOICE.offset): U16 {
+  return MEM.SND_VOICES.at(voice * VOICE_SIZE + VOICE.offset[field]);
 }
 
 /** Channel 3's waveform: a soft, rounded triangle (32 4-bit samples) */
@@ -401,7 +404,7 @@ export function buildSoundDriver(): Op[] {
     jr('z', VOICE_LOOP),
     jr('nc', VOICE_END),
     // $C0 nn / $C1 nn: the ENVELOPE or DUTY field
-    sub(SEQ.ENVELOPE - VOICE.ENVELOPE),
+    sub(SEQ.ENVELOPE - VOICE.offset.ENVELOPE),
     add('l'),
     ld('l', 'a'),
     ld('a', ['de']),
@@ -410,7 +413,7 @@ export function buildSoundDriver(): Op[] {
 
     label(VOICE_LENGTH),
     and(MAX_LENGTH),
-    ...Array.from({ length: VOICE.LENGTH }, () => inc('l')),
+    ...Array.from({ length: VOICE.offset.LENGTH }, () => inc('l')),
     label(VOICE_STORE),
     ld(['hl'], 'a'),
     ld('l', 'b'),
@@ -418,7 +421,7 @@ export function buildSoundDriver(): Op[] {
 
     label(VOICE_LOOP),
     ld('a', 'l'),
-    add(VOICE.START_LO),
+    add(VOICE.offset.START_LO),
     ld('l', 'a'),
     ld('a', ['hl+']),
     ld('d', ['hl']),
