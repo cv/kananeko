@@ -389,7 +389,7 @@ export function assemble(
     rom,
     symbols: new Map(placed.map(([label, address]) => [nameOf(label), address])),
     unreferenced: placed
-      .filter(([label]) => !referenced.has(label))
+      .filter(([label]) => label.name !== undefined && !referenced.has(label))
       .map(([label]) => nameOf(label)),
     programBytes: laidOut.positioned.reduce((sum, { op }) => sum + op.bytes.length, 0),
     ...(stackDepth === undefined ? {} : { stackDepth }),

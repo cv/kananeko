@@ -7,6 +7,7 @@
  * Every kana answer counts toward its basic hiragana: カ, が and ガ all count as か.
  */
 
+import { block, doWhile, ifThen, loop } from '../asm/flow';
 import { JOY } from '../asm/hardware';
 import { MEM } from './ram';
 import {
@@ -64,13 +65,6 @@ import { CHART_FADE } from './labels';
 // Labels placed in this module
 const CHART_OF_TILE = new Label('chart_of_tile');
 const CHART_LAYOUT = new Label('chart_layout');
-const CHART_MARK = new Label('chart_mark');
-const CHART_MARK_DONE = new Label('chart_mark_done');
-const CHART_BIT_SHIFT = new Label('chart_bit_shift');
-const CHART_ENTRY = new Label('chart_entry');
-const CHART_ENTRY_DRAW = new Label('chart_entry_draw');
-const CHART_ENTRY_NEXT = new Label('chart_entry_next');
-const CHART_NO_PASSWORD = new Label('chart_no_password');
 const CHART_WAIT = new Label('chart_wait');
 
 /** The chart's rows (consonants), five vowels each; spaces are gaps */
@@ -171,16 +165,18 @@ export function buildChartData(): Op[] {
  * chart_show                 the chart screen; C = 1 to show the password too
  */
 export function buildChartRoutines(fade: Label): Op[] {
+  const markDone = new Label('chart_mark_done');
+  const markEntry = new Label('chart_mark');
   const missed = paletteOf(CHART_COLORS, 'missed');
   return [
     label(CHART_SEEN),
     push('hl'),
     ld('hl', MEM.KANA_SEEN.address),
-    jr(CHART_MARK),
+    jr(markEntry),
     label(CHART_MISSED),
     push('hl'),
     ld('hl', MEM.KANA_MISSED.address),
-    label(CHART_MARK),
+    label(markEntry),
     push('bc'),
     push('de'),
     ld('a', [MEM.KANA_SHUFFLE.at(0)]), // the right answer's tile
@@ -192,12 +188,12 @@ export function buildChartRoutines(fade: Label): Op[] {
     ld('a', ['hl']),
     pop('hl'),
     cp(NO_ENTRY),
-    jr('z', CHART_MARK_DONE),
+    jr('z', markDone),
     call(CHART_BIT),
     ld('a', ['hl']),
     or('b'),
     ld(['hl'], 'a'),
-    label(CHART_MARK_DONE),
+    label(markDone),
     pop('de'),
     pop('bc'),
     pop('hl'),
@@ -215,14 +211,14 @@ export function buildChartRoutines(fade: Label): Op[] {
     add('hl', 'de'),
     ld('a', ['hl']),
     cp(NO_ENTRY),
-    jr('z', CHART_MARK_DONE),
+    jr('z', markDone),
     ld('hl', MEM.KANA_MISSED.address),
     call(CHART_BIT),
     ld('a', 'b'),
     cpl(),
     and(['hl']),
     ld(['hl'], 'a'),
-    jr(CHART_MARK_DONE),
+    jr(markDone),
 
     label(CHART_BIT),
     ld('b', 'a'),
@@ -235,12 +231,7 @@ export function buildChartRoutines(fade: Label): Op[] {
     ld('a', 'b'),
     and(7),
     ld('b', 1),
-    label(CHART_BIT_SHIFT),
-    or('a'),
-    ret('z'),
-    sla('b'),
-    dec('a'),
-    jr(CHART_BIT_SHIFT),
+    ...loop((again) => [or('a'), ret('z'), sla('b'), dec('a'), jr(again)]),
 
     label(CHART_SHOW),
     push('bc'),
@@ -252,65 +243,64 @@ export function buildChartRoutines(fade: Label): Op[] {
     // Each kana: itself if answered right, a dash if not yet; red if ever missed
     ld('de', CHART_LAYOUT),
     ld('c', 0),
-    label(CHART_ENTRY),
-    ld('a', ['de']),
-    inc('de'),
-    ld('l', 'a'),
-    ld('a', ['de']),
-    inc('de'),
-    ld('h', 'a'),
-    push('hl'), // the cell's address
-    push('de'),
-    ld('a', 'c'),
-    ld('hl', MEM.KANA_SEEN.address),
-    call(CHART_BIT),
-    ld('a', ['hl']),
-    and('b'),
-    pop('de'),
-    pop('hl'),
-    ld('a', ['de']), // the kana's tile
-    inc('de'),
-    jr('nz', CHART_ENTRY_DRAW),
-    ld('a', UNSEEN),
-    label(CHART_ENTRY_DRAW),
-    ld(['hl'], 'a'),
-    // On the GBC, the missed ones' cells get the red palette (VRAM bank 1)
-    ld('a', [MEM.IS_CGB]),
-    or('a'),
-    jr('z', CHART_ENTRY_NEXT),
-    push('hl'),
-    push('de'),
-    ld('a', 'c'),
-    ld('hl', MEM.KANA_MISSED.address),
-    call(CHART_BIT),
-    ld('a', ['hl']),
-    and('b'),
-    pop('de'),
-    pop('hl'),
-    jr('z', CHART_ENTRY_NEXT),
-    ld('a', 1),
-    ldh([HW.VBK], 'a'),
-    ld(['hl'], missed),
-    ld('a', 0),
-    ldh([HW.VBK], 'a'),
-    label(CHART_ENTRY_NEXT),
-    inc('c'),
-    ld('a', 'c'),
-    cp(CHART_KANA.length),
-    jr('nz', CHART_ENTRY),
+    ...doWhile('nz', [
+      ld('a', ['de']),
+      inc('de'),
+      ld('l', 'a'),
+      ld('a', ['de']),
+      inc('de'),
+      ld('h', 'a'),
+      push('hl'), // the cell's address
+      push('de'),
+      ld('a', 'c'),
+      ld('hl', MEM.KANA_SEEN.address),
+      call(CHART_BIT),
+      ld('a', ['hl']),
+      and('b'),
+      pop('de'),
+      pop('hl'),
+      ld('a', ['de']), // the kana's tile
+      inc('de'),
+      ...ifThen('z', [ld('a', UNSEEN)]),
+      ld(['hl'], 'a'),
+      // On the GBC, the missed ones' cells get the red palette (VRAM bank 1)
+      ld('a', [MEM.IS_CGB]),
+      or('a'),
+      ...block((done) => [
+        jr('z', done),
+        push('hl'),
+        push('de'),
+        ld('a', 'c'),
+        ld('hl', MEM.KANA_MISSED.address),
+        call(CHART_BIT),
+        ld('a', ['hl']),
+        and('b'),
+        pop('de'),
+        pop('hl'),
+        jr('z', done),
+        ld('a', 1),
+        ldh([HW.VBK], 'a'),
+        ld(['hl'], missed),
+        ld('a', 0),
+        ldh([HW.VBK], 'a'),
+      ]),
+      inc('c'),
+      ld('a', 'c'),
+      cp(CHART_KANA.length),
+    ]),
 
     // The password for what comes next
     pop('bc'),
     ld('a', 'c'),
     or('a'),
-    jr('z', CHART_NO_PASSWORD),
-    call(PASS_ENCODE),
-    ...drawTiles(
-      tilemapAddr(CHART_PASSWORD_ROW, passwordLineCol()),
-      textToTiles(`${PASSWORD_LABEL} `),
-    ),
-    call(PASS_DRAW),
-    label(CHART_NO_PASSWORD),
+    ...ifThen('nz', [
+      call(PASS_ENCODE),
+      ...drawTiles(
+        tilemapAddr(CHART_PASSWORD_ROW, passwordLineCol()),
+        textToTiles(`${PASSWORD_LABEL} `),
+      ),
+      call(PASS_DRAW),
+    ]),
     ...fadeIn(fade),
     // The paw beside つぎへ
     ...storeByte(oamField(SPRITE_SLOT.cursor, 'y'), LAYOUT.nextRow * 8 + 16),

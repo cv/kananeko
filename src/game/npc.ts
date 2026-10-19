@@ -5,9 +5,10 @@
  */
 
 import { MEM } from './ram';
+import { ifThen, loop } from '../asm/flow';
 import { loadPointer, storeByte, zeroBytes } from '../asm/macros';
 import { add, cp, dec, inc, jp, jr, label, ld, and, ret } from '../asm/sm83';
-import { type Op, Label } from '../asm/types';
+import type { Op } from '../asm/types';
 import { sliceArt } from './art';
 import { encodeGlyph } from './font';
 import { type NpcLook, npcArt } from './npc-art';
@@ -17,9 +18,6 @@ import { NPC_SELECT, NPC_UPDATE, NPC_HIDE } from './labels';
 import { gameModule } from '../asm/program';
 
 // Labels placed in this module
-const NPC_SCAN = new Label('npc_scan');
-const NPC_FOUND = new Label('npc_found');
-const NPC_BOB_SET = new Label('npc_bob_set');
 
 /** NPC_CURRENT when nobody is shown */
 export const NPC_NONE = 0xff;
@@ -84,18 +82,18 @@ export function buildNpcRoutines(): Op[] {
     ld('a', [MEM.DLG_NODE_ID]),
     ld('b', 'a'),
     ld('c', NONE),
-    label(NPC_SCAN),
-    ld('a', ['hl+']), // segment start node ($FF = end of table)
-    cp(NONE),
-    jr('z', NPC_FOUND),
-    ld('d', 'a'),
-    ld('a', 'b'),
-    cp('d'),
-    jr('c', NPC_FOUND), // node is before this segment
-    ld('a', ['hl+']),
-    ld('c', 'a'),
-    jr(NPC_SCAN),
-    label(NPC_FOUND),
+    ...loop((again, done) => [
+      ld('a', ['hl+']), // segment start node ($FF = end of table)
+      cp(NONE),
+      jr('z', done),
+      ld('d', 'a'),
+      ld('a', 'b'),
+      cp('d'),
+      jr('c', done), // node is before this segment
+      ld('a', ['hl+']),
+      ld('c', 'a'),
+      jr(again),
+    ]),
     ld('a', 'c'),
     ld([MEM.NPC_CURRENT], 'a'),
     cp(NONE),
@@ -133,9 +131,7 @@ export function buildNpcRoutines(): Op[] {
     ld([MEM.NPC_TIMER], 'a'),
     and(BOB_BIT),
     ld('a', [MEM.NPC_Y]), // LD leaves the flags from AND
-    jr('z', NPC_BOB_SET),
-    dec('a'),
-    label(NPC_BOB_SET),
+    ...ifThen('nz', [dec('a')]),
     ld([field(0, 'y')], 'a'),
     ld([field(1, 'y')], 'a'),
     add(8),

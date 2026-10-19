@@ -1,10 +1,12 @@
 /**
  * Structured control flow: branches and loops whose labels are made for you.
  *
- *   ...[cp_n(u8(3))], ...ifThen('z', [inc_r('b')])          // if A == 3: B++
- *   ...ifElse('c', [ld_r_n('a', u8(1))], [xor_r('a')])
- *   ...repeat(4, [ldi_hl_a()])                               // B counts down
- *   ...loop((again, done) => [ld_a_hl(), or_r('a'), jr_cc('z', done), ..., jr(again)])
+ *   cp(3), ...ifThen('z', [inc('b')])                // if A == 3: B++
+ *   ...ifElse('c', [ld('a', 1)], [xor('a')])         // A = carry ? 1 : 0
+ *   ...repeat(4, [ld(['hl+'], 'a')])                 // B counts down
+ *   ...doWhile('nz', [ld(['hl+'], 'a'), dec('c')])   // until C reaches 0
+ *   ...block((done) => [cp(3), jr('z', done), ..., cp(5), jr('z', done), ...])
+ *   ...loop((again, done) => [ld('a', ['hl']), or('a'), jr('z', done), ..., jr(again)])
  *
  * The jumps they make are left to the assembler, which uses JR whenever it reaches.
  */
@@ -58,6 +60,18 @@ export function repeat(count: number, body: readonly Op[], reg: 'b' | 'c' | 'd' 
   }
   const again = new Label();
   return [ld_r_n(reg, lo(count)), label(again), ...body, dec_r(reg), jp_cc('nz', again)];
+}
+
+/** `body` gets a label just after it: jumping to `done` leaves the block. */
+export function block(body: (done: Label) => readonly Op[]): Op[] {
+  const done = new Label();
+  return [...body(done), label(done)];
+}
+
+/** Run `body`, then go round again while `cc` holds. */
+export function doWhile(cc: CCName, body: readonly Op[]): Op[] {
+  const again = new Label();
+  return [label(again), ...body, jp_cc(cc, again)];
 }
 
 /**

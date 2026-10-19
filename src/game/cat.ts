@@ -13,6 +13,7 @@
  *   cat_tick   once per frame: count down a reaction, blink
  */
 
+import { doWhile, ifThen, repeat } from '../asm/flow';
 import { HW } from '../asm/hardware';
 import { MEM } from './ram';
 import { copyBlock, storeByte, zeroBytes } from '../asm/macros';
@@ -31,13 +32,6 @@ import { gameModule } from '../asm/program';
 // Labels placed in this module
 const CAT_TILES = new Label('cat_tiles');
 const CAT_PLACE = routine('cat_place', { clobbers: ['a', 'bc', 'de', 'hl'] });
-const CAT_PLACE_ROW = new Label('cat_place_row');
-const CAT_PLACE_COL = new Label('cat_place_col');
-const CAT_SET_FACE = new Label('cat_set_face');
-const CAT_SHOW_FACE = new Label('cat_show_face');
-const CAT_FACE_TILE = new Label('cat_face_tile');
-const CAT_TICK_REST = new Label('cat_tick_rest');
-const CAT_TICK_BLINK = new Label('cat_tick_blink');
 
 export { CAT_FACES, type CatFace };
 
@@ -114,6 +108,8 @@ export function buildCatData(): Op[] {
 }
 
 export function buildCatRoutines(): Op[] {
+  const setFace = new Label('cat_set_face');
+  const showFace = new Label('cat_show_face');
   return [
     // cat_place: B = left, C = top
     label(CAT_PLACE),
@@ -125,80 +121,73 @@ export function buildCatRoutines(): Op[] {
     ld('c', 'a'), // C = OAM y of the current row
     ld('hl', oamField(SPRITE_SLOT.cat, 'y')),
     ld('d', CAT_SPRITE_BASE), // D = tile
-    ld('e', ROWS),
-    label(CAT_PLACE_ROW),
-    ld('a', [MEM.CAT_X]),
-    ld('b', 'a'), // B = OAM x of the current column
-    ...storeByte(MEM.CAT_COL, COLS),
-    label(CAT_PLACE_COL),
-    ld('a', 'c'),
-    ld(['hl+'], 'a'),
-    ld('a', 'b'),
-    ld(['hl+'], 'a'),
-    ld('a', 'd'),
-    ld(['hl+'], 'a'),
-    inc('d'),
-    ld('a', CAT_OBJ_PALETTE),
-    ld(['hl+'], 'a'),
-    ld('a', 'b'),
-    add(8),
-    ld('b', 'a'),
-    ld('a', [MEM.CAT_COL]),
-    dec('a'),
-    ld([MEM.CAT_COL], 'a'),
-    jr('nz', CAT_PLACE_COL),
-    ld('a', 'c'),
-    add(8),
-    ld('c', 'a'),
-    dec('e'),
-    jr('nz', CAT_PLACE_ROW),
-    jr(CAT_SHOW_FACE),
+    ...repeat(
+      ROWS,
+      [
+        ld('a', [MEM.CAT_X]),
+        ld('b', 'a'), // B = OAM x of the current column
+        ...storeByte(MEM.CAT_COL, COLS),
+        ...doWhile('nz', [
+          ld('a', 'c'),
+          ld(['hl+'], 'a'),
+          ld('a', 'b'),
+          ld(['hl+'], 'a'),
+          ld('a', 'd'),
+          ld(['hl+'], 'a'),
+          inc('d'),
+          ld('a', CAT_OBJ_PALETTE),
+          ld(['hl+'], 'a'),
+          ld('a', 'b'),
+          add(8),
+          ld('b', 'a'),
+          ld('a', [MEM.CAT_COL]),
+          dec('a'),
+          ld([MEM.CAT_COL], 'a'),
+        ]),
+        ld('a', 'c'),
+        add(8),
+        ld('c', 'a'),
+      ],
+      'e',
+    ),
+    jr(showFace),
 
     // cat_rest: A = resting face
     label(CAT_REST),
     ld([MEM.CAT_REST], 'a'),
     ...zeroBytes(MEM.CAT_TIMER), // clobbers A
     ld('a', [MEM.CAT_REST]),
-    jr(CAT_SET_FACE),
+    jr(setFace),
 
     // cat_react: A = face for REACT_FRAMES
     label(CAT_REACT),
     ld('b', 'a'),
     ...storeByte(MEM.CAT_TIMER, REACT_FRAMES),
     ld('a', 'b'),
-    label(CAT_SET_FACE),
+    label(setFace),
     ld([MEM.CAT_FACE], 'a'),
 
     // cat_show_face: point the middle row's sprites at CAT_FACE's tiles
-    label(CAT_SHOW_FACE),
+    label(showFace),
     ld('a', [MEM.CAT_FACE]),
     add('a'),
     add('a'),
     add(faceTile('neutral')),
     ld('hl', oamField(FACE_SLOT, 'tile')),
-    ld('b', COLS),
-    label(CAT_FACE_TILE),
-    ld(['hl'], 'a'),
-    inc('a'),
-    inc('hl'),
-    inc('hl'),
-    inc('hl'),
-    inc('hl'),
-    dec('b'),
-    jr('nz', CAT_FACE_TILE),
+    ...repeat(COLS, [ld(['hl'], 'a'), inc('a'), inc('hl'), inc('hl'), inc('hl'), inc('hl')]),
     ret(),
 
     // cat_tick: end a reaction when its time is up; blink while resting neutral
     label(CAT_TICK),
     ld('a', [MEM.CAT_TIMER]),
     or('a'),
-    jr('z', CAT_TICK_REST),
-    dec('a'),
-    ld([MEM.CAT_TIMER], 'a'),
-    ret('nz'),
-    ld('a', [MEM.CAT_REST]),
-    jr(CAT_SET_FACE),
-    label(CAT_TICK_REST),
+    ...ifThen('nz', [
+      dec('a'),
+      ld([MEM.CAT_TIMER], 'a'),
+      ret('nz'),
+      ld('a', [MEM.CAT_REST]),
+      jr(setFace),
+    ]),
     ld('a', [MEM.CAT_REST]),
     cp(FACE.neutral),
     ret('nz'), // only a neutral cat blinks
@@ -207,14 +196,9 @@ export function buildCatRoutines(): Op[] {
     ld([MEM.CAT_BLINK], 'a'),
     and(BLINK_PERIOD - 1),
     cp(BLINK_PERIOD - BLINK_FRAMES),
-    jr('z', CAT_TICK_BLINK),
-    or('a'),
-    ret('nz'),
-    ld('a', FACE.neutral),
-    jr(CAT_SET_FACE),
-    label(CAT_TICK_BLINK),
+    ...ifThen('nz', [or('a'), ret('nz'), ld('a', FACE.neutral), jr(setFace)]),
     ld('a', FACE.blink),
-    jp(CAT_SET_FACE),
+    jp(setFace),
   ];
 }
 

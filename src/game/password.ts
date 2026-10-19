@@ -11,6 +11,7 @@
  * decodePassword are the reference; the game's routines do the same in assembly.
  */
 
+import { ifThen, loop, repeat } from '../asm/flow';
 import { JOY } from '../asm/hardware';
 import { MEM } from './ram';
 import {
@@ -76,24 +77,9 @@ import { TITLE_FADE } from './labels';
 const PASS_CHECK = routine('pass_check', { out: ['a'], clobbers: ['b'] });
 const PASS_XOR = routine('pass_xor', { clobbers: ['a', 'hl'] });
 const PASS_SHIFT = routine('pass_shift', { clobbers: ['hl'] });
-const PASS_ENCODE_KANA = new Label('pass_encode_kana');
-const PASS_DECODE_KANA = new Label('pass_decode_kana');
-const PASS_SCORE_OK = new Label('pass_score_ok');
-const PASS_BAD = new Label('pass_bad');
-const PASS_APPLY_FLAGS = new Label('pass_apply_flags');
-const PASS_APPLY_FLAGS_DONE = new Label('pass_apply_flags_done');
-const PASS_DRAW_KANA = new Label('pass_draw_kana');
 const PASS_TILE = routine('pass_tile', { clobbers: ['a'] });
 const PASS_ALPHABET = new Label('pass_alphabet');
-const PASSWORD_LOOP = new Label('password_loop');
-const PASSWORD_MOVE = new Label('password_move');
-const PASSWORD_ADD = new Label('password_add');
-const PASSWORD_WRONG = new Label('password_wrong');
-const PASSWORD_DELETE = new Label('password_delete');
-const PASSWORD_BACK = new Label('password_back');
 const PASS_DRAW_SLOTS = routine('pass_draw_slots', { clobbers: ['a', 'bc', 'de', 'hl'] });
-const PASS_SLOT = new Label('pass_slot');
-const PASS_SLOT_DRAW = new Label('pass_slot_draw');
 const PASS_CURSOR = routine('pass_cursor', { clobbers: ['a'] });
 
 /** 32 kana, leaving out the easily confused ones (ぬ/め, わ/れ/ね, る/ろ, は/ほ, さ/ち/き...) */
@@ -180,6 +166,7 @@ const acc = (i: number): U16 => MEM.PASS_ACC.at(i);
  * pass_draw    draw PASS_CHARS at HL (vram_put: safe with the LCD on)
  */
 export function buildPasswordRoutines(sceneCount: number): Op[] {
+  const invalid = new Label('pass_bad');
   return [
     // pass_check: A = the check of PASS_ACC bytes 1-3
     label(PASS_CHECK),
@@ -235,59 +222,55 @@ export function buildPasswordRoutines(sceneCount: number): Op[] {
     // The 30 bits sit at the bottom: shift the top 2 (zeros) out, then take 5 a kana
     ...[0, 1].flatMap(() => [xor('a'), call(PASS_SHIFT)]),
     ld('de', MEM.PASS_CHARS.address),
-    ld('b', PASSWORD_LENGTH),
-    label(PASS_ENCODE_KANA),
-    ld('c', 0),
-    ...Array.from({ length: BITS_PER_KANA }, () => [
-      xor('a'), // carry in: 0
-      call(PASS_SHIFT),
-      rl('c'),
-    ]).flat(),
-    ld('a', 'c'),
-    ld(['de'], 'a'),
-    inc('de'),
-    dec('b'),
-    jr('nz', PASS_ENCODE_KANA),
+    ...repeat(PASSWORD_LENGTH, [
+      ld('c', 0),
+      ...Array.from({ length: BITS_PER_KANA }, () => [
+        xor('a'), // carry in: 0
+        call(PASS_SHIFT),
+        rl('c'),
+      ]).flat(),
+      ld('a', 'c'),
+      ld(['de'], 'a'),
+      inc('de'),
+    ]),
     ret(),
 
     label(PASS_DECODE),
     ...zeroBytes(acc(0), acc(1), acc(2), acc(3)),
     ld('de', MEM.PASS_CHARS.address),
-    ld('b', PASSWORD_LENGTH),
-    label(PASS_DECODE_KANA),
-    ld('a', ['de']),
-    inc('de'),
-    add('a'),
-    add('a'),
-    add('a'), // its 5 bits at the top of A
-    ld('c', 'a'),
-    ...Array.from({ length: BITS_PER_KANA }, () => [sla('c'), call(PASS_SHIFT)]).flat(),
-    dec('b'),
-    jr('nz', PASS_DECODE_KANA),
+    ...repeat(PASSWORD_LENGTH, [
+      ld('a', ['de']),
+      inc('de'),
+      add('a'),
+      add('a'),
+      add('a'), // its 5 bits at the top of A
+      ld('c', 'a'),
+      ...Array.from({ length: BITS_PER_KANA }, () => [sla('c'), call(PASS_SHIFT)]).flat(),
+    ]),
     call(PASS_XOR),
     // Hearts 1 to 3, a scene that exists, a score within the cap, and the check
     ld('a', [acc(1)]),
     and(3),
-    jr('z', PASS_BAD),
+    jr('z', invalid),
     ld('a', [acc(1)]),
     cp(sceneCount << 2),
-    jr('nc', PASS_BAD),
+    jr('nc', invalid),
     ld('a', [acc(2)]),
     cp(hi(MAX_SCORE)),
-    jr('c', PASS_SCORE_OK),
-    jr('nz', PASS_BAD),
-    ld('a', [acc(3)]),
-    cp(lo(MAX_SCORE) + 1),
-    jr('nc', PASS_BAD),
-    label(PASS_SCORE_OK),
+    ...ifThen('nc', [
+      jr('nz', invalid),
+      ld('a', [acc(3)]),
+      cp(lo(MAX_SCORE) + 1),
+      jr('nc', invalid),
+    ]),
     call(PASS_CHECK),
     ld('b', 'a'),
     ld('a', [acc(0)]),
     cp('b'),
-    jr('nz', PASS_BAD),
+    jr('nz', invalid),
     xor('a'),
     ret(),
-    label(PASS_BAD),
+    label(invalid),
     ld('a', 1),
     or('a'),
     ret(),
@@ -304,12 +287,7 @@ export function buildPasswordRoutines(sceneCount: number): Op[] {
     ld('b', 'a'),
     ld('a', 1),
     inc('b'),
-    label(PASS_APPLY_FLAGS),
-    dec('b'),
-    jr('z', PASS_APPLY_FLAGS_DONE),
-    add('a'),
-    jr(PASS_APPLY_FLAGS),
-    label(PASS_APPLY_FLAGS_DONE),
+    ...loop((again, done) => [dec('b'), jr('z', done), add('a'), jr(again)]),
     dec('a'),
     ld([MEM.SCENE_FLAGS], 'a'),
     ld('a', [acc(2)]),
@@ -323,14 +301,15 @@ export function buildPasswordRoutines(sceneCount: number): Op[] {
     label(PASS_DRAW),
     ld('de', MEM.PASS_CHARS.address),
     ld('b', PASSWORD_LENGTH),
-    label(PASS_DRAW_KANA),
-    ld('a', ['de']),
-    inc('de'),
-    call(PASS_TILE),
-    call(VRAM_PUT),
-    dec('b'),
-    ret('z'),
-    jr(PASS_DRAW_KANA),
+    ...loop((again) => [
+      ld('a', ['de']),
+      inc('de'),
+      call(PASS_TILE),
+      call(VRAM_PUT),
+      dec('b'),
+      ret('z'),
+      jr(again),
+    ]),
 
     // pass_tile: A = the tile of kana A (an alphabet index); preserves HL
     label(PASS_TILE),
@@ -387,6 +366,10 @@ function gridRowTiles(row: number): number[] {
  * empty password goes back to the title. `fade` is the fade-in's palette label.
  */
 export function buildPasswordScreen(fade: Label): Op[] {
+  const moveCursor = new Label('password_move');
+  const deleteChar = new Label('password_delete');
+  const addChar = new Label('password_add');
+  const screenLoop = new Label('password_loop');
   const { promptRow, slotsRow, slotsCol, gridRow, gridCol, messageRow } = PASSWORD_LAYOUT;
   const wrong = textToTiles(PASSWORD_WRONG_TEXT);
   return [
@@ -403,17 +386,17 @@ export function buildPasswordScreen(fade: Label): Op[] {
     ...fadeIn(fade),
     call(PASS_CURSOR),
 
-    label(PASSWORD_LOOP),
+    label(screenLoop),
     ...frameWait(),
     ...runDma(),
     call(JOY_READ),
     ld('a', [MEM.JOYPAD_NEW]),
     ld('b', 'a'),
     and(JOY.A),
-    jp('nz', PASSWORD_ADD),
+    jp('nz', addChar),
     ld('a', 'b'),
     and(JOY.B),
-    jp('nz', PASSWORD_DELETE),
+    jp('nz', deleteChar),
     // The d-pad moves around the grid, wrapping (32 cells: AND 31)
     ...(
       [
@@ -430,23 +413,23 @@ export function buildPasswordScreen(fade: Label): Op[] {
         jr('z', next),
         ld('a', [MEM.PASS_CURSOR]),
         add(s8(step)),
-        jp(PASSWORD_MOVE),
+        jp(moveCursor),
         label(next),
       ];
     }),
-    jp(PASSWORD_LOOP),
+    jp(screenLoop),
 
-    label(PASSWORD_MOVE),
+    label(moveCursor),
     and(PASSWORD_ALPHABET.length - 1),
     ld([MEM.PASS_CURSOR], 'a'),
     ...playSfx('cursor'),
     call(PASS_CURSOR),
-    jp(PASSWORD_LOOP),
+    jp(screenLoop),
 
-    label(PASSWORD_ADD),
+    label(addChar),
     ld('a', [MEM.PASS_LEN]),
     cp(PASSWORD_LENGTH),
-    jp('nc', PASSWORD_LOOP), // full (and wrong): B to fix it
+    jp('nc', screenLoop), // full (and wrong): B to fix it
     ld('e', 'a'),
     ld('d', 0),
     ld('hl', MEM.PASS_CHARS.address),
@@ -460,36 +443,34 @@ export function buildPasswordScreen(fade: Label): Op[] {
     call(PASS_DRAW_SLOTS),
     ld('a', [MEM.PASS_LEN]),
     cp(PASSWORD_LENGTH),
-    jp('nz', PASSWORD_LOOP),
+    jp('nz', screenLoop),
     // All six in: check it
     call(PASS_DECODE),
-    jp('nz', PASSWORD_WRONG),
-    ...playSfx('start'),
-    call(PASS_APPLY),
-    xor('a'),
-    ldh([HW.DIV], 'a'), // like a new game: the same shuffles whenever it's typed
-    jp(SCENE_LOAD),
-
-    label(PASSWORD_WRONG),
+    ...ifThen('z', [
+      ...playSfx('start'),
+      call(PASS_APPLY),
+      xor('a'),
+      ldh([HW.DIV], 'a'), // like a new game: the same shuffles whenever it's typed
+      jp(SCENE_LOAD),
+    ]),
     ...playSfx('wrong'),
     ...writeCenteredRow(messageRow, wrong),
-    jp(PASSWORD_LOOP),
+    jp(screenLoop),
 
-    label(PASSWORD_DELETE),
+    label(deleteChar),
     ld('a', [MEM.PASS_LEN]),
     or('a'),
-    jr('z', PASSWORD_BACK),
-    dec('a'),
-    ld([MEM.PASS_LEN], 'a'),
-    ...playSfx('cursor'),
-    call(PASS_DRAW_SLOTS),
-    ...writeCenteredRow(
-      messageRow,
-      wrong.map(() => requireTile(' ')),
-    ),
-    jp(PASSWORD_LOOP),
-
-    label(PASSWORD_BACK),
+    ...ifThen('nz', [
+      dec('a'),
+      ld([MEM.PASS_LEN], 'a'),
+      ...playSfx('cursor'),
+      call(PASS_DRAW_SLOTS),
+      ...writeCenteredRow(
+        messageRow,
+        wrong.map(() => requireTile(' ')),
+      ),
+      jp(screenLoop),
+    ]),
     ...playSfx('cursor'),
     ...fadeOut(),
     ...screenOff(),
@@ -501,20 +482,16 @@ export function buildPasswordScreen(fade: Label): Op[] {
     ld('de', MEM.PASS_CHARS.address),
     ld('a', [MEM.PASS_LEN]),
     ld('c', 'a'),
-    ld('b', PASSWORD_LENGTH),
-    label(PASS_SLOT),
-    ld('a', ['de']),
-    inc('de'),
-    call(PASS_TILE),
-    dec('c'),
-    bit(7, 'c'), // past the entered kana?
-    jr('z', PASS_SLOT_DRAW),
-    ld('a', EMPTY_SLOT),
-    label(PASS_SLOT_DRAW),
-    call(VRAM_PUT),
-    inc('hl'), // a space between
-    dec('b'),
-    jr('nz', PASS_SLOT),
+    ...repeat(PASSWORD_LENGTH, [
+      ld('a', ['de']),
+      inc('de'),
+      call(PASS_TILE),
+      dec('c'),
+      bit(7, 'c'), // past the entered kana?
+      ...ifThen('nz', [ld('a', EMPTY_SLOT)]),
+      call(VRAM_PUT),
+      inc('hl'),
+    ]),
     ret(),
 
     // pass_cursor: the paw beside the highlighted kana

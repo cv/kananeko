@@ -133,7 +133,10 @@ function buildLoseLife(): Op[] {
 
 - **Instructions** (`src/asm/sm83.ts`): one function per mnemonic. Forms the CPU doesn't have, like `ld('b', [MEM.X])`, are type errors, and immediates are range-checked.
 - **Variables** (`src/game/ram.ts`): declared as `byte()`, `byteOf(SomeEnum)`, `word()` or `buffer(n)`, and laid out by the allocator. A `byteOf` byte only takes that enum's values. A word has `.lo` and `.hi`, and a buffer has `.address` and a bounds-checked `.at(i)`.
-- **Labels** are objects, so a misspelt one is a compile error. `new Label()` without a name is a local label, named after the label before it in the `.sym` file. `ifThen`, `ifElse`, `repeat` and `loop` (`src/asm/flow.ts`) make their own labels.
+- **Labels** are objects, so a misspelt one is a compile error. Where they're declared shows how far they reach:
+  - module constants (`KANA_DRAW_HUD`, or in `labels.ts` when another module calls them) are routines and data;
+  - `const wrongAnswer = new Label('kana_wrong')` inside a builder is a branch within its routines, like a state's handler or a shared exit;
+  - plain branches and loops use `src/asm/flow.ts`, which makes the labels for you: `ifThen` and `ifElse` for short branches, `block((done) => …)` to jump forward to a common exit, and `repeat`, `doWhile` and `loop((again, done) => …)` for loops. Their labels are named after the label before them in the `.sym` file (`kana_update.3`).
 - **Routines** are labels with a register contract: `routine('name', { out: ['a'], clobbers: ['bc'] })`. The build follows each routine through its jumps, calls and PUSH/POP pairs, and fails in these cases:
   - the routine changes a register its contract doesn't allow;
   - a caller still needs a register the routine clobbers;

@@ -19,6 +19,7 @@
  * sound effects (pulse channel 1), so effects never interrupt the tune.
  */
 
+import { block, ifElse, ifThen } from '../asm/flow';
 import { HW } from '../asm/hardware';
 import { MEM } from './ram';
 import {
@@ -49,16 +50,6 @@ import { byte, struct } from '../asm/struct';
 
 // Labels placed in this module
 const VOICE_TICK = routine('voice_tick', { clobbers: ['a', 'bc', 'de', 'hl'] });
-const VOICE_STEP = new Label('voice_step');
-const VOICE_LENGTH = new Label('voice_length');
-const VOICE_STORE = new Label('voice_store');
-const VOICE_LOOP = new Label('voice_loop');
-const VOICE_END = new Label('voice_end');
-const VOICE_NOTE = new Label('voice_note');
-const VOICE_PLAY = new Label('voice_play');
-const SFX_START = new Label('sfx_start');
-const SFX_DONE = new Label('sfx_done');
-const MUSIC_DONE = new Label('music_done');
 const NOTE_PERIODS = new Label('note_periods');
 const WAVE_DATA = new Label('wave_data');
 const SFX_TABLE = new Label('sfx_table');
@@ -369,6 +360,11 @@ export function buildSoundInit(): Op[] {
  * changing L alone.
  */
 export function buildSoundDriver(): Op[] {
+  const playNote = new Label('voice_note');
+  const sfxDone = new Label('sfx_done');
+  const voiceEnd = new Label('voice_end');
+  const voiceLoop = new Label('voice_loop');
+  const nextStep = new Label('voice_step');
   return [
     label(SOUND_TICK),
     ...VOICE_CHANNELS.flatMap((channel, voice) => [
@@ -392,34 +388,33 @@ export function buildSoundDriver(): Op[] {
     dec('l'),
     ld('e', ['hl']), // DE = the next step, HL = the voice
 
-    label(VOICE_STEP),
+    label(nextStep),
     ld('a', ['de']),
     inc('de'),
     cp(SEQ.LENGTH),
-    jr('c', VOICE_NOTE),
+    jr('c', playNote),
     ld('b', 'l'),
     cp(SEQ.ENVELOPE),
-    jr('c', VOICE_LENGTH),
-    cp(SEQ.LOOP),
-    jr('z', VOICE_LOOP),
-    jr('nc', VOICE_END),
-    // $C0 nn / $C1 nn: the ENVELOPE or DUTY field
-    sub(SEQ.ENVELOPE - VOICE.offset.ENVELOPE),
-    add('l'),
-    ld('l', 'a'),
-    ld('a', ['de']),
-    inc('de'),
-    jr(VOICE_STORE),
-
-    label(VOICE_LENGTH),
-    and(MAX_LENGTH),
-    ...Array.from({ length: VOICE.offset.LENGTH }, () => inc('l')),
-    label(VOICE_STORE),
+    ...ifElse(
+      'nc',
+      [
+        cp(SEQ.LOOP),
+        jr('z', voiceLoop),
+        jr('nc', voiceEnd),
+        // $C0 nn / $C1 nn: the ENVELOPE or DUTY field
+        sub(SEQ.ENVELOPE - VOICE.offset.ENVELOPE),
+        add('l'),
+        ld('l', 'a'),
+        ld('a', ['de']),
+        inc('de'),
+      ],
+      [and(MAX_LENGTH), ...Array.from({ length: VOICE.offset.LENGTH }, () => inc('l'))],
+    ),
     ld(['hl'], 'a'),
     ld('l', 'b'),
-    jr(VOICE_STEP),
+    jr(nextStep),
 
-    label(VOICE_LOOP),
+    label(voiceLoop),
     ld('a', 'l'),
     add(VOICE.offset.START_LO),
     ld('l', 'a'),
@@ -427,16 +422,16 @@ export function buildSoundDriver(): Op[] {
     ld('d', ['hl']),
     ld('e', 'a'),
     ld('l', 'b'),
-    jr(VOICE_STEP),
+    jr(nextStep),
 
-    label(VOICE_END),
+    label(voiceEnd),
     inc('l'),
     xor('a'),
     ld(['hl'], 'a'), // PTR_HI = 0: idle
     ret(),
 
     // A = a note or a rest: save the position, hold it for LENGTH frames, play it
-    label(VOICE_NOTE),
+    label(playNote),
     ld('b', 'a'),
     ld(['hl'], 'e'),
     inc('l'),
@@ -450,16 +445,7 @@ export function buildSoundDriver(): Op[] {
     inc('l'), // ENVELOPE
     ld('a', 'b'),
     cp(SEQ.REST),
-    jr('nz', VOICE_PLAY),
-    // A rest: zero volume (on the pulse channels this also turns the DAC off until
-    // the next note restarts it)
-    inc('c'),
-    inc('c'),
-    xor('a'),
-    ld(['c'], 'a'),
-    ret(),
-
-    label(VOICE_PLAY),
+    ...ifThen('z', [inc('c'), inc('c'), xor('a'), ld(['c'], 'a'), ret()]),
     // Register 0: off, then $80. Restarting the wave channel while it plays can
     // corrupt its waveform on a DMG, so its DAC goes off and on first; on channel 1
     // this turns the sweep off, and channel 2 has no register 0.
@@ -503,17 +489,18 @@ export function buildSoundDriver(): Op[] {
     add('hl', 'bc'), // 3 bytes each: address, priority
     ld('a', [voiceField(SFX_VOICE, 'PTR_HI')]),
     or('a'),
-    jr('z', SFX_START),
-    inc('hl'),
-    inc('hl'),
-    ld('a', [MEM.SFX_PRIO]),
-    ld('b', 'a'),
-    ld('a', ['hl']),
-    dec('hl'),
-    dec('hl'),
-    cp('b'),
-    jr('c', SFX_DONE), // a more important effect is playing
-    label(SFX_START),
+    ...block((done) => [
+      jr('z', done),
+      inc('hl'),
+      inc('hl'),
+      ld('a', [MEM.SFX_PRIO]),
+      ld('b', 'a'),
+      ld('a', ['hl']),
+      dec('hl'),
+      dec('hl'),
+      cp('b'),
+      jr('c', sfxDone),
+    ]),
     // The VBlank handler skips the voice while PTR_HI is 0, so it never sees it half set
     xor('a'),
     ld([voiceField(SFX_VOICE, 'PTR_HI')], 'a'),
@@ -534,7 +521,7 @@ export function buildSoundDriver(): Op[] {
     ld([voiceField(SFX_VOICE, 'TIMER')], 'a'), // the first step plays on the next frame
     ld('a', 'd'),
     ld([voiceField(SFX_VOICE, 'PTR_HI')], 'a'),
-    label(SFX_DONE),
+    label(sfxDone),
     pop('hl'),
     pop('de'),
     pop('bc'),
@@ -548,42 +535,43 @@ export function buildSoundDriver(): Op[] {
     push('hl'),
     ld('hl', MEM.MUSIC_ID),
     cp(['hl']),
-    jr('z', MUSIC_DONE),
-    ld(['hl'], 'a'),
-    ld('c', 'a'),
-    // Stop both music voices and quiet their channels
-    xor('a'),
-    ld([voiceField(0, 'PTR_HI')], 'a'),
-    ld([voiceField(1, 'PTR_HI')], 'a'),
-    ldh([ioReg(0x17)], 'a'), // NR22: channel 2's volume
-    ldh([ioReg(0x1c)], 'a'), // NR32: channel 3's output level
-    ld('a', 'c'),
-    or('a'),
-    jr('z', MUSIC_DONE),
-    // HL = the song's two sequence addresses (4 bytes per song, from ID 1)
-    dec('a'),
-    add('a'),
-    add('a'),
-    ld('e', 'a'),
-    ld('d', 0),
-    ld('hl', MUSIC_TABLE),
-    add('hl', 'de'),
-    ...[0, 1].flatMap((voice) => [
-      ld('a', ['hl+']),
+    ...block((done) => [
+      jr('z', done),
+      ld(['hl'], 'a'),
+      ld('c', 'a'),
+      // Stop both music voices and quiet their channels
+      xor('a'),
+      ld([voiceField(0, 'PTR_HI')], 'a'),
+      ld([voiceField(1, 'PTR_HI')], 'a'),
+      ldh([ioReg(0x17)], 'a'), // NR22: channel 2's volume
+      ldh([ioReg(0x1c)], 'a'), // NR32: channel 3's output level
+      ld('a', 'c'),
+      or('a'),
+      jr('z', done),
+      // HL = the song's two sequence addresses (4 bytes per song, from ID 1)
+      dec('a'),
+      add('a'),
+      add('a'),
       ld('e', 'a'),
-      ld('a', ['hl+']),
-      ld('d', 'a'),
-      ld('a', 'e'),
-      ld([voiceField(voice, 'PTR_LO')], 'a'),
-      ld([voiceField(voice, 'START_LO')], 'a'),
-      ld('a', 'd'),
-      ld([voiceField(voice, 'START_HI')], 'a'),
-      ld('a', 1),
-      ld([voiceField(voice, 'TIMER')], 'a'),
-      ld('a', 'd'),
-      ld([voiceField(voice, 'PTR_HI')], 'a'), // last: the voice starts now
+      ld('d', 0),
+      ld('hl', MUSIC_TABLE),
+      add('hl', 'de'),
+      ...[0, 1].flatMap((voice) => [
+        ld('a', ['hl+']),
+        ld('e', 'a'),
+        ld('a', ['hl+']),
+        ld('d', 'a'),
+        ld('a', 'e'),
+        ld([voiceField(voice, 'PTR_LO')], 'a'),
+        ld([voiceField(voice, 'START_LO')], 'a'),
+        ld('a', 'd'),
+        ld([voiceField(voice, 'START_HI')], 'a'),
+        ld('a', 1),
+        ld([voiceField(voice, 'TIMER')], 'a'),
+        ld('a', 'd'),
+        ld([voiceField(voice, 'PTR_HI')], 'a'), // last: the voice starts now
+      ]),
     ]),
-    label(MUSIC_DONE),
     pop('hl'),
     pop('de'),
     pop('bc'),

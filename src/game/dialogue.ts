@@ -11,6 +11,7 @@
  */
 
 import { playSfx } from './sound';
+import { doWhile, ifThen, loop, repeat } from '../asm/flow';
 import { HW, JOY } from '../asm/hardware';
 import { MEM } from './ram';
 import {
@@ -73,39 +74,8 @@ import {
   DLG_OPEN_NODE,
 } from './labels';
 import { type GameModule, gameModule } from '../asm/program';
-
-// Labels placed in this module
-const DLG_ORDER_TWO = new Label('dlg_order_two');
-const DLG_ORDER_THREE = new Label('dlg_order_three');
-const DLG_ORDER_THREE_DISPATCH = new Label('dlg_order_three_dispatch');
 const DLG_CLEAR_BOX = routine('dlg_clear_box', { clobbers: ['a', 'bc', 'hl'] });
-const DLG_CLEAR_ROW = new Label('dlg_clear_row');
-const DLG_CLEAR_CELL = new Label('dlg_clear_cell');
-const DLG_CLEAR_NC = new Label('dlg_clear_nc');
-const TEXT_NEXT_RAW = new Label('text_next_raw');
-const TEXT_NEXT_EXPAND = new Label('text_next_expand');
-const TEXT_NEXT_DONE = new Label('text_next_done');
-const DLG_OPEN = new Label('dlg_open');
-const DLG_DO_PRINT = new Label('dlg_do_print');
-const DLG_PRINT_SLOW = new Label('dlg_print_slow');
 const DLG_PRINT_CHAR = routine('dlg_print_char', { clobbers: ['a', 'bc', 'hl'] });
-const DLG_TEXT_DONE = new Label('dlg_text_done');
-const DLG_SETUP_CHOICES = new Label('dlg_setup_choices');
-const DLG_DRAW_CHOICE_LOOP = new Label('dlg_draw_choice_loop');
-const DLG_CHOICE_CHAR = new Label('dlg_choice_char');
-const DLG_CHOICE_STR_DONE = new Label('dlg_choice_str_done');
-const DLG_DO_WAIT = new Label('dlg_do_wait');
-const DLG_DO_CHOOSE = new Label('dlg_do_choose');
-const DLG_BOUNCE_SET = new Label('dlg_bounce_set');
-const DLG_CURSOR_DOWN = new Label('dlg_cursor_down');
-const DLG_CURSOR_UP = new Label('dlg_cursor_up');
-const DLG_CURSOR_UP_DEC = new Label('dlg_cursor_up_dec');
-const DLG_CURSOR_SAVE = new Label('dlg_cursor_save');
-const DLG_CONFIRM_CHOICE = new Label('dlg_confirm_choice');
-const DLG_NEXT_STORE = new Label('dlg_next_store');
-const DLG_GOOD_CHOICE = new Label('dlg_good_choice');
-const DLG_BAD_CHOICE = new Label('dlg_bad_choice');
-const DLG_SCORE_DONE = new Label('dlg_score_done');
 const DLG_DRAW_CURSOR = routine('dlg_draw_cursor', { clobbers: ['a'] });
 
 // Re-export data types and encoder from dialogue-data.ts
@@ -205,6 +175,7 @@ function writeChoiceOrder(order: readonly number[]): Op[] {
 
 /** Shuffle the display order of the current node's choices using DIV as entropy. */
 function buildInitChoiceOrder(): Op[] {
+  const orderThree = new Label('dlg_order_three');
   const done = new Label('dlg_order_done');
   return [
     // Identity order: row i shows choice i
@@ -217,13 +188,7 @@ function buildInitChoiceOrder(): Op[] {
 
     ld('a', [MEM.DLG_CHOICE_CNT]),
     cp(2),
-    jr('z', DLG_ORDER_TWO),
-    cp(3),
-    jr('z', DLG_ORDER_THREE),
-    jp(done),
-
-    // Two choices: swap on an odd DIV
-    label(DLG_ORDER_TWO),
+    ...ifThen('nz', [cp(3), jr('z', orderThree), jp(done)]),
     ldh('a', [HW.DIV]),
     and(1),
     jr('z', done),
@@ -231,13 +196,11 @@ function buildInitChoiceOrder(): Op[] {
     jp(done),
 
     // Three choices: DIV & 7, folded into 0..5, picks a permutation
-    label(DLG_ORDER_THREE),
+    label(orderThree),
     ldh('a', [HW.DIV]),
     and(7),
     cp(THREE_CHOICE_ORDERS.length),
-    jr('c', DLG_ORDER_THREE_DISPATCH),
-    sub(THREE_CHOICE_ORDERS.length),
-    label(DLG_ORDER_THREE_DISPATCH),
+    ...ifThen('nc', [sub(THREE_CHOICE_ORDERS.length)]),
     ...switchCases(THREE_CHOICE_ORDERS.map(writeChoiceOrder)),
 
     label(done),
@@ -279,23 +242,14 @@ function buildClearTextbox(): Op[] {
   return [
     label(DLG_CLEAR_BOX),
     ld('hl', u16(tilemapAddr(BOX_TOP_ROW + 1, 1))),
-    ld('b', BOX_ROWS - 2),
-    label(DLG_CLEAR_ROW),
-    ld('c', BOX_INTERIOR_COLS),
-    label(DLG_CLEAR_CELL),
-    xor('a'),
-    ...vramPut(),
-    dec('c'),
-    jr('nz', DLG_CLEAR_CELL),
-    // Skip to column 1 of the next row
-    ld('a', 'l'),
-    add(32 - BOX_INTERIOR_COLS),
-    ld('l', 'a'),
-    jr('nc', DLG_CLEAR_NC),
-    inc('h'),
-    label(DLG_CLEAR_NC),
-    dec('b'),
-    jr('nz', DLG_CLEAR_ROW),
+    ...repeat(BOX_ROWS - 2, [
+      ...repeat(BOX_INTERIOR_COLS, [xor('a'), ...vramPut()], 'c'),
+      // Skip to column 1 of the next row
+      ld('a', 'l'),
+      add(32 - BOX_INTERIOR_COLS),
+      ld('l', 'a'),
+      ...ifThen('c', [inc('h')]),
+    ]),
     ret(),
   ];
 }
@@ -318,6 +272,8 @@ function buildClearTextbox(): Op[] {
  * as is. Advances DLG_STR. Preserves BC, DE, HL.
  */
 export function buildTextNext(base: number): Op[] {
+  const nextDone = new Label('text_next_done');
+  const expand = new Label('text_next_expand');
   return [
     label(TEXT_NEXT),
     push('bc'),
@@ -325,27 +281,26 @@ export function buildTextNext(base: number): Op[] {
     push('hl'),
     ld('a', [MEM.TEXT_SP]),
     or('a'),
-    jr('z', TEXT_NEXT_RAW),
-    // A right half waiting on the stack comes first
-    dec('a'),
-    ld([MEM.TEXT_SP], 'a'),
-    ld('e', 'a'),
-    ld('d', 0),
-    ld('hl', MEM.TEXT_STACK.address),
-    add('hl', 'de'),
-    ld('a', ['hl']),
-    jr(TEXT_NEXT_EXPAND),
-    label(TEXT_NEXT_RAW),
+    ...ifThen('nz', [
+      dec('a'),
+      ld([MEM.TEXT_SP], 'a'),
+      ld('e', 'a'),
+      ld('d', 0),
+      ld('hl', MEM.TEXT_STACK.address),
+      add('hl', 'de'),
+      ld('a', ['hl']),
+      jr(expand),
+    ]),
     ...loadPointer('hl', MEM.DLG_STR),
     ld('a', ['hl+']),
     ld('b', 'a'),
     ...storePointer('hl', MEM.DLG_STR),
     ld('a', 'b'),
-    label(TEXT_NEXT_EXPAND),
+    label(expand),
     cp(base),
-    jr('c', TEXT_NEXT_DONE), // a tile
+    jr('c', nextDone), // a tile
     cp(TEXT_END),
-    jr('z', TEXT_NEXT_DONE),
+    jr('z', nextDone),
     // A code: push its right half, go on with its left half
     sub(base),
     ld('l', 'a'),
@@ -365,8 +320,8 @@ export function buildTextNext(base: number): Op[] {
     add('hl', 'de'),
     ld(['hl'], 'c'),
     ld('a', 'b'),
-    jr(TEXT_NEXT_EXPAND),
-    label(TEXT_NEXT_DONE),
+    jr(expand),
+    label(nextDone),
     pop('hl'),
     pop('de'),
     pop('bc'),
@@ -375,12 +330,21 @@ export function buildTextNext(base: number): Op[] {
 }
 
 export function buildDialogueEngine(): Op[] {
+  const scoreDone = new Label('dlg_score_done');
+  const badChoice = new Label('dlg_bad_choice');
+  const saveCursor = new Label('dlg_cursor_save');
+  const cursorUp = new Label('dlg_cursor_up');
+  const confirmChoice = new Label('dlg_confirm_choice');
+  const textDone = new Label('dlg_text_done');
+  const doChoose = new Label('dlg_do_choose');
+  const doWait = new Label('dlg_do_wait');
+  const openDialogue = new Label('dlg_open');
   return [
     // =================================================================
     // dlg_open — Start showing a dialogue node. DE = pointer to node data.
     // Clears the textbox (drawn at scene load) without turning the LCD off.
     // =================================================================
-    label(DLG_OPEN),
+    label(openDialogue),
     call(DLG_CLEAR_BOX),
 
     // Store node data pointer; no compressed text is half-read
@@ -409,29 +373,23 @@ export function buildDialogueEngine(): Op[] {
     cp(DialogueState.IDLE),
     ret('z'),
     cp(DialogueState.PRINTING),
-    jp('z', DLG_DO_PRINT),
-    cp(DialogueState.WAITING),
-    jp('z', DLG_DO_WAIT),
-    cp(DialogueState.CHOOSING),
-    jp(DLG_DO_CHOOSE),
-
-    // =================================================================
-    // dlg_do_print — Reveal one character per REVEAL_DELAY frames, or
-    // FAST_REVEAL_CHARS every frame while B is held
-    // =================================================================
-    label(DLG_DO_PRINT),
+    ...ifThen('nz', [
+      cp(DialogueState.WAITING),
+      jp('z', doWait),
+      cp(DialogueState.CHOOSING),
+      jp(doChoose),
+    ]),
     ld('a', [MEM.JOYPAD_CUR]),
     and(JOY.B),
-    jr('z', DLG_PRINT_SLOW),
-    ...Array.from({ length: FAST_REVEAL_CHARS - 1 }, () => [
-      call(DLG_PRINT_CHAR),
-      ld('a', [MEM.DLG_STATE]),
-      cp(DialogueState.PRINTING),
-      ret('nz'), // the text ended
-    ]).flat(),
-    jr(DLG_PRINT_CHAR),
-
-    label(DLG_PRINT_SLOW),
+    ...ifThen('nz', [
+      ...Array.from({ length: FAST_REVEAL_CHARS - 1 }, () => [
+        call(DLG_PRINT_CHAR),
+        ld('a', [MEM.DLG_STATE]),
+        cp(DialogueState.PRINTING),
+        ret('nz'), // the text ended
+      ]).flat(),
+      jr(DLG_PRINT_CHAR),
+    ]),
     ...countDownOrReturn(MEM.DLG_DELAY),
     ...storeByte(MEM.DLG_DELAY, REVEAL_DELAY),
 
@@ -441,7 +399,7 @@ export function buildDialogueEngine(): Op[] {
 
     // Check for text terminator (not 0x00, because tile 0 = space)
     cp(TEXT_END),
-    jr('z', DLG_TEXT_DONE),
+    jr('z', textDone),
 
     // Write the tile at the VRAM cursor and advance it
     ld('b', 'a'),
@@ -457,7 +415,7 @@ export function buildDialogueEngine(): Op[] {
     ret(),
 
     // --- Text finished: read choice count and transition ---
-    label(DLG_TEXT_DONE),
+    label(textDone),
     // String pointer now points to choice_count byte
     ...loadPointer('hl', MEM.DLG_STR),
     ld('a', ['hl+']), // A = choice count
@@ -478,12 +436,7 @@ export function buildDialogueEngine(): Op[] {
     // If 0 choices, go to wait-for-A mode
     ld('a', [MEM.DLG_CHOICE_CNT]),
     cp(0),
-    jr('nz', DLG_SETUP_CHOICES),
-    ...storeByte(MEM.DLG_STATE, DialogueState.WAITING),
-    ret(),
-
-    // --- Set up choices ---
-    label(DLG_SETUP_CHOICES),
+    ...ifThen('z', [...storeByte(MEM.DLG_STATE, DialogueState.WAITING), ret()]),
     ...storeByte(MEM.DLG_STATE, DialogueState.CHOOSING),
     ...buildInitChoiceOrder(),
 
@@ -493,22 +446,20 @@ export function buildDialogueEngine(): Op[] {
     ld('c', 'a'), // C = remaining choices
     ld('b', 0), // B = choice index
 
-    label(DLG_DRAW_CHOICE_LOOP),
-    // HL = text position of the display row showing logical choice B
-    ...buildLoadChoicePositionForLogicalChoice(),
+    ...doWhile('nz', [
+      ...buildLoadChoicePositionForLogicalChoice(),
 
-    // Copy the choice's tiles to [HL] until the text terminator
-    label(DLG_CHOICE_CHAR),
-    call(TEXT_NEXT),
-    cp(TEXT_END),
-    jr('z', DLG_CHOICE_STR_DONE),
-    ...vramPut(),
-    jr(DLG_CHOICE_CHAR),
-
-    label(DLG_CHOICE_STR_DONE),
-    inc('b'), // next choice index
-    dec('c'), // remaining--
-    jr('nz', DLG_DRAW_CHOICE_LOOP),
+      // Copy the choice's tiles to [HL] until the text terminator
+      ...loop((again, done) => [
+        call(TEXT_NEXT),
+        cp(TEXT_END),
+        jr('z', done),
+        ...vramPut(),
+        jr(again),
+      ]),
+      inc('b'), // next choice index
+      dec('c'),
+    ]),
 
     // Cursor sprite on the first row
     ...zeroBytes(MEM.DLG_CURSOR, MEM.DLG_BOUNCE),
@@ -519,7 +470,7 @@ export function buildDialogueEngine(): Op[] {
     // =================================================================
     // dlg_do_wait — Wait for A button press, then set idle
     // =================================================================
-    label(DLG_DO_WAIT),
+    label(doWait),
     ld('a', [MEM.JOYPAD_NEW]),
     and(JOY.A),
     ret('z'), // not pressed
@@ -531,16 +482,14 @@ export function buildDialogueEngine(): Op[] {
     // =================================================================
     // dlg_do_choose — Navigate choices with UP/DOWN, confirm with A
     // =================================================================
-    label(DLG_DO_CHOOSE),
+    label(doChoose),
     // Bounce the cursor one pixel right every CURSOR_BOUNCE_FRAMES frames
     ld('a', [MEM.DLG_BOUNCE]),
     inc('a'),
     ld([MEM.DLG_BOUNCE], 'a'),
     and(CURSOR_BOUNCE_FRAMES),
     ld('a', CURSOR_X),
-    jr('z', DLG_BOUNCE_SET),
-    inc('a'),
-    label(DLG_BOUNCE_SET),
+    ...ifThen('nz', [inc('a')]),
     ld([oamField(SPRITE_SLOT.cursor, 'x')], 'a'),
 
     ld('a', [MEM.JOYPAD_NEW]),
@@ -548,22 +497,12 @@ export function buildDialogueEngine(): Op[] {
     // Check A button
     ld('b', 'a'), // save joypad in B
     and(JOY.A),
-    jr('nz', DLG_CONFIRM_CHOICE),
+    jr('nz', confirmChoice),
 
     // Check DOWN
     ld('a', 'b'),
     and(JOY.DOWN),
-    jr('nz', DLG_CURSOR_DOWN),
-
-    // Check UP
-    ld('a', 'b'),
-    and(JOY.UP),
-    jr('nz', DLG_CURSOR_UP),
-
-    ret(), // no relevant input
-
-    // --- Move cursor down ---
-    label(DLG_CURSOR_DOWN),
+    ...ifThen('z', [ld('a', 'b'), and(JOY.UP), jr('nz', cursorUp), ret()]),
     // Increment cursor, wrap around
     ld('a', [MEM.DLG_CURSOR]),
     inc('a'),
@@ -572,32 +511,26 @@ export function buildDialogueEngine(): Op[] {
     ld('c', 'a'), // C = choice count
     ld('a', 'b'),
     cp('c'),
-    jr('c', DLG_CURSOR_SAVE), // if cursor < count, no wrap
+    jr('c', saveCursor), // if cursor < count, no wrap
     xor('a'), // wrap to 0
-    jr(DLG_CURSOR_SAVE),
+    jr(saveCursor),
 
     // --- Move cursor up ---
-    label(DLG_CURSOR_UP),
+    label(cursorUp),
     ld('a', [MEM.DLG_CURSOR]),
     cp(0),
-    jr('nz', DLG_CURSOR_UP_DEC),
-    // Wrap to last choice
-    ld('a', [MEM.DLG_CHOICE_CNT]),
-    dec('a'),
-    jr(DLG_CURSOR_SAVE),
-
-    label(DLG_CURSOR_UP_DEC),
+    ...ifThen('z', [ld('a', [MEM.DLG_CHOICE_CNT]), dec('a'), jr(saveCursor)]),
     ld('a', [MEM.DLG_CURSOR]),
     dec('a'),
 
-    label(DLG_CURSOR_SAVE),
+    label(saveCursor),
     ld([MEM.DLG_CURSOR], 'a'),
     ...playSfx('cursor'),
     call(DLG_DRAW_CURSOR),
     ret(),
 
     // --- Confirm choice ---
-    label(DLG_CONFIRM_CHOICE),
+    label(confirmChoice),
     ...playSfx('confirm'),
     ...zeroBytes(oamField(SPRITE_SLOT.cursor, 'y')), // hide the cursor
     ld('a', [MEM.DLG_CURSOR]),
@@ -622,50 +555,47 @@ export function buildDialogueEngine(): Op[] {
     ld('a', 'b'),
     and(0xff ^ BAD_CHOICE_FLAG),
     cp(NEXT_END),
-    jr('nz', DLG_NEXT_STORE),
-    ld('a', END_OF_CONVERSATION),
-    label(DLG_NEXT_STORE),
+    ...ifThen('z', [ld('a', END_OF_CONVERSATION)]),
     ld([MEM.DLG_NODE_ID], 'a'),
 
     // Rating: flagged = bad, first authored choice = good, anything else = ok.
     // good = +10 & regain a life, ok = no change, bad = -5 & lose a life
     ld('a', 'b'),
     and(BAD_CHOICE_FLAG),
-    jr('nz', DLG_BAD_CHOICE),
+    jr('nz', badChoice),
     ld('a', 'c'),
     cp(0),
-    jr('z', DLG_GOOD_CHOICE),
-    ...buildClearDelta(), // ok: nothing changes
-    jr(DLG_SCORE_DONE),
-
-    label(DLG_GOOD_CHOICE),
+    ...ifThen('nz', [
+      ...buildClearDelta(), // ok: nothing changes
+      jr(scoreDone),
+    ]),
     ...catFace(CAT_REACT, 'happy'),
     // Good: +10 score, +1 life (capped at MAX_LIVES)
     ...buildAddScore(10),
     ...buildSetDelta(DELTA_PLUS_10),
     ld('a', [MEM.KANA_LIVES]),
     cp(MAX_LIVES),
-    jr('nc', DLG_SCORE_DONE), // already at max
+    jr('nc', scoreDone), // already at max
     inc('a'),
     ld([MEM.KANA_LIVES], 'a'),
-    jr(DLG_SCORE_DONE),
+    jr(scoreDone),
 
-    label(DLG_BAD_CHOICE),
+    label(badChoice),
     ...catFace(CAT_REACT, 'sad'),
     // Bad: -5 score, -1 life (floor at 0)
     ...buildSubScore(5),
     ...buildSetDelta(DELTA_MINUS_5),
     ld('a', [MEM.KANA_LIVES]),
     cp(0),
-    jr('z', DLG_SCORE_DONE), // already at 0
+    jr('z', scoreDone), // already at 0
     dec('a'),
     ld([MEM.KANA_LIVES], 'a'),
     // If lives just hit 0, end conversation → skip to kana
     cp(0),
-    jr('nz', DLG_SCORE_DONE),
+    jr('nz', scoreDone),
     ...storeByte(MEM.DLG_NODE_ID, END_OF_CONVERSATION),
 
-    label(DLG_SCORE_DONE),
+    label(scoreDone),
     ...zeroBytes(MEM.DLG_STATE), // idle
     ret(),
 
@@ -724,7 +654,7 @@ export function buildDialogueEngine(): Op[] {
     adc('d'),
     ld('d', 'a'),
     // DE = absolute ROM pointer to node data
-    jp(DLG_OPEN),
+    jp(openDialogue),
 
     ...buildDrawTextbox(),
     ...buildClearTextbox(),

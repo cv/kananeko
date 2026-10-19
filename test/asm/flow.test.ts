@@ -1,7 +1,7 @@
 /** Structured control flow, run in the emulator. */
 
 import { describe, expect, it } from 'vitest';
-import { ifElse, ifThen, loop, repeat } from '@asm/flow';
+import { block, doWhile, ifElse, ifThen, loop, repeat } from '@asm/flow';
 import { cp, dec, inc, jr, ld, ret } from '@asm/sm83';
 import { u16 } from '@asm/types';
 import { SCRATCH, runProgram } from '../helpers/run-program';
@@ -62,6 +62,35 @@ describe('repeat', () => {
   it('rejects counts outside 1-256', () => {
     expect(() => repeat(0, [])).toThrow(RangeError);
     expect(() => repeat(257, [])).toThrow(RangeError);
+  });
+});
+
+describe('block', () => {
+  it.each([
+    [1, 1],
+    [2, 2],
+    [9, 3],
+  ])('jumping to done skips the rest (A = %i)', (a, expected) => {
+    const memory = runProgram([
+      ld('a', a),
+      ld('b', 1),
+      ...block((done) => [cp(1), jr('z', done), inc('b'), cp(2), jr('z', done), inc('b')]),
+      ld('a', 'b'),
+      ld([OUT], 'a'),
+    ]);
+    expect(memory[SCRATCH]).toBe(expected);
+  });
+});
+
+describe('doWhile', () => {
+  it('runs its body once, then again while the condition holds', () => {
+    const memory = runProgram([
+      ld('a', 0),
+      ld('c', 4),
+      ...doWhile('nz', [inc('a'), inc('a'), dec('c')]),
+      ld([OUT], 'a'),
+    ]);
+    expect(memory[SCRATCH]).toBe(8);
   });
 });
 

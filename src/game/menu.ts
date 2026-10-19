@@ -3,6 +3,7 @@
  * one. Up and down move it (wrapping); A or START picks it.
  */
 
+import { block, ifThen } from '../asm/flow';
 import { JOY } from '../asm/hardware';
 import { MEM } from './ram';
 import { add, and, cp, dec, inc, jr, label, ld, or, ret } from '../asm/sm83';
@@ -17,12 +18,7 @@ import { MENU_DRAW, MENU_UPDATE } from './labels';
 import { gameModule } from '../asm/program';
 
 // Labels placed in this module
-const MENU_NO_PICK = new Label('menu_no_pick');
-const MENU_UP_DEC = new Label('menu_up_dec');
-const MENU_DOWN = new Label('menu_down');
-const MENU_MOVE = new Label('menu_move');
 const MENU_CURSOR = new Label('menu_cursor');
-const MENU_NONE = new Label('menu_none');
 
 /** The menu's items, in order; menu_update returns an item's index + 1 when it's picked */
 export const TITLE_MENU = ['はじめる', 'つづき', 'れんしゅう'] as const;
@@ -51,6 +47,7 @@ function itemRow(item: string): number[] {
  * menu_update  move the cursor on the d-pad; A = the picked item's index + 1, or 0
  */
 export function buildMenuRoutines(): Op[] {
+  const noInput = new Label('menu_none');
   const bottom = MENU_TOP_ROW + TITLE_MENU.length + 1;
   return [
     label(MENU_DRAW),
@@ -64,32 +61,27 @@ export function buildMenuRoutines(): Op[] {
     ld('a', [MEM.JOYPAD_NEW]),
     ld('b', 'a'),
     and(JOY.A | JOY.START),
-    jr('z', MENU_NO_PICK),
-    ld('a', [MEM.MENU_CURSOR]),
-    inc('a'),
-    ret(),
-    label(MENU_NO_PICK),
+    ...ifThen('nz', [ld('a', [MEM.MENU_CURSOR]), inc('a'), ret()]),
     ld('a', 'b'),
     and(JOY.DOWN),
-    jr('nz', MENU_DOWN),
-    ld('a', 'b'),
-    and(JOY.UP),
-    jr('z', MENU_NONE),
-    // Up: the item before, wrapping to the last
-    ld('a', [MEM.MENU_CURSOR]),
-    or('a'),
-    jr('nz', MENU_UP_DEC),
-    ld('a', TITLE_MENU.length),
-    label(MENU_UP_DEC),
-    dec('a'),
-    jr(MENU_MOVE),
-    label(MENU_DOWN),
-    ld('a', [MEM.MENU_CURSOR]),
-    inc('a'),
-    cp(TITLE_MENU.length),
-    jr('c', MENU_MOVE),
-    ld('a', 0),
-    label(MENU_MOVE),
+    ...block((done) => [
+      ...ifThen('z', [
+        ld('a', 'b'),
+        and(JOY.UP),
+        jr('z', noInput),
+        // Up: the item before, wrapping to the last
+        ld('a', [MEM.MENU_CURSOR]),
+        or('a'),
+        ...ifThen('z', [ld('a', TITLE_MENU.length)]),
+        dec('a'),
+        jr(done),
+      ]),
+      ld('a', [MEM.MENU_CURSOR]),
+      inc('a'),
+      cp(TITLE_MENU.length),
+      jr('c', done),
+      ld('a', 0),
+    ]),
     ld([MEM.MENU_CURSOR], 'a'),
     ...playSfx('cursor'),
     // menu_cursor: the paw beside the highlighted item
@@ -104,7 +96,7 @@ export function buildMenuRoutines(): Op[] {
     ...storeByte(oamField(SPRITE_SLOT.cursor, 'x'), MENU_TEXT_COL * 8 - 1),
     ...storeByte(oamField(SPRITE_SLOT.cursor, 'tile'), SPRITE_TILE.cursor),
     ...zeroBytes(oamField(SPRITE_SLOT.cursor, 'attr')),
-    label(MENU_NONE),
+    label(noInput),
     ld('a', 0),
     ret(),
   ];

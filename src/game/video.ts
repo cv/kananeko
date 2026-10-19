@@ -2,6 +2,7 @@
  * Screen helpers shared by the title screen, scenes, and engines.
  */
 
+import { doWhile, ifThen, loop, repeat } from '../asm/flow';
 import { HW, LCDC } from '../asm/hardware';
 import { MEM } from './ram';
 import { lcdOff, lcdOn, loadPointer, storePointer, zeroPages } from '../asm/macros';
@@ -46,31 +47,13 @@ import { gameModule } from '../asm/program';
 
 // Labels placed in this module
 const FRAME_WAIT = routine('frame_wait', { keepsFlags: true });
-const FRAME_WAIT_STORE = new Label('frame_wait_store');
-const FRAME_WAIT_DONE = new Label('frame_wait_done');
-const VRAM_PUT_WAIT = new Label('vram_put_wait');
-const FILL_TILES_NEXT = new Label('fill_tiles_next');
 const CLEAR_SCREEN = routine('clear_screen', { clobbers: ['a', 'bc', 'hl'] });
-const DRAW_RUNS_NEXT = new Label('draw_runs_next');
-const DRAW_RUNS_CELL = new Label('draw_runs_cell');
-const DRAW_RUNS_NC = new Label('draw_runs_nc');
-const DRAW_RUNS_SAME_ROW = new Label('draw_runs_same_row');
 const PALETTE_PUT = routine('palette_put', { keepsFlags: true });
-const PALETTE_PUT_WAIT = new Label('palette_put_wait');
 const FADE_APPLY = routine('fade_apply', { clobbers: ['a', 'c', 'd'] });
-const FADE_BGP_NC = new Label('fade_bgp_nc');
 const FADE_PALETTES = routine('fade_palettes', { clobbers: ['a', 'c', 'd', 'hl'] });
-const FADE_PALETTE = new Label('fade_palette');
-const FADE_COLOR = new Label('fade_color');
-const FADE_SRC_OK = new Label('fade_src_ok');
-const FADE_SRC_NC = new Label('fade_src_nc');
-const FADE_NEXT_NC = new Label('fade_next_nc');
 const FADE_WAIT = routine('fade_wait', { clobbers: ['a', 'c'] });
-const FADE_WAIT_FRAME = new Label('fade_wait_frame');
 const FADE_IN_CURRENT = routine('fade_in_current', { clobbers: ['a', 'd', 'bc', 'hl'] });
-const FADE_IN_STEP = new Label('fade_in_step');
 const FADE_OUT = routine('fade_out', { clobbers: ['a', 'd', 'bc', 'hl'] });
-const FADE_OUT_STEP = new Label('fade_out_step');
 const FADE_BGP = new Label('fade_bgp');
 
 /** Palette numbers every screen shares (see color.ts) */
@@ -135,16 +118,14 @@ export function buildFrameWait(): Op[] {
     ld([MEM.LAST_FRAME], 'a'),
     sub('c'), // VBlanks since the last wait
     cp(2),
-    jr('c', FRAME_WAIT_DONE),
-    dec('a'),
-    ld('c', 'a'),
-    ld('a', [MEM.FRAMES_MISSED]),
-    add('c'),
-    jr('nc', FRAME_WAIT_STORE),
-    ld('a', 0xff),
-    label(FRAME_WAIT_STORE),
-    ld([MEM.FRAMES_MISSED], 'a'),
-    label(FRAME_WAIT_DONE),
+    ...ifThen('nc', [
+      dec('a'),
+      ld('c', 'a'),
+      ld('a', [MEM.FRAMES_MISSED]),
+      add('c'),
+      ...ifThen('c', [ld('a', 0xff)]),
+      ld([MEM.FRAMES_MISSED], 'a'),
+    ]),
     // Sound steps once per frame here rather than in the VBlank handler, so it plays
     // the same with interrupts off (the tests' emulator runs without them)
     push('de'),
@@ -172,10 +153,7 @@ export function buildVramPut(): Op[] {
   return [
     label(VRAM_PUT),
     push('af'),
-    label(VRAM_PUT_WAIT),
-    ldh('a', [HW.STAT]),
-    and(STAT_BUSY),
-    jr('nz', VRAM_PUT_WAIT),
+    ...doWhile('nz', [ldh('a', [HW.STAT]), and(STAT_BUSY)]),
     pop('af'),
     ld(['hl+'], 'a'),
     ret(),
@@ -216,10 +194,7 @@ export function buildDrawTiles(): Op[] {
 
     label(FILL_TILES),
     push('bc'),
-    label(FILL_TILES_NEXT),
-    ld(['hl+'], 'a'),
-    dec('b'),
-    jr('nz', FILL_TILES_NEXT),
+    ...doWhile('nz', [ld(['hl+'], 'a'), dec('b')]),
     pop('bc'),
     ret(),
   ];
@@ -338,32 +313,30 @@ export function buildDrawRuns(): Op[] {
   return [
     label(DRAW_RUNS),
     ld('c', SCREEN_COLS),
-    label(DRAW_RUNS_NEXT),
-    ld('a', ['de']),
-    inc('de'),
-    cp(0),
-    ret('z'),
-    ld('b', 'a'), // run length
-    ld('a', ['de']),
-    inc('de'), // A = tile or palette
-    label(DRAW_RUNS_CELL),
-    ld(['hl+'], 'a'),
-    dec('c'),
-    jr('nz', DRAW_RUNS_SAME_ROW),
-    // End of a visible row: skip to the next tilemap row
-    push('af'),
-    ld('a', 'l'),
-    add(32 - SCREEN_COLS),
-    ld('l', 'a'),
-    jr('nc', DRAW_RUNS_NC),
-    inc('h'),
-    label(DRAW_RUNS_NC),
-    pop('af'),
-    ld('c', SCREEN_COLS),
-    label(DRAW_RUNS_SAME_ROW),
-    dec('b'),
-    jr('nz', DRAW_RUNS_CELL),
-    jr(DRAW_RUNS_NEXT),
+    ...loop((again) => [
+      ld('a', ['de']),
+      inc('de'),
+      cp(0),
+      ret('z'),
+      ld('b', 'a'), // run length
+      ld('a', ['de']),
+      inc('de'), // A = tile or palette
+      ...doWhile('nz', [
+        ld(['hl+'], 'a'),
+        dec('c'),
+        ...ifThen('z', [
+          push('af'),
+          ld('a', 'l'),
+          add(32 - SCREEN_COLS),
+          ld('l', 'a'),
+          ...ifThen('c', [inc('h')]),
+          pop('af'),
+          ld('c', SCREEN_COLS),
+        ]),
+        dec('b'),
+      ]),
+      jr(again),
+    ]),
   ];
 }
 
@@ -404,10 +377,7 @@ export function buildFadeRoutines(): Op[] {
     // palette_put: write A to BCPD once palette RAM is accessible (preserves A)
     label(PALETTE_PUT),
     push('af'),
-    label(PALETTE_PUT_WAIT),
-    ldh('a', [HW.STAT]),
-    and(STAT_BUSY),
-    jr('nz', PALETTE_PUT_WAIT),
+    ...doWhile('nz', [ldh('a', [HW.STAT]), and(STAT_BUSY)]),
     pop('af'),
     ldh([HW.BCPD], 'a'),
     ret(),
@@ -420,9 +390,7 @@ export function buildFadeRoutines(): Op[] {
     ld('a', 'b'),
     add('l'),
     ld('l', 'a'),
-    jr('nc', FADE_BGP_NC),
-    inc('h'),
-    label(FADE_BGP_NC),
+    ...ifThen('c', [inc('h')]),
     ld('a', ['hl']),
     ldh([HW.BGP], 'a'),
     pop('hl'), // the set (the other copy is restored on return)
@@ -442,48 +410,37 @@ export function buildFadeRoutines(): Op[] {
 
     // fade_palettes: write D palettes from HL at fade level B. Clobbers A, C, D, HL.
     label(FADE_PALETTES),
-    label(FADE_PALETTE),
-    ld('c', 0), // C = color index j
-    label(FADE_COLOR),
-    push('hl'),
-    ld('a', 'c'),
-    sub('b'),
-    jr('nc', FADE_SRC_OK),
-    xor('a'), // max(0, j - k)
-    label(FADE_SRC_OK),
-    add('a'), // 2 bytes per color
-    add('l'),
-    ld('l', 'a'),
-    jr('nc', FADE_SRC_NC),
-    inc('h'),
-    label(FADE_SRC_NC),
-    ld('a', ['hl+']),
-    call(PALETTE_PUT),
-    ld('a', ['hl']),
-    call(PALETTE_PUT),
-    pop('hl'),
-    inc('c'),
-    ld('a', 'c'),
-    cp(4),
-    jr('nz', FADE_COLOR),
-    ld('a', 'l'),
-    add(8), // next palette
-    ld('l', 'a'),
-    jr('nc', FADE_NEXT_NC),
-    inc('h'),
-    label(FADE_NEXT_NC),
-    dec('d'),
-    jr('nz', FADE_PALETTE),
+    ...doWhile('nz', [
+      ld('c', 0), // C = color index j
+      ...doWhile('nz', [
+        push('hl'),
+        ld('a', 'c'),
+        sub('b'),
+        ...ifThen('c', [xor('a')]),
+        add('a'), // 2 bytes per color
+        add('l'),
+        ld('l', 'a'),
+        ...ifThen('c', [inc('h')]),
+        ld('a', ['hl+']),
+        call(PALETTE_PUT),
+        ld('a', ['hl']),
+        call(PALETTE_PUT),
+        pop('hl'),
+        inc('c'),
+        ld('a', 'c'),
+        cp(4),
+      ]),
+      ld('a', 'l'),
+      add(8), // next palette
+      ld('l', 'a'),
+      ...ifThen('c', [inc('h')]),
+      dec('d'),
+    ]),
     ret(),
 
     // fade_wait: show the current level for FADE_STEP_FRAMES frames
     label(FADE_WAIT),
-    ld('c', FADE_STEP_FRAMES),
-    label(FADE_WAIT_FRAME),
-    call(FRAME_WAIT),
-    call(OAM_DMA), // so sprites update during fades
-    dec('c'),
-    jr('nz', FADE_WAIT_FRAME),
+    ...repeat(FADE_STEP_FRAMES, [call(FRAME_WAIT), call(OAM_DMA)], 'c'),
     ret(),
 
     // fade_in: HL = palette set. Starts at paper, turns the LCD on, steps to full color.
@@ -494,13 +451,7 @@ export function buildFadeRoutines(): Op[] {
     ld('b', FADE_STEPS - 1),
     call(FADE_APPLY),
     ...screenOn(),
-    label(FADE_IN_STEP),
-    call(FADE_WAIT),
-    dec('b'),
-    call(FADE_APPLY),
-    ld('a', 'b'),
-    cp(0),
-    jr('nz', FADE_IN_STEP),
+    ...doWhile('nz', [call(FADE_WAIT), dec('b'), call(FADE_APPLY), ld('a', 'b'), cp(0)]),
     ret(),
 
     // fade_out: step the current set to paper. HALT never wakes with the LCD
@@ -512,13 +463,13 @@ export function buildFadeRoutines(): Op[] {
     call(SPRITES_OFF), // sprites don't fade: take them off first
     ...loadPointer('hl', MEM.FADE_TABLE),
     ld('b', 0),
-    label(FADE_OUT_STEP),
-    call(FADE_WAIT),
-    inc('b'),
-    call(FADE_APPLY),
-    ld('a', 'b'),
-    cp(FADE_STEPS - 1),
-    jr('nz', FADE_OUT_STEP),
+    ...doWhile('nz', [
+      call(FADE_WAIT),
+      inc('b'),
+      call(FADE_APPLY),
+      ld('a', 'b'),
+      cp(FADE_STEPS - 1),
+    ]),
     ret(),
   ];
 }

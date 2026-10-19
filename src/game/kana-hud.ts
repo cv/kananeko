@@ -14,7 +14,7 @@
  */
 
 import { playSfx } from './sound';
-import { loop } from '../asm/flow';
+import { ifThen, loop } from '../asm/flow';
 import { type Op, type TileIndex, type U16, u16, Label, routine } from '../asm/types';
 import { adc, add, call, cp, dec, inc, jp, jr, label, ld, ret, sbc, sub } from '../asm/sm83';
 import { MEM } from './ram';
@@ -31,15 +31,8 @@ import { gameModule } from '../asm/program';
 
 // Labels placed in this module
 const SCORE_ADD = routine('score_add', { clobbers: ['a', 'b'] });
-const SCORE_CAP = new Label('score_cap');
 const SCORE_SUB = routine('score_sub', { clobbers: ['a', 'b'] });
-const HUD_DELTA_TICKED = new Label('hud_delta_ticked');
-const HUD_DELTA_KNOWN = new Label('hud_delta_known');
-const HUD_HEART_UP = new Label('hud_heart_up');
-const HUD_LIVES_SAME = new Label('hud_lives_same');
 const HUD_REDRAW = new Label('hud_redraw');
-const HUD_SHADOW_DELTA = new Label('hud_shadow_delta');
-const DELTA_CLEAR = new Label('delta_clear');
 
 // ---------------------------------------------------------------------------
 // Layout & tile constants
@@ -189,11 +182,7 @@ export function buildScoreRoutines(): Op[] {
     // Cap: HI > hi(MAX) or (HI == hi(MAX) and LO > lo(MAX))
     cp(hi(MAX_SCORE)),
     ret('c'),
-    jr('nz', SCORE_CAP),
-    ld('a', [MEM.KANA_SCORE.lo]),
-    cp(lo(MAX_SCORE) + 1),
-    ret('c'),
-    label(SCORE_CAP),
+    ...ifThen('z', [ld('a', [MEM.KANA_SCORE.lo]), cp(lo(MAX_SCORE) + 1), ret('c')]),
     ld('a', lo(MAX_SCORE)),
     ld([MEM.KANA_SCORE.lo], 'a'),
     ld('a', hi(MAX_SCORE)),
@@ -296,19 +285,13 @@ export function buildDrawHudOps(): Op[] {
     label(HUD_UPDATE),
     ld('a', [MEM.DELTA_TIMER]),
     cp(0),
-    jr('z', HUD_DELTA_TICKED),
-    dec('a'),
-    ld([MEM.DELTA_TIMER], 'a'),
-    label(HUD_DELTA_TICKED),
+    ...ifThen('nz', [dec('a'), ld([MEM.DELTA_TIMER], 'a')]),
 
     // B = visible delta type (0 once the flash has expired)
     ld('b', 0),
     ld('a', [MEM.DELTA_TIMER]),
     cp(0),
-    jr('z', HUD_DELTA_KNOWN),
-    ld('a', [MEM.DELTA_TYPE]),
-    ld('b', 'a'),
-    label(HUD_DELTA_KNOWN),
+    ...ifThen('nz', [ld('a', [MEM.DELTA_TYPE]), ld('b', 'a')]),
 
     // A heart won or lost: its sound, then the redraw (checked before the delta,
     // which usually changes on the same frame and would redraw the hearts silently)
@@ -316,14 +299,11 @@ export function buildDrawHudOps(): Op[] {
     ld('c', 'a'),
     ld('a', [MEM.HUD_SHOWN_LIVES]),
     cp('c'),
-    jr('z', HUD_LIVES_SAME),
-    jr('c', HUD_HEART_UP),
-    ...playSfx('heartDown'),
-    jp(HUD_REDRAW),
-    label(HUD_HEART_UP),
-    ...playSfx('heartUp'),
-    jp(HUD_REDRAW),
-    label(HUD_LIVES_SAME),
+    ...ifThen('nz', [
+      ...ifThen('nc', [...playSfx('heartDown'), jp(HUD_REDRAW)]),
+      ...playSfx('heartUp'),
+      jp(HUD_REDRAW),
+    ]),
     ...redrawIfChanged(MEM.HUD_SHOWN_DELTA, 'b'),
 
     ...redrawIfChanged(MEM.HUD_SHOWN_SCORE.lo, MEM.KANA_SCORE.lo),
@@ -336,10 +316,7 @@ export function buildDrawHudOps(): Op[] {
     ld('b', 0),
     ld('a', [MEM.DELTA_TIMER]),
     cp(0),
-    jr('z', HUD_SHADOW_DELTA),
-    ld('a', [MEM.DELTA_TYPE]),
-    ld('b', 'a'),
-    label(HUD_SHADOW_DELTA),
+    ...ifThen('nz', [ld('a', [MEM.DELTA_TYPE]), ld('b', 'a')]),
     ld('a', 'b'),
     ld([MEM.HUD_SHOWN_DELTA], 'a'),
     ld('a', [MEM.KANA_LIVES]),
@@ -359,17 +336,16 @@ export function buildDrawHudOps(): Op[] {
     // --- Delta flash at cols 15-18 (timer ticks in hud_update) ---
     ld('a', [MEM.DELTA_TIMER]),
     cp(0),
-    jp('z', DELTA_CLEAR),
-
-    // Dispatch on delta type (the last case is the default)
-    ld('a', [MEM.DELTA_TYPE]),
-    ...switchCases(
-      DELTA_TYPES.map((type) => [...buildDrawTilesAt(0, DELTA_COL, DELTA_TILE_RUNS[type]), ret()]),
-      { compare: (i) => [cp(at(DELTA_TYPES, i))], exit: 'none' },
-    ),
-
-    // Clear delta area (timer expired or type=0)
-    label(DELTA_CLEAR),
+    ...ifThen('nz', [
+      ld('a', [MEM.DELTA_TYPE]),
+      ...switchCases(
+        DELTA_TYPES.map((type) => [
+          ...buildDrawTilesAt(0, DELTA_COL, DELTA_TILE_RUNS[type]),
+          ret(),
+        ]),
+        { compare: (i) => [cp(at(DELTA_TYPES, i))], exit: 'none' },
+      ),
+    ]),
     ...buildDrawTilesAt(0, DELTA_COL, DELTA_CLEAR_TILES),
     ret(),
   ];

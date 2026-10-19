@@ -21,6 +21,7 @@
  */
 
 import { playMusic, playSfx } from './sound';
+import { block, doWhile, ifThen } from '../asm/flow';
 import { HW, JOY } from '../asm/hardware';
 import { MEM } from './ram';
 import {
@@ -88,34 +89,10 @@ import {
   KANA_UPDATE,
 } from './labels';
 import { gameModule } from '../asm/program';
-
-// Labels placed in this module
-const KANA_LIVES_OK = new Label('kana_lives_ok');
-const KANA_LOAD_QUESTION = new Label('kana_load_question');
-const KANA_NEXT_QUESTION = new Label('kana_next_question');
-const KANA_DRAW_WORD = new Label('kana_draw_word');
-const KANA_QUESTION_SHOWN = new Label('kana_question_shown');
 const KANA_DRAW_CLOCK = routine('kana_draw_clock', { clobbers: ['a', 'hl'] });
-const KANA_AWAIT_INPUT = new Label('kana_await_input');
-const PRACTICE_NO_QUIT = new Label('practice_no_quit');
-const KANA_CLOCK_DONE = new Label('kana_clock_done');
-const KANA_SCORE_ATTEMPT1 = new Label('kana_score_attempt1');
-const KANA_PRACTICE_WIN = new Label('kana_practice_win');
-const KANA_SCORE_NONE = new Label('kana_score_none');
-const KANA_CORRECT_DONE = new Label('kana_correct_done');
-const KANA_WRONG = new Label('kana_wrong');
-const KANA_DEATH = new Label('kana_death');
 const KANA_STREAK = new Label('kana_streak');
-const KANA_REDEEM_WIN = new Label('kana_redeem_win');
-const KANA_REDEEM_FULL = new Label('kana_redeem_full');
-const KANA_CHANCE_MISS = new Label('kana_chance_miss');
-const KANA_CORRECT_FB = new Label('kana_correct_fb');
-const KANA_WRONG_FB = new Label('kana_wrong_fb');
 const KANA_SHOW_PROMPT = routine('kana_show_prompt', { clobbers: ['a', 'hl'] });
-const KANA_SHOW_KATAKANA = new Label('kana_show_katakana');
-const KANA_SHOW_HURRY = new Label('kana_show_hurry');
 const KANA_REVEAL = routine('kana_reveal', { clobbers: ['a', 'hl'], keepsFlags: true });
-const KANA_ALL_DONE = new Label('kana_all_done');
 
 // ---------------------------------------------------------------------------
 // Types
@@ -379,6 +356,17 @@ function readDirection(gotAnswer: Label): Op[] {
 }
 
 export function buildKanaEngine(): Op[] {
+  const chanceMiss = new Label('kana_chance_miss');
+  const noScore = new Label('kana_score_none');
+  const correctDone = new Label('kana_correct_done');
+  const practiceWin = new Label('kana_practice_win');
+  const redeemWin = new Label('kana_redeem_win');
+  const wrongAnswer = new Label('kana_wrong');
+  const noQuit = new Label('practice_no_quit');
+  const wrongFeedback = new Label('kana_wrong_fb');
+  const correctFeedback = new Label('kana_correct_fb');
+  const allDone = new Label('kana_all_done');
+  const loadQuestion = new Label('kana_load_question');
   return [
     // =================================================================
     // kana_start — DE = question data pointer.
@@ -393,34 +381,32 @@ export function buildKanaEngine(): Op[] {
     ...buildClearDelta(), // don't carry a dialogue flash into the round
     ld('a', [MEM.KANA_LIVES]),
     cp(0),
-    jr('nz', KANA_LIVES_OK),
-    ...storeByte(MEM.KANA_LIVES, 1),
-    label(KANA_LIVES_OK),
+    ...ifThen('z', [...storeByte(MEM.KANA_LIVES, 1)]),
     ...catFace(CAT_REST, 'neutral'),
 
-    jp(KANA_LOAD_QUESTION),
+    jp(loadQuestion),
 
     // =================================================================
     // kana_load_question — Read question from ROM, shuffle, draw.
     // =================================================================
-    label(KANA_LOAD_QUESTION),
+    label(loadQuestion),
     // Out of questions? End the round with the last question still on screen.
     ...loadPointer('hl', MEM.KANA_DATA),
     ld('a', ['hl']),
     cp(0),
-    jp('z', KANA_ALL_DONE),
+    jp('z', allDone),
 
     // The round's first question gets a fresh screen; later ones keep the frame and
     // redraw only the word, the answers, and the prompt, with the LCD on
     ld('a', [MEM.KANA_Q_IDX]),
     or('a'),
-    jr('nz', KANA_NEXT_QUESTION),
-    ...fadeOut(),
-    ...screenOff(),
-    ...clearScreen(),
-    call(KANA_DRAW_HUD),
-    ...buildRoundFrame(),
-    label(KANA_NEXT_QUESTION),
+    ...ifThen('z', [
+      ...fadeOut(),
+      ...screenOff(),
+      ...clearScreen(),
+      call(KANA_DRAW_HUD),
+      ...buildRoundFrame(),
+    ]),
     ...drawTiles(WORD_INNER_ADDR, Array<number>(WORD_BOX.innerWidth).fill(0)), // empty word box
 
     ...loadPointer('de', MEM.KANA_DATA),
@@ -429,7 +415,7 @@ export function buildKanaEngine(): Op[] {
     ld('a', ['de']),
     inc('de'),
     cp(0),
-    jp('z', KANA_ALL_DONE),
+    jp('z', allDone),
     ld('c', 'a'),
     and(MATCH_FLAG),
     ld([MEM.KANA_PROMPT], 'a'),
@@ -447,12 +433,7 @@ export function buildKanaEngine(): Op[] {
     ...storePointer('hl', MEM.KANA_BLANK), // word start, for now
 
     // Copy the word's tiles
-    label(KANA_DRAW_WORD),
-    ld('a', ['de']),
-    inc('de'),
-    ...vramPut(),
-    dec('c'),
-    jr('nz', KANA_DRAW_WORD),
+    ...doWhile('nz', [ld('a', ['de']), inc('de'), ...vramPut(), dec('c')]),
 
     // Read blank_position; remember that cell and cover it with BLANK_TILE
     ld('a', ['de']),
@@ -481,10 +462,7 @@ export function buildKanaEngine(): Op[] {
     // A fresh screen fades in, with the cat beside it
     ld('a', [MEM.KANA_Q_IDX]),
     or('a'),
-    jr('nz', KANA_QUESTION_SHOWN),
-    ...fadeInCurrent(),
-    ...placeCat(CAT_SPOTS.quiz),
-    label(KANA_QUESTION_SHOWN),
+    ...ifThen('z', [...fadeInCurrent(), ...placeCat(CAT_SPOTS.quiz)]),
 
     // Reset attempts and wait for input
     ...zeroBytes(MEM.KANA_ATTEMPTS),
@@ -514,85 +492,81 @@ export function buildKanaEngine(): Op[] {
     cp(KanaState.IDLE),
     ret('z'),
     cp(KanaState.AWAITING),
-    jp('z', KANA_AWAIT_INPUT),
-    cp(KanaState.ADVANCE_FEEDBACK),
-    jp('z', KANA_CORRECT_FB),
-    cp(KanaState.RETRY_FEEDBACK),
-    jp('z', KANA_WRONG_FB),
-    ret(),
-
-    // =================================================================
-    // kana_await_input — Check d-pad, compare with correct position.
-    // =================================================================
-    label(KANA_AWAIT_INPUT),
+    ...ifThen('nz', [
+      cp(KanaState.ADVANCE_FEEDBACK),
+      jp('z', correctFeedback),
+      cp(KanaState.RETRY_FEEDBACK),
+      jp('z', wrongFeedback),
+      ret(),
+    ]),
     // Practice: B quits (see practice.ts)
     ld('a', [MEM.KANA_MODE]),
     cp(KanaMode.PRACTICE),
-    jr('nz', PRACTICE_NO_QUIT),
+    jr('nz', noQuit),
     ld('a', [MEM.JOYPAD_NEW]),
     and(JOY.B),
-    jr('z', PRACTICE_NO_QUIT),
+    jr('z', noQuit),
     ...storeByte(MEM.PRACTICE_QUIT, 1),
-    jp(KANA_ALL_DONE),
-    label(PRACTICE_NO_QUIT),
+    jp(allDone),
+    label(noQuit),
     // Speed round: tick the clock; running out counts as a miss
     ld('a', [MEM.KANA_MODE]),
     cp(KanaMode.SPEED),
-    jr('nz', KANA_CLOCK_DONE),
-    ld('a', [MEM.KANA_CLOCK_FRAMES]),
-    dec('a'),
-    ld([MEM.KANA_CLOCK_FRAMES], 'a'),
-    jr('nz', KANA_CLOCK_DONE),
-    ...storeByte(MEM.KANA_CLOCK_FRAMES, FRAMES_PER_SECOND),
-    ld('a', [MEM.KANA_CLOCK_SECS]),
-    dec('a'),
-    ld([MEM.KANA_CLOCK_SECS], 'a'),
-    ...playSfx('tick'),
-    call(KANA_DRAW_CLOCK),
-    ld('a', [MEM.KANA_CLOCK_SECS]),
-    or('a'),
-    jp('z', KANA_WRONG),
-    label(KANA_CLOCK_DONE),
+    ...block((done) => [
+      jr('nz', done),
+      ld('a', [MEM.KANA_CLOCK_FRAMES]),
+      dec('a'),
+      ld([MEM.KANA_CLOCK_FRAMES], 'a'),
+      jr('nz', done),
+      ...storeByte(MEM.KANA_CLOCK_FRAMES, FRAMES_PER_SECOND),
+      ld('a', [MEM.KANA_CLOCK_SECS]),
+      dec('a'),
+      ld([MEM.KANA_CLOCK_SECS], 'a'),
+      ...playSfx('tick'),
+      call(KANA_DRAW_CLOCK),
+      ld('a', [MEM.KANA_CLOCK_SECS]),
+      or('a'),
+      jp('z', wrongAnswer),
+    ]),
     ...readDirection(new Label('kana_got_answer')),
     ld([MEM.KANA_ANSWER], 'a'),
 
     ld('b', 'a'),
     ld('a', [MEM.KANA_CORRECT_POS]),
     cp('b'),
-    jp('nz', KANA_WRONG),
+    jp('nz', wrongAnswer),
 
     // === CORRECT: a won-back life, or a score that depends on the attempt number ===
     call(CHART_SEEN),
     ld('a', [MEM.KANA_MODE]),
     cp(KanaMode.REDEEM),
-    jp('z', KANA_REDEEM_WIN),
+    jp('z', redeemWin),
     cp(KanaMode.PRACTICE),
-    jp('z', KANA_PRACTICE_WIN),
+    jp('z', practiceWin),
     ld('a', [MEM.KANA_ATTEMPTS]),
     cp(0),
-    jr('nz', KANA_SCORE_ATTEMPT1),
-    ...buildAddScore(SCORE_FIRST_TRY),
-    ...buildSetDelta(DELTA_PLUS_100),
-    ld('a', [MEM.KANA_STREAK]),
-    inc('a'),
-    cp(STREAK_LENGTH),
-    jp('z', KANA_STREAK),
-    ld([MEM.KANA_STREAK], 'a'),
-    jr(KANA_CORRECT_DONE),
-
-    label(KANA_SCORE_ATTEMPT1),
+    ...ifThen('z', [
+      ...buildAddScore(SCORE_FIRST_TRY),
+      ...buildSetDelta(DELTA_PLUS_100),
+      ld('a', [MEM.KANA_STREAK]),
+      inc('a'),
+      cp(STREAK_LENGTH),
+      jp('z', KANA_STREAK),
+      ld([MEM.KANA_STREAK], 'a'),
+      jr(correctDone),
+    ]),
     cp(1),
-    jr('nz', KANA_SCORE_NONE),
+    jr('nz', noScore),
     ...buildAddScore(SCORE_SECOND_TRY),
     ...buildSetDelta(DELTA_PLUS_10),
-    jr(KANA_CORRECT_DONE),
+    jr(correctDone),
 
-    label(KANA_PRACTICE_WIN), // practiced right: no longer a missed kana, no points
+    label(practiceWin), // practiced right: no longer a missed kana, no points
     call(CHART_UNMISS),
-    label(KANA_SCORE_NONE), // attempt 2: +0
+    label(noScore), // attempt 2: +0
     ...buildClearDelta(),
 
-    label(KANA_CORRECT_DONE),
+    label(correctDone),
     ...playSfx('correct'), // (a streak's fanfare outranks it)
     ...showMessage(KANA_MESSAGES.correct),
     ...showFace('happy'),
@@ -601,28 +575,24 @@ export function buildKanaEngine(): Op[] {
     ret(),
 
     // === WRONG ===
-    label(KANA_WRONG),
+    label(wrongAnswer),
     call(CHART_MISSED),
     ...playSfx('wrong'),
     ...zeroBytes(MEM.KANA_STREAK),
     ld('a', [MEM.KANA_MODE]),
     cp(KanaMode.NORMAL),
-    jp('nz', KANA_CHANCE_MISS), // one-try rounds just show the answer
+    jp('nz', chanceMiss), // one-try rounds just show the answer
     ld('a', [MEM.KANA_ATTEMPTS]),
     cp(MAX_ATTEMPTS),
-    jr('z', KANA_DEATH),
-
-    // Not dead yet — count the attempt and re-prompt after feedback
-    inc('a'),
-    ld([MEM.KANA_ATTEMPTS], 'a'),
-    ...buildClearDelta(),
-    ...showMessage(KANA_MESSAGES.retry),
-    ...showFace('sad'),
-    ...enterFeedback(KanaState.RETRY_FEEDBACK),
-    ret(),
-
-    // === DEATH (3rd wrong) ===
-    label(KANA_DEATH),
+    ...ifThen('nz', [
+      inc('a'),
+      ld([MEM.KANA_ATTEMPTS], 'a'),
+      ...buildClearDelta(),
+      ...showMessage(KANA_MESSAGES.retry),
+      ...showFace('sad'),
+      ...enterFeedback(KanaState.RETRY_FEEDBACK),
+      ret(),
+    ]),
     ...buildSubScore(SCORE_DEATH_PENALTY),
     ...buildSetDelta(DELTA_MINUS_100),
     ...showMessage(KANA_MESSAGES.reveal),
@@ -633,7 +603,7 @@ export function buildKanaEngine(): Op[] {
     dec('a'),
     ld([MEM.KANA_LIVES], 'a'),
     cp(0),
-    jp('z', KANA_ALL_DONE), // no lives left: end the round now
+    jp('z', allDone), // no lives left: end the round now
 
     // Show feedback, then move on to the next question
     ...enterFeedback(KanaState.ADVANCE_FEEDBACK),
@@ -652,17 +622,14 @@ export function buildKanaEngine(): Op[] {
     ret(),
 
     // === One-try rounds ===
-    label(KANA_REDEEM_WIN), // the life lost to a bad answer comes back
+    label(redeemWin), // the life lost to a bad answer comes back
     ld('a', [MEM.KANA_LIVES]),
     cp(MAX_LIVES),
-    jr('nc', KANA_REDEEM_FULL),
-    inc('a'),
-    ld([MEM.KANA_LIVES], 'a'),
-    label(KANA_REDEEM_FULL),
+    ...ifThen('c', [inc('a'), ld([MEM.KANA_LIVES], 'a')]),
     ...buildClearDelta(),
-    jp(KANA_CORRECT_DONE),
+    jp(correctDone),
 
-    label(KANA_CHANCE_MISS), // no penalty: reveal and move on
+    label(chanceMiss), // no penalty: reveal and move on
     ...buildClearDelta(),
     ...showMessage(KANA_MESSAGES.reveal),
     ...showFace('sad'),
@@ -673,17 +640,17 @@ export function buildKanaEngine(): Op[] {
     // =================================================================
     // kana_correct_fb — Feedback countdown, then next question.
     // =================================================================
-    label(KANA_CORRECT_FB),
+    label(correctFeedback),
     ...countDownOrReturn(MEM.KANA_FEEDBACK_TIMER),
     ld('a', [MEM.KANA_Q_IDX]),
     inc('a'),
     ld([MEM.KANA_Q_IDX], 'a'),
-    jp(KANA_LOAD_QUESTION),
+    jp(loadQuestion),
 
     // =================================================================
     // kana_wrong_fb — Feedback countdown, then re-prompt the same question.
     // =================================================================
-    label(KANA_WRONG_FB),
+    label(wrongFeedback),
     ...countDownOrReturn(MEM.KANA_FEEDBACK_TIMER),
     call(KANA_SHOW_PROMPT),
     ...showFace('neutral'),
@@ -697,16 +664,13 @@ export function buildKanaEngine(): Op[] {
     label(KANA_SHOW_PROMPT),
     ld('a', [MEM.KANA_MODE]),
     cp(KanaMode.SPEED),
-    jr('z', KANA_SHOW_HURRY), // the speed round hurries you along
-    ld('a', [MEM.KANA_PROMPT]),
-    or('a'),
-    jr('nz', KANA_SHOW_KATAKANA), // match questions ask for katakana
-    ...showMessage(KANA_MESSAGES.prompt),
-    ret(),
-    label(KANA_SHOW_KATAKANA),
-    ...showMessage(KANA_MESSAGES.katakana),
-    ret(),
-    label(KANA_SHOW_HURRY),
+    ...ifThen('nz', [
+      ld('a', [MEM.KANA_PROMPT]),
+      or('a'),
+      ...ifThen('z', [...showMessage(KANA_MESSAGES.prompt), ret()]),
+      ...showMessage(KANA_MESSAGES.katakana),
+      ret(),
+    ]),
     ...showMessage(KANA_MESSAGES.hurry),
     ret(),
 
@@ -722,7 +686,7 @@ export function buildKanaEngine(): Op[] {
     // =================================================================
     // kana_all_done — Round finished (all questions answered or out of lives).
     // =================================================================
-    label(KANA_ALL_DONE),
+    label(allDone),
     ...zeroBytes(MEM.KANA_STATE),
     ret(),
   ];

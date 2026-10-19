@@ -8,6 +8,7 @@
  * line of dialogue it appears in.
  */
 
+import { doWhile, ifThen, loop, repeat } from '../asm/flow';
 import { HW } from '../asm/hardware';
 import { MEM } from './ram';
 import {
@@ -55,26 +56,10 @@ import { SPEED_ROUND_DATA } from './labels';
 
 // Labels placed in this module
 const PRACTICE_TABLE = new Label('practice_table');
-const PRACTICE_MOD = new Label('practice_mod');
 const PRACTICE_PICK = routine('practice_pick', { clobbers: ['a', 'd', 'bc'] });
-const PRACTICE_SCAN = new Label('practice_scan');
-const PRACTICE_SCAN_NEXT = new Label('practice_scan_next');
-const PRACTICE_FOUND = new Label('practice_found');
-const PRACTICE_NEXT_OK = new Label('practice_next_ok');
 const PRACTICE_COPY = routine('practice_copy', { out: ['hl'], clobbers: ['a', 'b', 'de'] });
 const QUESTION_COPY = routine('question_copy', { out: ['hl'], clobbers: ['a', 'b', 'de'] });
-const QUESTION_COPY_BYTE = new Label('question_copy_byte');
 const PRACTICE_FILL = routine('practice_fill', { clobbers: ['a', 'b', 'de', 'hl'] });
-const PRACTICE_FILL_NEXT = new Label('practice_fill_next');
-const SPEED_COUNT_BYTE = new Label('speed_count_byte');
-const SPEED_COUNT_BIT = new Label('speed_count_bit');
-const SPEED_COUNT_NEXT = new Label('speed_count_next');
-const SPEED_COUNT_OK = new Label('speed_count_ok');
-const SPEED_FILL_MISSED = new Label('speed_fill_missed');
-const SPEED_FILL_REST = new Label('speed_fill_rest');
-const SPEED_FILL_OWN = new Label('speed_fill_own');
-const SPEED_FILL_END = new Label('speed_fill_end');
-const PRACTICE_LOOP = new Label('practice_loop');
 
 /** Words for kana no line of dialogue has */
 const FALLBACK_WORDS: Readonly<Record<string, string>> = { ぬ: 'いぬ' };
@@ -128,6 +113,7 @@ export function buildPracticeData(): Op[] {
  *                 length), then the speed round's own questions to fill it, then the end
  */
 export function buildPracticeRoutines(speedRound: Label): Op[] {
+  const found = new Label('practice_found');
   const speedLength = SPEED_ROUND.length;
   return [
     label(PRACTICE_RAND),
@@ -138,43 +124,37 @@ export function buildPracticeRoutines(speedRound: Label): Op[] {
     add('a'),
     inc('a'),
     ld([MEM.PRACTICE_SEED], 'a'),
-    label(PRACTICE_MOD),
-    cp(KANA_COUNT),
-    ret('c'),
-    sub(KANA_COUNT),
-    jr(PRACTICE_MOD),
+    ...loop((again) => [cp(KANA_COUNT), ret('c'), sub(KANA_COUNT), jr(again)]),
 
     label(PRACTICE_PICK),
     ld('a', [MEM.PRACTICE_NEXT]),
     ld('c', 'a'),
-    ld('d', KANA_COUNT),
-    label(PRACTICE_SCAN),
-    ld('a', 'c'),
-    push('hl'),
-    push('de'), // chart_bit uses DE (D counts the entries left to look at)
-    ld('hl', MEM.KANA_MISSED.address),
-    call(CHART_BIT),
-    ld('a', ['hl']),
-    pop('de'),
-    pop('hl'),
-    and('b'),
-    jr('nz', PRACTICE_FOUND),
-    inc('c'),
-    ld('a', 'c'),
-    cp(KANA_COUNT),
-    jr('c', PRACTICE_SCAN_NEXT),
-    ld('c', 0),
-    label(PRACTICE_SCAN_NEXT),
-    dec('d'),
-    jr('nz', PRACTICE_SCAN),
+    ...repeat(
+      KANA_COUNT,
+      [
+        ld('a', 'c'),
+        push('hl'),
+        push('de'), // chart_bit uses DE (D counts the entries left to look at)
+        ld('hl', MEM.KANA_MISSED.address),
+        call(CHART_BIT),
+        ld('a', ['hl']),
+        pop('de'),
+        pop('hl'),
+        and('b'),
+        jr('nz', found),
+        inc('c'),
+        ld('a', 'c'),
+        cp(KANA_COUNT),
+        ...ifThen('nc', [ld('c', 0)]),
+      ],
+      'd',
+    ),
     jr(PRACTICE_RAND), // nothing missed: any kana
-    label(PRACTICE_FOUND),
+    label(found),
     ld('a', 'c'),
     inc('a'),
     cp(KANA_COUNT),
-    jr('c', PRACTICE_NEXT_OK),
-    xor('a'),
-    label(PRACTICE_NEXT_OK),
+    ...ifThen('nc', [xor('a')]),
     ld([MEM.PRACTICE_NEXT], 'a'),
     ld('a', 'c'),
     ret(),
@@ -197,26 +177,19 @@ export function buildPracticeRoutines(speedRound: Label): Op[] {
     and(0x7f), // the word's length (bit 7: a katakana question)
     add(6),
     ld('b', 'a'),
-    label(QUESTION_COPY_BYTE),
-    ld('a', ['de']),
-    inc('de'),
-    ld(['hl+'], 'a'),
-    dec('b'),
-    jr('nz', QUESTION_COPY_BYTE),
+    ...doWhile('nz', [ld('a', ['de']), inc('de'), ld(['hl+'], 'a'), dec('b')]),
     ret(),
 
     label(PRACTICE_FILL),
     ld('hl', MEM.PRACTICE_BUF.address),
-    ld('b', PRACTICE_ROUND),
-    label(PRACTICE_FILL_NEXT),
-    push('bc'),
-    push('hl'),
-    call(PRACTICE_PICK),
-    pop('hl'),
-    call(PRACTICE_COPY),
-    pop('bc'),
-    dec('b'),
-    jr('nz', PRACTICE_FILL_NEXT),
+    ...repeat(PRACTICE_ROUND, [
+      push('bc'),
+      push('hl'),
+      call(PRACTICE_PICK),
+      pop('hl'),
+      call(PRACTICE_COPY),
+      pop('bc'),
+    ]),
     ld(['hl'], 0),
     ret(),
 
@@ -224,55 +197,49 @@ export function buildPracticeRoutines(speedRound: Label): Op[] {
     // C = the missed kana, at most the round's length
     ld('hl', MEM.KANA_MISSED.address),
     ld('c', 0),
-    ld('d', 6),
-    label(SPEED_COUNT_BYTE),
-    ld('a', ['hl+']),
-    label(SPEED_COUNT_BIT),
-    or('a'),
-    jr('z', SPEED_COUNT_NEXT),
-    srl('a'),
-    jr('nc', SPEED_COUNT_BIT),
-    inc('c'),
-    jr(SPEED_COUNT_BIT),
-    label(SPEED_COUNT_NEXT),
-    dec('d'),
-    jr('nz', SPEED_COUNT_BYTE),
+    ...repeat(
+      6,
+      [
+        ld('a', ['hl+']),
+        ...loop((again, done) => [
+          or('a'),
+          jr('z', done),
+          srl('a'),
+          jr('nc', again),
+          inc('c'),
+          jr(again),
+        ]),
+      ],
+      'd',
+    ),
     ld('a', 'c'),
     cp(speedLength),
-    jr('c', SPEED_COUNT_OK),
-    ld('c', speedLength),
-    label(SPEED_COUNT_OK),
+    ...ifThen('nc', [ld('c', speedLength)]),
     // The missed ones first
     ld('hl', MEM.PRACTICE_BUF.address),
     ld('a', 'c'),
     or('a'),
-    jr('z', SPEED_FILL_REST),
-    ld('b', 'a'),
-    label(SPEED_FILL_MISSED),
-    push('bc'),
-    push('hl'),
-    call(PRACTICE_PICK),
-    pop('hl'),
-    call(PRACTICE_COPY),
-    pop('bc'),
-    dec('b'),
-    jr('nz', SPEED_FILL_MISSED),
-    // Then the round's own questions, up to its length
-    label(SPEED_FILL_REST),
+    ...ifThen('nz', [
+      ld('b', 'a'),
+      ...doWhile('nz', [
+        push('bc'),
+        push('hl'),
+        call(PRACTICE_PICK),
+        pop('hl'),
+        call(PRACTICE_COPY),
+        pop('bc'),
+        dec('b'),
+      ]),
+    ]),
     ld('a', 'c'),
     sub(speedLength),
-    jr('z', SPEED_FILL_END),
-    cpl(),
-    inc('a'), // A = the round's length - C
-    ld('c', 'a'),
-    ld('de', speedRound),
-    label(SPEED_FILL_OWN),
-    push('bc'),
-    call(QUESTION_COPY),
-    pop('bc'),
-    dec('c'),
-    jr('nz', SPEED_FILL_OWN),
-    label(SPEED_FILL_END),
+    ...ifThen('nz', [
+      cpl(),
+      inc('a'), // A = the round's length - C
+      ld('c', 'a'),
+      ld('de', speedRound),
+      ...doWhile('nz', [push('bc'), call(QUESTION_COPY), pop('bc'), dec('c')]),
+    ]),
     ld(['hl'], 0),
     ret(),
   ];
@@ -293,14 +260,14 @@ export function buildPracticeLoop(): Op[] {
     ...storeByte(MEM.KANA_LIVES, MAX_LIVES),
     call(PRACTICE_RAND),
     ld([MEM.PRACTICE_NEXT], 'a'),
-    label(PRACTICE_LOOP),
-    call(PRACTICE_FILL),
-    ...storeByte(MEM.KANA_MODE, KanaMode.PRACTICE),
-    ld('de', MEM.PRACTICE_BUF.address),
-    call(PLAY_ROUND),
-    ld('a', [MEM.PRACTICE_QUIT]),
-    or('a'),
-    jr('z', PRACTICE_LOOP),
+    ...doWhile('z', [
+      call(PRACTICE_FILL),
+      ...storeByte(MEM.KANA_MODE, KanaMode.PRACTICE),
+      ld('de', MEM.PRACTICE_BUF.address),
+      call(PLAY_ROUND),
+      ld('a', [MEM.PRACTICE_QUIT]),
+      or('a'),
+    ]),
     ...fadeOut(),
     ...screenOff(),
     jp(TITLE_SCREEN),

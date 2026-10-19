@@ -4,9 +4,10 @@
  */
 
 import { MEM } from './ram';
+import { ifThen, repeat } from '../asm/flow';
 import { loadPointer } from '../asm/macros';
-import { add, and, cp, dec, inc, jr, label, ld, pop, push, ret, swap, xor } from '../asm/sm83';
-import { type Op, Label } from '../asm/types';
+import { add, and, cp, inc, label, ld, pop, push, ret, swap, xor } from '../asm/sm83';
+import type { Op } from '../asm/types';
 import type { SceneArt } from './backdrop';
 import { encodeGlyph } from './font';
 import { SCENERY, isProp } from './scenery';
@@ -16,8 +17,6 @@ import { ANIM_TICK } from './labels';
 import { gameModule } from '../asm/program';
 
 // Labels placed in this module
-const ANIM_FRAME_OK = new Label('anim_frame_ok');
-const ANIM_COPY = new Label('anim_copy');
 
 const MAX_FRAMES = 16; // frame offset is computed with SWAP (frame * 16 < 256)
 
@@ -76,9 +75,7 @@ export function buildAnimRoutines(): Op[] {
     ld('a', [MEM.ANIM_FRAME]),
     inc('a'),
     cp('b'),
-    jr('c', ANIM_FRAME_OK),
-    xor('a'),
-    label(ANIM_FRAME_OK),
+    ...ifThen('nc', [xor('a')]),
     ld([MEM.ANIM_FRAME], 'a'),
     swap('a'), // A = frame * 16
     ld('c', 'a'),
@@ -86,18 +83,16 @@ export function buildAnimRoutines(): Op[] {
     add('hl', 'bc'), // HL = frame data
 
     // Copy 16 bytes from [HL] to VRAM at DE
-    ld('b', 16),
-    label(ANIM_COPY),
-    ld('a', ['hl+']),
-    push('hl'),
-    ld('h', 'd'),
-    ld('l', 'e'),
-    ...vramPut(),
-    ld('d', 'h'),
-    ld('e', 'l'),
-    pop('hl'),
-    dec('b'),
-    jr('nz', ANIM_COPY),
+    ...repeat(16, [
+      ld('a', ['hl+']),
+      push('hl'),
+      ld('h', 'd'),
+      ld('l', 'e'),
+      ...vramPut(),
+      ld('d', 'h'),
+      ld('e', 'l'),
+      pop('hl'),
+    ]),
     ret(),
   ];
 }

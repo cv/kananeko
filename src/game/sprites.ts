@@ -3,10 +3,11 @@
  * frame (right after HALT, inside VBlank). Writing the shadow is always safe.
  */
 
+import { repeat } from '../asm/flow';
 import { HW } from '../asm/hardware';
 import { MEM } from './ram';
 import { copyBytes, zeroPages } from '../asm/macros';
-import { call, db, dec, inc, jr, jp, label, ld, ldh } from '../asm/sm83';
+import { call, db, inc, jp, label, ld, ldh } from '../asm/sm83';
 import { type Op, type U16, u16, Label } from '../asm/types';
 import { hi, lo } from '../asm/util';
 import { encodeGlyph, glyphOf } from './font';
@@ -18,7 +19,6 @@ import { gameModule } from '../asm/program';
 import { byte, struct } from '../asm/struct';
 
 // Labels placed in this module
-const SPRITE_COPY_DMA = new Label('sprite_copy_dma');
 const DMA_ROUTINE = new Label('dma_routine');
 const SPRITE_TILES = new Label('sprite_tiles');
 
@@ -70,13 +70,7 @@ export function buildSpriteInit(): Op[] {
     ...copyBytes(MEM.OBJ_TILES, SPRITE_TILES, SPRITE_TILE_BYTES),
     ld('hl', DMA_HRAM),
     ld('de', DMA_ROUTINE),
-    ld('b', DMA_ROUTINE_BYTES.length),
-    label(SPRITE_COPY_DMA),
-    ld('a', ['de']),
-    inc('de'),
-    ld(['hl+'], 'a'),
-    dec('b'),
-    jr('nz', SPRITE_COPY_DMA),
+    ...repeat(DMA_ROUTINE_BYTES.length, [ld('a', ['de']), inc('de'), ld(['hl+'], 'a')]),
 
     ld('a', 0xe4), // DMG: color index → shade, same as the background
     ldh([HW.OBP0], 'a'),

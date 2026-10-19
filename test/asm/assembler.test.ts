@@ -180,6 +180,11 @@ describe('unreferenced labels', () => {
     expect(unreferenced).toEqual(['start', 'after']);
   });
 
+  it('leaves out local labels: a loop with no way out never uses its done', () => {
+    const { unreferenced } = build([label(START), nop(), label(new Label()), jr(START)]);
+    expect(unreferenced).toEqual([]);
+  });
+
   it('counts the VBlank handler as referenced and jumps to it from $0040', () => {
     const { rom, unreferenced } = assemble([nop(), label(TARGET), ret()], {
       ...HEADER,

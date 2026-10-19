@@ -4,6 +4,7 @@
  * Flow: Title screen → Scene 0..4 (dialogue → kana) → End/loop
  */
 
+import { doWhile, ifElse, ifThen, loop } from '../asm/flow';
 import { type AssembleResult, type ROMHeader, assemble } from '../asm/assembler';
 import { HW, JOY } from '../asm/hardware';
 import { BUFFERS, MEM, STACK_TOP, VARIABLES } from './ram';
@@ -136,27 +137,12 @@ import {
 
 // Labels placed in this module
 const TABLE_FIND = routine('table_find', { out: ['c', 'f'], clobbers: ['a', 'b', 'de', 'hl'] });
-const TABLE_SCAN = new Label('table_scan');
-const TABLE_ABSENT = new Label('table_absent');
-const TABLE_FOUND = new Label('table_found');
 const ROUND_CHECK = routine('round_check', { clobbers: ['a', 'bc', 'de', 'hl'] });
 const CHANCE_CHECK = routine('chance_check', { clobbers: ['a', 'bc', 'de', 'hl'] });
-const CHANCE_NOT_BAD = new Label('chance_not_bad');
-const CHANCE_FIND = new Label('chance_find');
 const DRAW_STAMPS = routine('draw_stamps', { clobbers: ['a', 'hl'] });
 const DRAW_START_BOX = routine('draw_start_box', { clobbers: ['a', 'hl'] });
 const TITLE_BLINK = routine('title_blink', { clobbers: ['a', 'b', 'hl'] });
-const TITLE_PROMPT_ON = new Label('title_prompt_on');
-const INIT_NOT_CGB = new Label('init_not_cgb');
-const TITLE_DEBOUNCE = new Label('title_debounce');
-const TITLE_LOOP = new Label('title_loop');
-const TITLE_NEW_GAME = new Label('title_new_game');
-const SCENE_NO_ROUND = new Label('scene_no_round');
-const SCENE_OPEN_NODE = new Label('scene_open_node');
-const SCENE_COMPLETE = new Label('scene_complete');
-const SCENE_LAST_DONE = new Label('scene_last_done');
 const SCENE_DRAW = routine('scene_draw', { clobbers: ['a', 'bc', 'de', 'hl'] });
-const SCENE_CAST_PALETTE = new Label('scene_cast_palette');
 
 export const ROM_HEADER: ROMHeader = {
   title: 'KANANEKO',
@@ -299,29 +285,30 @@ function engineLoop(loop: Label, update: Label, stateAddr: U16): Op[] {
  * - play_round: DE = question list, KANA_MODE set; hides the speaker, plays, sets ROUND_RAN.
  */
 function buildRoundRoutines(): Op[] {
+  const found = new Label('table_found');
   return [
     label(TABLE_FIND),
     push('hl'), // table start, for the offset
     ld('a', ['hl+']),
     ld('b', 'a'), // entries left
     ld('c', 1),
-    label(TABLE_SCAN),
-    ld('a', 'b'),
-    or('a'),
-    jr('z', TABLE_ABSENT),
-    ld('a', ['hl+']),
-    cp('d'),
-    jr('z', TABLE_FOUND),
-    inc('hl'), // skip the offset
-    inc('hl'),
-    sla('c'),
-    dec('b'),
-    jr(TABLE_SCAN),
-    label(TABLE_ABSENT),
+    ...loop((again, done) => [
+      ld('a', 'b'),
+      or('a'),
+      jr('z', done),
+      ld('a', ['hl+']),
+      cp('d'),
+      jr('z', found),
+      inc('hl'), // skip the offset
+      inc('hl'),
+      sla('c'),
+      dec('b'),
+      jr(again),
+    ]),
     pop('hl'),
     xor('a'), // Z
     ret(),
-    label(TABLE_FOUND),
+    label(found),
     ld('a', ['hl+']),
     ld('e', 'a'),
     ld('d', ['hl']), // DE = offset
@@ -352,23 +339,26 @@ function buildRoundRoutines(): Op[] {
     ld('a', [MEM.DLG_PICK]),
     ld('b', 'a'),
     and(BAD_PICK),
-    jr('z', CHANCE_NOT_BAD),
-    ld('a', [MEM.KANA_LIVES]),
-    or('a'),
-    ret('z'), // the conversation is over anyway
-    ld('a', [MEM.DLG_FROM_NODE]),
-    or(REDEEM_KEY),
-    ld('d', 'a'),
-    ld('a', KanaMode.REDEEM),
-    jr(CHANCE_FIND),
-    label(CHANCE_NOT_BAD),
-    ld('a', 'b'),
-    or('a'),
-    ret('nz'), // only the first reply can be a fill-in
-    ld('a', [MEM.DLG_FROM_NODE]),
-    ld('d', 'a'),
-    ld('a', KanaMode.SAY_IT),
-    label(CHANCE_FIND),
+    ...ifElse(
+      'nz',
+      [
+        ld('a', [MEM.KANA_LIVES]),
+        or('a'),
+        ret('z'), // the conversation is over anyway
+        ld('a', [MEM.DLG_FROM_NODE]),
+        or(REDEEM_KEY),
+        ld('d', 'a'),
+        ld('a', KanaMode.REDEEM),
+      ],
+      [
+        ld('a', 'b'),
+        or('a'),
+        ret('nz'), // only the first reply can be a fill-in
+        ld('a', [MEM.DLG_FROM_NODE]),
+        ld('d', 'a'),
+        ld('a', KanaMode.SAY_IT),
+      ],
+    ),
     ld([MEM.KANA_MODE], 'a'),
     ...loadPointer('hl', MEM.CHANCES),
     call(TABLE_FIND),
@@ -517,10 +507,7 @@ function buildTitleBlink(): Op[] {
     ret('nz'),
     ld('a', 'b'),
     and(BLINK_BIT),
-    jr('z', TITLE_PROMPT_ON),
-    ...writeCenteredRow(START_PROMPT_ROW, START_BOX_OFF),
-    ret(),
-    label(TITLE_PROMPT_ON),
+    ...ifThen('nz', [...writeCenteredRow(START_PROMPT_ROW, START_BOX_OFF), ret()]),
     ...writeCenteredRow(START_PROMPT_ROW, START_BOX_ON),
     ret(),
   ];
@@ -538,9 +525,7 @@ function buildBoot(): Op[] {
     // A = $11 at boot on a Game Boy Color (LD doesn't touch the flags CP set)
     cp(0x11),
     ld('a', 0),
-    jr('nz', INIT_NOT_CGB),
-    inc('a'),
-    label(INIT_NOT_CGB),
+    ...ifThen('z', [inc('a')]),
     ld('sp', STACK_TOP),
     // WRAM and HRAM start with random contents on real hardware (and in accurate
     // emulators): zero the buffers' page and every variable, keeping the GBC flag across
@@ -570,6 +555,7 @@ function buildBoot(): Op[] {
 
 /** The game: the title screen, the scenes and their rounds, and the result screens */
 function buildMain(): Op[] {
+  const sceneComplete = new Label('scene_complete');
   return [
     // Enable the VBlank interrupt so HALT wakes once per frame (fades and game loops);
     // its handler counts frames (see buildFrameWait).
@@ -603,31 +589,30 @@ function buildMain(): Op[] {
     ...placeCat(CAT_SPOTS.portrait),
 
     // Wait for all buttons to be released (debounce boot ROM START press)
-    label(TITLE_DEBOUNCE),
-    ...frameWait(),
-    ...runDma(),
-    call(JOY_READ),
-    ld('a', [MEM.JOYPAD_CUR]),
-    cp(0),
-    jr('nz', TITLE_DEBOUNCE),
+    ...doWhile('nz', [
+      ...frameWait(),
+      ...runDma(),
+      call(JOY_READ),
+      ld('a', [MEM.JOYPAD_CUR]),
+      cp(0),
+    ]),
 
     // The menu: はじめる starts a run, つづき takes a password
-    label(TITLE_LOOP),
-    ...frameWait(),
-    ...runDma(),
-    call(JOY_READ),
-    call(CAT_TICK),
-    call(MENU_UPDATE),
-    or('a'),
-    jr('z', TITLE_LOOP),
+    ...doWhile('z', [
+      ...frameWait(),
+      ...runDma(),
+      call(JOY_READ),
+      call(CAT_TICK),
+      call(MENU_UPDATE),
+      or('a'),
+    ]),
     cp(menuPick('はじめる')),
-    jr('z', TITLE_NEW_GAME),
-    ...playSfx('confirm'),
-    cp(menuPick('つづき')),
-    jp('z', PASSWORD_SCREEN),
-    jp(PRACTICE_START),
-
-    label(TITLE_NEW_GAME),
+    ...ifThen('nz', [
+      ...playSfx('confirm'),
+      cp(menuPick('つづき')),
+      jp('z', PASSWORD_SCREEN),
+      jp(PRACTICE_START),
+    ]),
     ...playSfx('start'),
 
     // START pressed — begin a fresh run at scene 0
@@ -659,25 +644,23 @@ function buildMain(): Op[] {
     call(ROUND_CHECK), // a kana round before the next node?
     ld('a', [MEM.ROUND_RAN]),
     or('a'),
-    jr('z', SCENE_NO_ROUND),
-    // Out of lives → game over
-    ld('a', [MEM.KANA_LIVES]),
-    cp(0),
-    jp('z', GAME_OVER_SCREEN.entry),
-    ld('a', [MEM.DLG_NODE_ID]),
-    cp(END_OF_CONVERSATION),
-    jr('z', SCENE_COMPLETE),
-    call(SCENE_DRAW), // back from the round: the conversation resumes
-    jr(SCENE_OPEN_NODE),
-    label(SCENE_NO_ROUND),
-    ld('a', [MEM.DLG_NODE_ID]),
-    cp(END_OF_CONVERSATION),
-    jr('z', SCENE_COMPLETE),
-    label(SCENE_OPEN_NODE),
+    ...ifElse(
+      'nz',
+      [
+        ld('a', [MEM.KANA_LIVES]),
+        cp(0),
+        jp('z', GAME_OVER_SCREEN.entry),
+        ld('a', [MEM.DLG_NODE_ID]),
+        cp(END_OF_CONVERSATION),
+        jr('z', sceneComplete),
+        call(SCENE_DRAW),
+      ],
+      [ld('a', [MEM.DLG_NODE_ID]), cp(END_OF_CONVERSATION), jr('z', sceneComplete)],
+    ),
     call(DLG_OPEN_NODE),
     jp(SCENE_DLG_LOOP),
 
-    label(SCENE_COMPLETE),
+    label(sceneComplete),
     // ==== Scene complete — set completion flag and advance ====
     ...sceneByte('flag'),
     ld('b', 'a'),
@@ -689,12 +672,7 @@ function buildMain(): Op[] {
     inc('a'),
     ld([MEM.SCENE_ID], 'a'),
     cp(SCENES.length),
-    jr('nc', SCENE_LAST_DONE),
-    // More scenes to go: the kana chart, with the password for the next
-    ld('c', 1),
-    call(CHART_SHOW),
-    jp(SCENE_LOAD),
-    label(SCENE_LAST_DONE),
+    ...ifThen('c', [ld('c', 1), call(CHART_SHOW), jp(SCENE_LOAD)]),
 
     // ==== Bonus: the speed round ====
     ...storeByte(MEM.KANA_MODE, KanaMode.SPEED),
@@ -743,11 +721,7 @@ function gameFlow(packedScenes: readonly PackedScene[]): GameModule {
       ...sceneWord('castPalettes'),
       pop('af'),
       ld('b', 'a'),
-      label(SCENE_CAST_PALETTE),
-      ld('a', ['hl+']),
-      ldh([HW.OCPD], 'a'),
-      dec('b'),
-      jr('nz', SCENE_CAST_PALETTE),
+      ...doWhile('nz', [ld('a', ['hl+']), ldh([HW.OCPD], 'a'), dec('b')]),
       ...sceneWord('castTable'),
       ...storePointer('hl', MEM.NPC_TABLE),
       ...storeByte(MEM.NPC_CURRENT, NPC_NONE),
