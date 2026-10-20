@@ -42,7 +42,7 @@ import {
   invoke,
 } from '../asm/sm83';
 import { HW } from '../asm/hardware';
-import { type Op, type U16, s8, u16, Label, routine } from '../asm/types';
+import { type Op, type U16, s8, Label, routine } from '../asm/types';
 import { hi, lo } from '../asm/util';
 import { copyByte, incByte, storeByte, tableEntry, zeroBytes } from '../asm/macros';
 import { requireTile, textToTiles } from './font';
@@ -107,7 +107,7 @@ const rotateLeft2 = (x: number): number => ((x << 2) | (x >> 6)) & 0xff;
  * The check of the scene/hearts byte and the score: every bit of them reaches its
  * 6 bits (x = (hi XOR swap(lo)) + sceneLives; check = x + rotate(x, 2) + bias).
  */
-export function passwordCheck(sceneLives: number, scoreHi: number, scoreLo: number): number {
+function passwordCheck(sceneLives: number, scoreHi: number, scoreLo: number): number {
   const x = ((scoreHi ^ swapNibbles(scoreLo)) + sceneLives) & 0xff;
   return (x + rotateLeft2(x) + CHECK_BIAS) & CHECK_BITS;
 }
@@ -362,7 +362,7 @@ function gridRowTiles(row: number): number[] {
  * password_screen: type a password in, then continue the run it holds. B on an
  * empty password goes back to the title. `fade` is the fade-in's palette label.
  */
-export function buildPasswordScreen(fade: Label): Op[] {
+function buildPasswordScreen(fade: Label): Op[] {
   const moveCursor = new Label('password_move');
   const deleteChar = new Label('password_delete');
   const addChar = new Label('password_add');
@@ -468,7 +468,7 @@ export function buildPasswordScreen(fade: Label): Op[] {
 
     // pass_draw_slots: the kana entered so far, then a dash for each still to come
     label(PASS_DRAW_SLOTS),
-    ld('hl', u16(tilemapAddr(slotsRow, slotsCol))),
+    ld('hl', tilemapAddr(slotsRow, slotsCol)),
     ld('de', MEM.PASS_CHARS.address),
     ld('a', [MEM.PASS_LEN]),
     ld('c', 'a'),

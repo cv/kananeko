@@ -36,9 +36,9 @@ const CAT_PLACE = routine('cat_place', { in: ['b', 'c'], clobbers: ['a', 'bc', '
 export { CAT_FACES, type CatFace };
 
 /** First sprite tile of the cat (NPC tiles sit below it) */
-export const CAT_SPRITE_BASE = 64;
+const CAT_SPRITE_BASE = 64;
 /** GBC OBJ palette of the cat (NPCs use 1..MAX_CAST) */
-export const CAT_OBJ_PALETTE = 7;
+const CAT_OBJ_PALETTE = 7;
 export const CAT_PALETTE: Palette = [PAPER, ...HUES.ginger, INK];
 
 const COLS = 4;
@@ -46,12 +46,12 @@ const ROWS = 3;
 /** First OAM slot of the face row (row 1) */
 const FACE_SLOT = SPRITE_SLOT.cat + COLS;
 /** Frames a reaction shows before the cat goes back to resting */
-export const REACT_FRAMES = 60;
+const REACT_FRAMES = 60;
 /** Blink: every BLINK_PERIOD frames, for BLINK_FRAMES */
 const BLINK_PERIOD = 128;
 const BLINK_FRAMES = 8;
 
-export const FACE: Record<CatFace, number> = Object.fromEntries(
+const FACE: Record<CatFace, number> = Object.fromEntries(
   CAT_FACES.map((face, i) => [face, i]),
 ) as Record<CatFace, number>;
 
@@ -66,7 +66,7 @@ export const CAT_SPOTS = {
 } as const;
 
 /** Sprite tile data: the neutral picture, then each face's middle row */
-export function buildCatTiles(): Uint8Array {
+function buildCatTiles(): Uint8Array {
   const neutral = sliceArt(catArt('neutral'));
   const faceRows = CAT_FACES.flatMap((face) => sliceArt(catArt(face)).slice(COLS, 2 * COLS));
   return Uint8Array.from([...neutral, ...faceRows].flatMap((glyph) => [...encodeGlyph(glyph)]));
@@ -88,7 +88,7 @@ export function catFace(routine: typeof CAT_REACT, face: CatFace): Op[] {
 }
 
 /** At boot: copy the cat's tiles to sprite memory and set its GBC palette */
-export function buildCatInit(): Op[] {
+function buildCatInit(): Op[] {
   return [
     ...copyBlock(u16(MEM.OBJ_TILES + CAT_SPRITE_BASE * 16), CAT_TILES, buildCatTiles().length),
     ld('a', 0x80 | (CAT_OBJ_PALETTE * 8)), // auto-increment from palette 7
@@ -103,11 +103,11 @@ export function buildCatInit(): Op[] {
 }
 
 /** The cat's sprite tiles (copied at boot) */
-export function buildCatData(): Op[] {
+function buildCatData(): Op[] {
   return [label(CAT_TILES), db(buildCatTiles())];
 }
 
-export function buildCatRoutines(): Op[] {
+function buildCatRoutines(): Op[] {
   const setFace = new Label('cat_set_face');
   const showFace = new Label('cat_show_face');
   return [

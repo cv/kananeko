@@ -3,8 +3,8 @@
  * allocator gives each one an address, so no two can overlap by accident. Bytes that
  * two engines share on purpose are declared with `same()`.
  *
- * What a variable is decides what code can do with it: a byte goes to `ld_a_nn` and
- * `storeByte` (and a `byteOf(SomeEnum)` byte only takes that enum's values), a word
+ * What a variable is decides what code can do with it: a byte goes to `ld('a', [X])`,
+ * `storeByte` and `compare` (and a `byteOf(SomeEnum)` byte only takes that enum's values), a word
  * to `loadPointer`/`storePointer` (or its `.lo`/`.hi` bytes), and a buffer to HL
  * (`.address`) or one checked byte at a time (`.at(i)`).
  *

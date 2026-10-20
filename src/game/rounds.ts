@@ -180,7 +180,7 @@ function blankOut(reply: string, question: KanaQuestion): string {
 }
 
 /** A question list found by a one-byte key (see buildQuestionTable) */
-export interface KeyedQuestions {
+interface KeyedQuestions {
   readonly key: number;
   readonly questions: readonly KanaQuestion[];
 }

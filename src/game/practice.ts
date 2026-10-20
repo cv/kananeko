@@ -99,7 +99,7 @@ export function practiceQuestions(): KanaQuestion[] {
   return Array.from(CHART_KANA, (kana) => practiceQuestionFor(kana, phrases));
 }
 
-export function buildPracticeData(): Op[] {
+function buildPracticeData(): Op[] {
   const questions = practiceQuestions();
   const labels = questions.map((_, i) => new Label(`practice_q${String(i)}`));
   return [
@@ -121,7 +121,7 @@ export function buildPracticeData(): Op[] {
  * speed_fill      PRACTICE_BUF = a question per missed kana (up to the speed round's
  *                 length), then the speed round's own questions to fill it, then the end
  */
-export function buildPracticeRoutines(speedRound: Label): Op[] {
+function buildPracticeRoutines(speedRound: Label): Op[] {
   const found = new Label('practice_found');
   const speedLength = SPEED_ROUND.length;
   return [
@@ -255,7 +255,7 @@ export function buildPracticeRoutines(speedRound: Label): Op[] {
 }
 
 /** practice_start: the practice loop, from the title menu; B leads back to the title */
-export function buildPracticeLoop(): Op[] {
+function buildPracticeLoop(): Op[] {
   return [
     label(PRACTICE_START),
     ...zeroBytes(

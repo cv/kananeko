@@ -69,7 +69,7 @@ import {
 // Scene data types
 // ---------------------------------------------------------------------------
 
-export type KanaRound = Quint<KanaQuestion>;
+type KanaRound = Quint<KanaQuestion>;
 
 export interface Scene {
   readonly name: string;
@@ -86,9 +86,9 @@ export interface Scene {
   readonly backdrop: Backdrop;
 }
 
-export type SceneList = readonly [Scene, Scene, Scene, Scene, Scene, Scene];
+type SceneList = readonly [Scene, Scene, Scene, Scene, Scene, Scene];
 
-export function defineScenes<const T extends SceneList>(scenes: T): T {
+function defineScenes<const T extends SceneList>(scenes: T): T {
   return scenes;
 }
 
@@ -273,7 +273,7 @@ export function sceneRounds(scene: Scene): readonly KanaCheckpoint[] {
  * The bonus round before the ending: one more phrase from each scene, none of
  * them asked anywhere else in the game.
  */
-export function planSpeedRound(scenes: readonly Scene[]): KanaQuestion[] {
+function planSpeedRound(scenes: readonly Scene[]): KanaQuestion[] {
   const asked = scenes
     .map(sceneQuiz)
     .flatMap((quiz) => [...quiz.rounds, ...quiz.chances])

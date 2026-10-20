@@ -11,9 +11,9 @@
  * The jumps they make are left to the assembler, which uses JR whenever it reaches.
  */
 
-import { cp_n, dec_r, jp, jp_cc, label, ld_a_nn, ld_r_n, ret, ret_cc } from './ops';
+import { cp, dec, jp, label, ld, ret } from './sm83';
 import type { ByteValue } from './ram';
-import { type CCName, Label, type Op, type U16, u8 } from './types';
+import { type CCName, Label, type Op, type U16 } from './types';
 import { lo } from './util';
 
 /** The condition that holds when `cc` doesn't */
@@ -37,7 +37,7 @@ function exits(ops: readonly Op[]): boolean {
 /** Run `body` only when `cc` holds (after a CP, AND, DEC...); otherwise skip it. */
 export function ifThen(cc: CCName, body: readonly Op[]): Op[] {
   const skip = new Label();
-  return [jp_cc(INVERSE[cc], skip), ...body, label(skip)];
+  return [jp(INVERSE[cc], skip), ...body, label(skip)];
 }
 
 /** Run `then` when `cc` holds and `otherwise` when it doesn't. */
@@ -45,7 +45,7 @@ export function ifElse(cc: CCName, then: readonly Op[], otherwise: readonly Op[]
   const otherwiseLabel = new Label();
   const end = new Label();
   return [
-    jp_cc(INVERSE[cc], otherwiseLabel),
+    jp(INVERSE[cc], otherwiseLabel),
     ...then,
     ...(exits(then) ? [] : [jp(end)]),
     label(otherwiseLabel),
@@ -60,7 +60,7 @@ export function repeat(count: number, body: readonly Op[], reg: 'b' | 'c' | 'd' 
     throw new RangeError(`repeat count must be 1-256, got ${String(count)}`);
   }
   const again = new Label();
-  return [ld_r_n(reg, lo(count)), label(again), ...body, dec_r(reg), jp_cc('nz', again)];
+  return [ld(reg, lo(count)), label(again), ...body, dec(reg), jp('nz', again)];
 }
 
 /** `body` gets a label just after it: jumping to `done` leaves the block. */
@@ -72,7 +72,7 @@ export function block(body: (done: Label) => readonly Op[]): Op[] {
 /** Run `body`, then go round again while `cc` holds. */
 export function doWhile(cc: CCName, body: readonly Op[]): Op[] {
   const again = new Label();
-  return [label(again), ...body, jp_cc(cc, again)];
+  return [label(again), ...body, jp(cc, again)];
 }
 
 /**
@@ -94,7 +94,7 @@ export function loop(body: (again: Label, done: Label) => readonly Op[]): Op[] {
  * compares with values of its own kind.
  */
 export function compare<A extends U16>(variable: A, value: ByteValue<A>): Op[] {
-  return [ld_a_nn(variable), cp_n(u8(value))];
+  return [ld('a', [variable]), cp(value)];
 }
 
 /** Run `body` only when the variable holds `value` (A = the variable). */
@@ -151,11 +151,11 @@ export function dispatch<A extends U16, const E extends Readonly<Record<string, 
   if (tested.length === 0) throw new Error('dispatch needs a case that returns or jumps');
   const falls = tested.length < Object.keys(values).length;
   return [
-    ld_a_nn(variable),
+    ld('a', [variable]),
     ...tested.flatMap(([name, value], i) => {
       const action = cases[name] as Exclude<Case, 'continue'>;
       if (!falls && i === tested.length - 1) return [action === 'ret' ? ret() : jp(action)];
-      return [cp_n(u8(value)), action === 'ret' ? ret_cc('z') : jp_cc('z', action)];
+      return [cp(value), action === 'ret' ? ret('z') : jp('z', action)];
     }),
   ];
 }

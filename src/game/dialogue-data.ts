@@ -21,7 +21,7 @@ import { textToTiles } from './font';
  */
 export type ChoiceRating = 'good' | 'ok' | 'bad';
 
-export interface DialogueChoice<Next extends number | null = number | null> {
+interface DialogueChoice<Next extends number | null = number | null> {
   readonly text: string;
   readonly next: Next; // next node index, null = end conversation
   readonly hint?: string; // what the NPC might say to this reply (not shown yet)
@@ -42,7 +42,7 @@ export const BAD_CHOICE_FLAG = 0x80;
 /** next-node value (without the flag) meaning "end of conversation" */
 export const NEXT_END = 0x7f;
 
-export type DialogueChoices<Next extends number | null = number | null> =
+type DialogueChoices<Next extends number | null = number | null> =
   | readonly []
   | readonly [DialogueChoice<Next>]
   | readonly [DialogueChoice<Next>, DialogueChoice<Next>]

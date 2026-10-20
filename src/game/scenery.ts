@@ -13,7 +13,7 @@
 
 import type { Glyph } from './font-data';
 
-export type Shade = '.' | '-' | '+' | '#';
+type Shade = '.' | '-' | '+' | '#';
 
 export interface Prop {
   /** Pixel art, a multiple of 8 in both directions */

@@ -40,7 +40,7 @@ export function ifHeld(buttons: number, body: readonly Op[]): Op[] {
   return [...held(buttons), ...ifThen('nz', body)];
 }
 
-export function buildReadJoypad(): Op[] {
+function buildReadJoypad(): Op[] {
   return [
     label(JOY_READ),
 

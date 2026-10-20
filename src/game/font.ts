@@ -10,7 +10,7 @@ import { ALL_GLYPHS, CAT_TILES, type Glyph } from './font-data';
 type TileTuple<T extends readonly string[]> = { [K in keyof T]: TileIndex };
 
 /** Glyph pixel characters → palette color index (0 = paper ... 3 = ink) */
-export const SHADES: Readonly<Record<string, number>> = { '.': 0, '-': 1, '+': 2, '#': 3 };
+const SHADES: Readonly<Record<string, number>> = { '.': 0, '-': 1, '+': 2, '#': 3 };
 
 /** Encode an 8x8 glyph as a 2bpp Game Boy tile (16 bytes: low plane, high plane per row). */
 export function encodeGlyph(glyph: Glyph): Uint8Array {
@@ -31,7 +31,7 @@ export function encodeGlyph(glyph: Glyph): Uint8Array {
 }
 
 /** Whether a glyph uses only paper and ink, so it can be stored at 1 bit per pixel */
-export function isOneBit(glyph: readonly string[]): boolean {
+function isOneBit(glyph: readonly string[]): boolean {
   return glyph.every((row) => /^[.#]*$/u.test(row));
 }
 

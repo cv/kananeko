@@ -53,7 +53,7 @@ import {
   sub,
   invoke,
 } from '../asm/sm83';
-import { type Op, type TileIndex, u16, Label, routine } from '../asm/types';
+import { type Op, type TileIndex, Label, routine } from '../asm/types';
 import { at } from '../asm/util';
 import type { NonEmpty, Quad, Triple, TupleIndex } from './fixed';
 import { requireTile, requireTiles, textToTiles } from './font';
@@ -257,12 +257,12 @@ function buildRoundFrame(): Op[] {
   const { top, left, innerWidth } = WORD_BOX;
   const right = left + innerWidth + 1;
   const tileAt = (pos: TilePosition, tile: number): Op[] => [
-    ld('hl', u16(tilemapAddr(pos))),
+    ld('hl', tilemapAddr(pos)),
     ld('a', tile),
     ld(['hl+'], 'a'),
   ];
   const horizontal = (row: number, l: string, edge: string, r: string): Op[] => [
-    ld('hl', u16(tilemapAddr(row, left))),
+    ld('hl', tilemapAddr(row, left)),
     ld('a', requireTile(l)),
     ld(['hl+'], 'a'),
     ...invoke(FILL_TILES, { a: requireTile(edge), b: innerWidth, hl: 'hl' }),
@@ -357,7 +357,7 @@ function readDirection(gotAnswer: Label): Op[] {
   ];
 }
 
-export function buildKanaEngine(): Op[] {
+function buildKanaEngine(): Op[] {
   const chanceMiss = new Label('kana_chance_miss');
   const noScore = new Label('kana_score_none');
   const correctDone = new Label('kana_correct_done');
@@ -427,7 +427,7 @@ export function buildKanaEngine(): Op[] {
     ld('a', WORD_BOX.innerWidth),
     sub('c'),
     srl('a'),
-    ld('hl', u16(WORD_INNER_ADDR)),
+    ld('hl', WORD_INNER_ADDR),
     ...addAToHL(),
     ...storePointer('hl', MEM.KANA_BLANK), // word start, for now
 
@@ -476,7 +476,7 @@ export function buildKanaEngine(): Op[] {
 
     // kana_draw_clock — show the seconds left (LCD on)
     label(KANA_DRAW_CLOCK),
-    ld('hl', u16(tilemapAddr(CLOCK_POSITION))),
+    ld('hl', tilemapAddr(CLOCK_POSITION)),
     ld('a', [MEM.KANA_CLOCK_SECS]),
     add(requireTile('0')),
     ...vramPut(),

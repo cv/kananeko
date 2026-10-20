@@ -15,7 +15,7 @@
 
 import { playSfx } from './sound';
 import { compare, ifNotEquals, ifThen, loop } from '../asm/flow';
-import { type Op, type TileIndex, type U16, u16, Label, routine } from '../asm/types';
+import { type Op, type TileIndex, type U16, Label, routine } from '../asm/types';
 import {
   adc,
   add,
@@ -85,9 +85,9 @@ const DELTA_TYPES = [
   DELTA_MINUS_100,
 ] as const;
 
-export type DeltaType = (typeof DELTA_TYPES)[number];
+type DeltaType = (typeof DELTA_TYPES)[number];
 
-export type ScoreDelta = 5 | 10 | 50 | 100;
+type ScoreDelta = 5 | 10 | 50 | 100;
 
 type HudTileExpr = TileIndex | 'from_a';
 type HudTileRun = Quad<TileIndex>;
@@ -175,7 +175,7 @@ export function buildScoreDigits(): Op[] {
 /** Draw the digit tiles computed by score_digits at (row, col); safe with the LCD on. */
 export function buildDrawScoreDigits(row: number, col: number): Op[] {
   return [
-    ld('hl', u16(tilemapAddr(row, col))),
+    ld('hl', tilemapAddr(row, col)),
     ...Array.from({ length: SCORE_DIGIT_COUNT }, (_, i) => [
       ld('a', [scoreDigitAddr(i)]),
       ...vramPut(),
@@ -271,7 +271,7 @@ export function buildDrawTileAt(
     throw new TypeError('buildDrawTileAt(row, col, tile) requires a tile expression');
   }
 
-  const ops: Op[] = [ld('hl', u16(position))];
+  const ops: Op[] = [ld('hl', position)];
   if (tileExpr !== 'from_a') {
     ops.push(ld('a', tileExpr));
   }
@@ -292,7 +292,7 @@ function buildDrawTilesAt(row: number, startCol: number, tiles: readonly HudTile
  *   kana_draw_hud — full redraw (hearts + score + delta). VRAM must be accessible.
  *   hud_update    — waits for VBlank, then calls kana_draw_hud. Safe from game loops.
  */
-export function buildDrawHudOps(): Op[] {
+function buildDrawHudOps(): Op[] {
   return [
     // === hud_update: called once per frame from the game loops ===
     // Ticks the delta flash, then redraws only if what the HUD shows changed.

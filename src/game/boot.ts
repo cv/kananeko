@@ -16,14 +16,14 @@ import { END_OF_CONVERSATION } from './state';
 // at tile 128, where $8800 addressing moves from $9000 to $8800
 // ---------------------------------------------------------------------------
 
-export interface FontSegment {
+interface FontSegment {
   readonly label: Label;
   readonly first: number;
   readonly oneBit: boolean;
   readonly data: Uint8Array;
 }
 
-export const FONT_SEGMENTS: readonly FontSegment[] = ((): FontSegment[] => {
+const FONT_SEGMENTS: readonly FontSegment[] = ((): FontSegment[] => {
   const { oneBit, twoBit } = buildPackedTileData();
   const total = TILE_COUNT + 1;
   const split = 128;

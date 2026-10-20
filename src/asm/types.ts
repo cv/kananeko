@@ -44,7 +44,7 @@ export function u8(n: number): U8 {
   return n as U8;
 }
 
-/** A signed byte (-128 to 127) in two's complement, e.g. `add_n(s8(-1))` subtracts 1 */
+/** A signed byte (-128 to 127) in two's complement, e.g. `add(s8(-1))` subtracts 1 */
 export function s8(n: number): U8 {
   if (!isIntIn(n, -0x80, 0x7f)) {
     throw new RangeError(`s8 out of range: ${String(n)}`);
@@ -244,7 +244,7 @@ export type Op =
   | InstOp
   /**
    * A jump to a label the assembler encodes as `short` (JR) when the target is in
-   * range and as `long` (JP) otherwise: see jp() and jp_cc()
+   * range and as `long` (JP) otherwise: see jp() in sm83.ts
    */
   | { readonly kind: 'jump'; readonly target: Label; readonly short: InstOp; readonly long: InstOp }
   | { readonly kind: 'label'; readonly label: Label }

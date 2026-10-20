@@ -28,7 +28,7 @@ export const NPC_TILE_BASE = 1;
 export const MAX_CAST = 6;
 
 /** Default stage: right of the cat, feet on the dialogue box's top edge */
-export const DEFAULT_STAGE = { x: 56, y: 56 } as const;
+const DEFAULT_STAGE = { x: 56, y: 56 } as const;
 /** NPC_TIMER bit that toggles the 1-pixel idle bob (upwards, off the box border) */
 const BOB_BIT = 0x10;
 
@@ -73,7 +73,7 @@ export function packCast(cast: SceneCast): PackedCast {
 }
 
 /** Subroutines npc_select (show the speaker for DLG_NODE_ID), npc_update (bob), npc_hide. */
-export function buildNpcRoutines(): Op[] {
+function buildNpcRoutines(): Op[] {
   const field = (i: number, f: 'y' | 'x' | 'tile' | 'attr'): ReturnType<typeof oamField> =>
     oamField(SPRITE_SLOT.npc + i, f);
   return [

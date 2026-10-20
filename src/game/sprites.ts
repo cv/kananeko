@@ -64,7 +64,7 @@ export const DMA_ROUTINE_BYTES = [
 const OBJ_PALETTE: Palette = [PAPER, ...HUES.sakura, INK];
 
 /** Clear the shadow OAM, install the DMA routine, and set sprite palettes. */
-export function buildSpriteInit(): Op[] {
+function buildSpriteInit(): Op[] {
   return [
     ...zeroPages(SHADOW_OAM, 1),
     ...copyBytes(MEM.OBJ_TILES, SPRITE_TILES, SPRITE_TILE_BYTES),
@@ -86,7 +86,7 @@ export function buildSpriteInit(): Op[] {
 }
 
 /** The DMA routine's bytes, copied to HRAM at boot, and the sprite tiles */
-export function buildSpriteData(): Op[] {
+function buildSpriteData(): Op[] {
   const tiles = SPRITE_GLYPHS.flatMap((ch) => Array.from(encodeGlyph(glyphOf(ch))));
   return [label(DMA_ROUTINE), db([...DMA_ROUTINE_BYTES]), label(SPRITE_TILES), db(tiles)];
 }
@@ -94,7 +94,7 @@ export function buildSpriteData(): Op[] {
 const SPRITE_TILE_BYTES = SPRITE_GLYPHS.length * 16;
 
 /** Subroutine sprites_off: take every sprite off screen (before a fade or screen change) */
-export function buildSpriteRoutines(): Op[] {
+function buildSpriteRoutines(): Op[] {
   return [label(SPRITES_OFF), ...zeroPages(SHADOW_OAM, 1), jp(OAM_DMA)];
 }
 

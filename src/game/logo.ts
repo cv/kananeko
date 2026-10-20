@@ -34,7 +34,7 @@ export function logoArt(glyph: Glyph): string[] {
   );
 }
 
-export interface Logo {
+interface Logo {
   readonly glyphs: Record<string, Glyph>;
   /** Two rows of characters: top halves, then bottom halves */
   readonly rows: readonly [string, string];

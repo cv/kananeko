@@ -37,7 +37,7 @@ import {
   xor,
   invoke,
 } from '../asm/sm83';
-import { type Op, u16, Label, Pooled, routine } from '../asm/types';
+import { type Op, Label, Pooled, routine } from '../asm/types';
 import type { Quad } from './fixed';
 import { SCREEN_COLS, centerStartCol, tilemapAddr, tileRow } from './tilemap';
 import {
@@ -76,7 +76,7 @@ export const PAL = { ui: 0, hud: 1 } as const;
  * The background uses $8800 tile addressing (LCDC bit 4 clear): BG tiles 0-127 live at
  * $9000 and 128-255 at $8800, which leaves $8000-$87FF to sprites alone.
  */
-export const SCREEN_ON_FLAGS = LCDC.LCD_ON | LCDC.BG_ON | LCDC.OBJ_ON;
+const SCREEN_ON_FLAGS = LCDC.LCD_ON | LCDC.BG_ON | LCDC.OBJ_ON;
 
 /** VRAM address of a background tile's pixel data */
 export function bgTileAddr(index: number): number {
@@ -89,7 +89,7 @@ export function screenOff(): Op[] {
 }
 
 /** Turn the LCD on with the game's standard flags. */
-export function screenOn(): Op[] {
+function screenOn(): Op[] {
   return [
     ...lcdOn(SCREEN_ON_FLAGS),
     // The time spent with the screen off isn't a missed frame (see frame_wait)
@@ -190,7 +190,7 @@ export function tileList(tiles: readonly number[]): Pooled {
  *               on (each write goes through vram_put)
  *   fill_tiles  HL = tilemap address, A = tile, B = count; LCD off
  */
-export function buildDrawTiles(): Op[] {
+function buildDrawTiles(): Op[] {
   return [
     label(DRAW_TILES),
     ld('a', ['de']),
@@ -211,7 +211,7 @@ export function buildDrawTiles(): Op[] {
 /** Draw tiles at a tilemap address from a shared tile list (safe with the LCD on) */
 export function drawTiles(address: number, tiles: readonly number[]): Op[] {
   // draw_tiles walks the list with DE: save the caller's
-  return [push('de'), ...invoke(DRAW_TILES, { hl: u16(address), de: tileList(tiles) }), pop('de')];
+  return [push('de'), ...invoke(DRAW_TILES, { hl: address, de: tileList(tiles) }), pop('de')];
 }
 
 /** Write a row of tiles horizontally centered on the visible screen (safe with the LCD on) */
@@ -258,7 +258,7 @@ export function fillAttributes(
   palette: number,
 ): Op[] {
   return Array.from({ length: rows }, (_, r) => [
-    ld('hl', u16(tilemapAddr(row + r, col))),
+    ld('hl', tilemapAddr(row + r, col)),
     ld('a', palette),
     ...Array.from({ length: cols }, () => ld(['hl+'], 'a')),
   ]).flat();
@@ -272,7 +272,7 @@ const HUD_ROW = 0;
  * Subroutine clear_screen: blank the BG tilemap and, on GBC, reset every cell to
  * palette 0 except the HUD ribbon (top row, palette 1). LCD must be off.
  */
-export function buildClearScreen(): Op[] {
+function buildClearScreen(): Op[] {
   return [
     label(CLEAR_SCREEN),
     ...zeroPages(MEM.VRAM_MAP0, 4),
@@ -310,7 +310,7 @@ export function encodeRuns(palettes: readonly number[]): Uint8Array {
  * Subroutine draw_runs: DE = runs (see encodeRuns), HL = first cell. Writes rows of
  * SCREEN_COLS cells, LCD off: backdrop tiles, or (inside cgbAttributes) their palettes.
  */
-export function buildDrawRuns(): Op[] {
+function buildDrawRuns(): Op[] {
   return [
     label(DRAW_RUNS),
     ld('c', SCREEN_COLS),
@@ -373,7 +373,7 @@ export function fadeOut(): Op[] {
 const SHARED_PALETTE_COUNT = 2;
 
 /** Subroutines palette_put, fade_apply, fade_palettes, fade_wait, fade_in(_current), fade_out. */
-export function buildFadeRoutines(): Op[] {
+function buildFadeRoutines(): Op[] {
   return [
     // palette_put: write A to BCPD once palette RAM is accessible (preserves A)
     label(PALETTE_PUT),
@@ -477,7 +477,7 @@ export function buildFadeRoutines(): Op[] {
 }
 
 /** Data used by the fade routines */
-export function buildFadeData(): Op[] {
+function buildFadeData(): Op[] {
   return [label(FADE_BGP), db([...FADE_BGP_SHADES])];
 }
 

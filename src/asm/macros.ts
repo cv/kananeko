@@ -1,38 +1,14 @@
 /**
- * Reusable instruction sequences (macros) built on top of the raw opcodes.
+ * Reusable instruction sequences (macros), written with the instructions in sm83.ts.
  *
  * Macros that branch use local labels (`new Label()`), which the assembler names
  * after the named label before them, so they need no names of their own.
  */
 
+import { add, cp, dec, inc, jp, jr, label, ld, ldh, or, ret, xor } from './sm83';
 import { HW } from './hardware';
-import {
-  add_hl_rr,
-  add_r,
-  cp_n,
-  dec_r,
-  dec_rr,
-  inc_r,
-  inc_rr,
-  jp,
-  jp_cc,
-  jr_cc,
-  label,
-  ld_a_de,
-  ld_a_nn,
-  ld_nn_a,
-  ld_r_n,
-  ld_r_r,
-  ld_rr_nn,
-  ldh_a_n,
-  ldh_n_a,
-  ldi_hl_a,
-  or_r,
-  ret_cc,
-  xor_r,
-} from './ops';
 import type { ByteValue, WordVar } from './ram';
-import { Label, type Op, type Target, type U16, u8, u16 } from './types';
+import { Label, type Op, type Target, type U16 } from './types';
 import { lo } from './util';
 
 /** First scanline of the vertical blank period. */
@@ -41,42 +17,42 @@ const VBLANK_LINE = 144;
 /** Busy-wait until the LCD reaches VBlank (LY == 144). */
 export function waitVBlank(): Op[] {
   const loop = new Label();
-  return [label(loop), ldh_a_n(HW.LY), cp_n(u8(VBLANK_LINE)), jr_cc('nz', loop)];
+  return [label(loop), ldh('a', [HW.LY]), cp(VBLANK_LINE), jr('nz', loop)];
 }
 
 /** Wait for VBlank, then switch the LCD off so VRAM can be written freely. */
 export function lcdOff(): Op[] {
-  return [...waitVBlank(), xor_r('a'), ldh_n_a(HW.LCDC)];
+  return [...waitVBlank(), xor('a'), ldh([HW.LCDC], 'a')];
 }
 
 /** Switch the LCD on with the given LCDC flags. */
 export function lcdOn(flags: number): Op[] {
-  return [ld_r_n('a', u8(flags)), ldh_n_a(HW.LCDC)];
+  return [ld('a', flags), ldh([HW.LCDC], 'a')];
 }
 
 /** Store an immediate byte to memory (clobbers A). */
 export function storeByte<A extends U16>(addr: A, value: ByteValue<A>): Op[] {
-  return [ld_r_n('a', u8(value)), ld_nn_a(addr)];
+  return [ld('a', value), ld([addr], 'a')];
 }
 
 /** Zero a list of memory bytes (clobbers A). */
 export function zeroBytes(...addrs: U16[]): Op[] {
-  return [xor_r('a'), ...addrs.map((addr) => ld_nn_a(addr))];
+  return [xor('a'), ...addrs.map((addr) => ld([addr], 'a'))];
 }
 
 /** Add 1 to a byte in memory: A = the new value, Z set if it wrapped to 0. */
 export function incByte(addr: U16): Op[] {
-  return [ld_a_nn(addr), inc_r('a'), ld_nn_a(addr)];
+  return [ld('a', [addr]), inc('a'), ld([addr], 'a')];
 }
 
 /** Take 1 from a byte in memory: A = the new value, Z set if it reached 0. */
 export function decByte(addr: U16): Op[] {
-  return [ld_a_nn(addr), dec_r('a'), ld_nn_a(addr)];
+  return [ld('a', [addr]), dec('a'), ld([addr], 'a')];
 }
 
 /** Decrement a memory counter and return from the subroutine while it is still non-zero. */
 export function countDownOrReturn(addr: U16): Op[] {
-  return [...decByte(addr), ret_cc('nz')];
+  return [...decByte(addr), ret('nz')];
 }
 
 /**
@@ -87,12 +63,12 @@ export function copyByte<D extends U16, S extends U16>(
   dst: D,
   src: S & (ByteValue<S> extends ByteValue<D> ? unknown : never),
 ): Op[] {
-  return [ld_a_nn(src), ld_nn_a(dst)];
+  return [ld('a', [src]), ld([dst], 'a')];
 }
 
 /** Copy a word variable (A = its high byte). */
 export function copyWord(dst: WordVar, src: WordVar): Op[] {
-  return [ld_a_nn(src.lo), ld_nn_a(dst.lo), ld_a_nn(src.hi), ld_nn_a(dst.hi)];
+  return [ld('a', [src.lo]), ld([dst.lo], 'a'), ld('a', [src.hi]), ld([dst.hi], 'a')];
 }
 
 /**
@@ -101,17 +77,17 @@ export function copyWord(dst: WordVar, src: WordVar): Op[] {
  */
 export function tableEntry(table: U16 | Target, stride: 1 | 2 | 4 | 8 = 1): Op[] {
   return [
-    ...Array.from({ length: Math.log2(stride) }, () => add_r('a')),
-    ld_r_r('e', 'a'),
-    ld_r_n('d', u8(0)),
-    ld_rr_nn('hl', table),
-    add_hl_rr('de'),
+    ...Array.from({ length: Math.log2(stride) }, () => add('a')),
+    ld('e', 'a'),
+    ld('d', 0),
+    ld('hl', table),
+    add('hl', 'de'),
   ];
 }
 
 /** HL += A. Clobbers DE. */
 export function addAToHl(): Op[] {
-  return [ld_r_r('e', 'a'), ld_r_n('d', u8(0)), add_hl_rr('de')];
+  return [ld('e', 'a'), ld('d', 0), add('hl', 'de')];
 }
 
 // ---------------------------------------------------------------------------
@@ -129,13 +105,13 @@ const PAIR_HALVES = {
 /** Load a register pair from a lo/hi byte pair in memory (clobbers A). */
 export function loadPointer(rr: PointerPair, src: WordVar): Op[] {
   const { low, high } = PAIR_HALVES[rr];
-  return [ld_a_nn(src.lo), ld_r_r(low, 'a'), ld_a_nn(src.hi), ld_r_r(high, 'a')];
+  return [ld('a', [src.lo]), ld(low, 'a'), ld('a', [src.hi]), ld(high, 'a')];
 }
 
 /** Store a register pair into a word variable (clobbers A). */
 export function storePointer(rr: PointerPair, dst: WordVar): Op[] {
   const { low, high } = PAIR_HALVES[rr];
-  return [ld_r_r('a', low), ld_nn_a(dst.lo), ld_r_r('a', high), ld_nn_a(dst.hi)];
+  return [ld('a', low), ld([dst.lo], 'a'), ld('a', high), ld([dst.hi], 'a')];
 }
 
 // ---------------------------------------------------------------------------
@@ -155,13 +131,13 @@ export function zeroBlock(dst: U16, count: number): Op[] {
     throw new RangeError(`zeroBlock count must be 1-256, got ${String(count)}`);
   const loop = new Label();
   return [
-    ld_rr_nn('hl', dst),
-    xor_r('a'),
-    ld_r_n('b', lo(count)), // 256 wraps
+    ld('hl', dst),
+    xor('a'),
+    ld('b', lo(count)), // 256 wraps
     label(loop),
-    ldi_hl_a(),
-    dec_r('b'),
-    jr_cc('nz', loop),
+    ld(['hl+'], 'a'),
+    dec('b'),
+    jr('nz', loop),
   ];
 }
 
@@ -170,16 +146,16 @@ export function zeroPages(dst: U16, pages: number): Op[] {
   checkPages('zeroPages', pages);
   const loop = new Label();
   return [
-    ld_rr_nn('hl', dst),
-    xor_r('a'),
-    ld_r_n('b', u8(pages)),
-    ld_r_n('c', u8(0)),
+    ld('hl', dst),
+    xor('a'),
+    ld('b', pages),
+    ld('c', 0),
     label(loop),
-    ldi_hl_a(),
-    dec_r('c'),
-    jr_cc('nz', loop),
-    dec_r('b'),
-    jr_cc('nz', loop),
+    ld(['hl+'], 'a'),
+    dec('c'),
+    jr('nz', loop),
+    dec('b'),
+    jr('nz', loop),
   ];
 }
 
@@ -189,15 +165,15 @@ export function copyBytes(dst: U16, src: U16 | Target, count: number): Op[] {
     throw new RangeError(`copyBytes count must be 1-256, got ${String(count)}`);
   const loop = new Label();
   return [
-    ld_rr_nn('hl', dst),
-    ld_rr_nn('de', src),
-    ld_r_n('b', lo(count)), // 256 wraps to 0, which DEC/JR NZ treats as 256
+    ld('hl', dst),
+    ld('de', src),
+    ld('b', lo(count)), // 256 wraps to 0, which DEC/JR NZ treats as 256
     label(loop),
-    ld_a_de(),
-    ldi_hl_a(),
-    inc_rr('de'),
-    dec_r('b'),
-    jr_cc('nz', loop),
+    ld('a', ['de']),
+    ld(['hl+'], 'a'),
+    inc('de'),
+    dec('b'),
+    jr('nz', loop),
   ];
 }
 
@@ -207,17 +183,17 @@ export function copyBlock(dst: U16, src: U16 | Target, count: number): Op[] {
     throw new RangeError(`copyBlock count must be 1-65535, got ${String(count)}`);
   const loop = new Label();
   return [
-    ld_rr_nn('hl', dst),
-    ld_rr_nn('de', src),
-    ld_rr_nn('bc', u16(count)),
+    ld('hl', dst),
+    ld('de', src),
+    ld('bc', count),
     label(loop),
-    ld_a_de(),
-    ldi_hl_a(),
-    inc_rr('de'),
-    dec_rr('bc'),
-    ld_r_r('a', 'b'),
-    or_r('c'),
-    jr_cc('nz', loop),
+    ld('a', ['de']),
+    ld(['hl+'], 'a'),
+    inc('de'),
+    dec('bc'),
+    ld('a', 'b'),
+    or('c'),
+    jr('nz', loop),
   ];
 }
 
@@ -230,18 +206,18 @@ export function expandOneBit(dst: U16, src: U16 | Target, count: number): Op[] {
     throw new RangeError(`expandOneBit count must be 1-65535, got ${String(count)}`);
   const loop = new Label();
   return [
-    ld_rr_nn('hl', dst),
-    ld_rr_nn('de', src),
-    ld_rr_nn('bc', u16(count)),
+    ld('hl', dst),
+    ld('de', src),
+    ld('bc', count),
     label(loop),
-    ld_a_de(),
-    inc_rr('de'),
-    ldi_hl_a(),
-    ldi_hl_a(),
-    dec_rr('bc'),
-    ld_r_r('a', 'b'),
-    or_r('c'),
-    jr_cc('nz', loop),
+    ld('a', ['de']),
+    inc('de'),
+    ld(['hl+'], 'a'),
+    ld(['hl+'], 'a'),
+    dec('bc'),
+    ld('a', 'b'),
+    or('c'),
+    jr('nz', loop),
   ];
 }
 
@@ -250,18 +226,18 @@ export function copyPages(dst: U16, src: U16 | Target, pages: number): Op[] {
   checkPages('copyPages', pages);
   const loop = new Label();
   return [
-    ld_rr_nn('hl', dst),
-    ld_rr_nn('de', src),
-    ld_r_n('b', u8(pages)),
-    ld_r_n('c', u8(0)),
+    ld('hl', dst),
+    ld('de', src),
+    ld('b', pages),
+    ld('c', 0),
     label(loop),
-    ld_a_de(),
-    ldi_hl_a(),
-    inc_rr('de'),
-    dec_r('c'),
-    jr_cc('nz', loop),
-    dec_r('b'),
-    jr_cc('nz', loop),
+    ld('a', ['de']),
+    ld(['hl+'], 'a'),
+    inc('de'),
+    dec('c'),
+    jr('nz', loop),
+    dec('b'),
+    jr('nz', loop),
   ];
 }
 
@@ -284,7 +260,7 @@ export interface SwitchOptions {
  * falling through to the last case when none of the others match.
  */
 export function switchCases(cases: readonly (readonly Op[])[], options: SwitchOptions = {}): Op[] {
-  const { compare = (i): Op[] => [cp_n(u8(i))], exit = 'jump' } = options;
+  const { compare = (i): Op[] => [cp(i)], exit = 'jump' } = options;
   const done = new Label();
   const ops: Op[] = [];
 
@@ -296,7 +272,7 @@ export function switchCases(cases: readonly (readonly Op[])[], options: SwitchOp
     }
     const next = new Label();
     // The assembler makes these JRs when the case is short enough
-    ops.push(...compare(i), jp_cc('nz', next), ...body);
+    ops.push(...compare(i), jp('nz', next), ...body);
     if (exit !== 'none') ops.push(jp(done));
     ops.push(label(next));
   });

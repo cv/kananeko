@@ -23,7 +23,7 @@ const MENU_CURSOR = new Label('menu_cursor');
 /** The menu's items, in order; menu_update returns an item's index + 1 when it's picked */
 export const TITLE_MENU = ['はじめる', 'つづき', 'れんしゅう'] as const;
 
-export type MenuItem = (typeof TITLE_MENU)[number];
+type MenuItem = (typeof TITLE_MENU)[number];
 
 /** The value menu_update returns when `item` is picked */
 export function menuPick(item: MenuItem): number {
@@ -46,7 +46,7 @@ function itemRow(item: string): number[] {
  * menu_draw    draw the box and its items, highlighting the first (LCD off)
  * menu_update  move the cursor on the d-pad; A = the picked item's index + 1, or 0
  */
-export function buildMenuRoutines(): Op[] {
+function buildMenuRoutines(): Op[] {
   const noInput = new Label('menu_none');
   const bottom = MENU_TOP_ROW + TITLE_MENU.length + 1;
   return [

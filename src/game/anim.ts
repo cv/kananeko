@@ -51,7 +51,7 @@ export function packAnimation(animation: TileAnimation | undefined, art: SceneAr
 }
 
 /** Subroutine anim_tick: advance the scene's tile animation (call once per frame, LCD on). */
-export function buildAnimRoutines(): Op[] {
+function buildAnimRoutines(): Op[] {
   return [
     label(ANIM_TICK),
     ...loadPointer('hl', MEM.ANIM),

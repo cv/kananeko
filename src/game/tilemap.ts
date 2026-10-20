@@ -2,14 +2,14 @@ declare const __tileRow: unique symbol;
 declare const __tileCol: unique symbol;
 declare const __tilemapAddr: unique symbol;
 
-export const BG_MAP_BASE = 0x9800;
-export const MAP_ROWS = 32;
-export const MAP_COLS = 32;
+const BG_MAP_BASE = 0x9800;
+const MAP_ROWS = 32;
+const MAP_COLS = 32;
 export const SCREEN_COLS = 20;
 
-export type TileRow = number & { readonly [__tileRow]: true };
-export type TileCol = number & { readonly [__tileCol]: true };
-export type TilemapAddress = number & { readonly [__tilemapAddr]: true };
+type TileRow = number & { readonly [__tileRow]: true };
+type TileCol = number & { readonly [__tileCol]: true };
+type TilemapAddress = number & { readonly [__tilemapAddr]: true };
 
 export interface TilePosition {
   readonly row: TileRow;

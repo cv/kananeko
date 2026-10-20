@@ -45,7 +45,7 @@ export function artChar(codepoint: number): string {
   return String.fromCodePoint(codepoint);
 }
 
-export interface ArtVariant {
+interface ArtVariant {
   /** Glyphs for tiles that differ from the base art, keyed by their characters */
   readonly glyphs: Record<string, Glyph>;
   /** Character for every tile of the variant, row-major (base characters where unchanged) */

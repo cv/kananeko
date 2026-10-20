@@ -47,9 +47,9 @@ export const SCENE_ENTRY = struct('scene entry', {
 });
 
 type SceneFields = typeof SCENE_ENTRY.fields;
-export type SceneWord = FieldsOf<SceneFields, 'word'>;
-export type SceneByte = FieldsOf<SceneFields, 'byte'>;
-export type SceneEntry = RecordOf<SceneFields>;
+type SceneWord = FieldsOf<SceneFields, 'word'>;
+type SceneByte = FieldsOf<SceneFields, 'byte'>;
+type SceneEntry = RecordOf<SceneFields>;
 
 /** The table: scene_table lists each entry's address; entries follow */
 export function buildSceneTable(entries: readonly SceneEntry[]): Op[] {
@@ -68,7 +68,7 @@ export function buildSceneTable(entries: readonly SceneEntry[]): Op[] {
  *   scene_byte  A = field offset → A = the field's byte (clobbers DE, HL)
  *   copy_block  copy BC (> 0) bytes from DE to HL (clobbers A, BC, DE, HL)
  */
-export function buildSceneTableRoutines(): Op[] {
+function buildSceneTableRoutines(): Op[] {
   return [
     label(SCENE_DESC),
     ld('a', [MEM.SCENE_ID]),

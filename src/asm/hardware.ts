@@ -1,7 +1,7 @@
 import { ioReg, u16, type IoRegOffset, type U16 } from './types';
 
 // SM83 / Game Boy hardware register addresses (offset from $FF00)
-// Use with ldh instructions: ldh_n_a(HW.LCDC) stores A into $FF40
+// Use with ldh instructions: ldh([HW.LCDC], 'a') stores A into $FF40
 
 export const HW = {
   // LCD

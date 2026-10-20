@@ -33,7 +33,7 @@ import {
 } from './video';
 import { storeByte, zeroBytes } from '../asm/macros';
 import { and, call, jp, jr, label, ld, ret, invoke, db } from '../asm/sm83';
-import { type Op, u16, Label, labelFamily, routine } from '../asm/types';
+import { type Op, Label, labelFamily, routine } from '../asm/types';
 import { requireTiles, textToTiles } from './font';
 import { centerStartCol, tilemapAddr } from './tilemap';
 import { SCENES } from './scene';
@@ -47,7 +47,7 @@ const ENDING_TITLE = 'おめでとう!';
 const ENDING_SCORE_LABEL = 'とくてん ';
 const ENDING_ROWS = { cat: 2, title: 6, stamps: 8, score: 10, password: 16 } as const;
 
-export interface ResultScreen {
+interface ResultScreen {
   /** Where the game jumps to; its name prefixes the screen's internal labels */
   readonly entry: Label;
   /** The cat's face here (a neutral cat blinks) */
@@ -77,9 +77,7 @@ export const GAME_OVER_SCREEN: ResultScreen = {
   colors: GAME_OVER_COLORS,
 };
 
-export const resultFadeLabel = labelFamily(
-  (screen: ResultScreen) => `${screen.entry.toString()}_fade`,
-);
+const resultFadeLabel = labelFamily((screen: ResultScreen) => `${screen.entry.toString()}_fade`);
 
 /** Width of the stamp row: each scene icon is 2 tiles, one blank tile apart */
 const STAMP_ROW_WIDTH = SCENES.length * 3 - 1;
@@ -93,7 +91,7 @@ function drawClearedStamps(row: number): Op[] {
       ld('a', [MEM.SCENE_FLAGS]),
       and(1 << i),
       jr('z', skip),
-      ld('hl', u16(tilemapAddr(row, startCol + i * 3))),
+      ld('hl', tilemapAddr(row, startCol + i * 3)),
       ...requireTiles(scene.icon).flatMap((tile) => [ld('a', tile), ld(['hl+'], 'a')]),
       label(skip),
     ];
@@ -122,7 +120,7 @@ export function resultScreen(screen: ResultScreen): Op[] {
     call(KANA_DRAW_HUD),
     ...writeCenteredRow(ENDING_ROWS.title, textToTiles(screen.title)),
     call(DRAW_STAMPS),
-    ld('hl', u16(tilemapAddr(ENDING_ROWS.score, scoreCol))),
+    ld('hl', tilemapAddr(ENDING_ROWS.score, scoreCol)),
     ...labelTiles.flatMap((tile) => [ld('a', tile), ld(['hl+'], 'a')]),
     call(SCORE_DIGITS),
     ...buildDrawScoreDigits(ENDING_ROWS.score, scoreCol + labelTiles.length),

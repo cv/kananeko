@@ -58,7 +58,7 @@ import {
   invoke,
   db,
 } from '../asm/sm83';
-import { type Op, u16, Label, routine } from '../asm/types';
+import { type Op, Label, routine } from '../asm/types';
 import { hi, lo } from '../asm/util';
 import { BAD_CHOICE_FLAG, NEXT_END, TEXT_END } from './dialogue-data';
 import type { Triple } from './fixed';
@@ -110,7 +110,7 @@ const CHOICE_START_ROW = 12;
 const CHOICE_ROW_STEP = 2;
 const REVEAL_DELAY = 3; // frames between each character reveal
 /** Characters revealed each frame while B is held (fast-forward) */
-export const FAST_REVEAL_CHARS = 3;
+const FAST_REVEAL_CHARS = 3;
 
 const TEXT_START = tilePos(TEXT_ROW_1, 2);
 const CHOICE_TEXT_POSITIONS: Triple<TilePosition> = [
@@ -169,7 +169,7 @@ const TWO_CHOICE_SWAPPED = [1, 0] as const;
 /** HL = text position of the display row whose DLG_ORDER entry equals B */
 function buildLoadChoicePositionForLogicalChoice(): Op[] {
   return switchCases(
-    CHOICE_TEXT_POSITIONS.map((position) => [ld('hl', u16(tilemapAddr(position)))]),
+    CHOICE_TEXT_POSITIONS.map((position) => [ld('hl', tilemapAddr(position))]),
     { compare: (row) => [ld('a', [MEM.DLG_ORDER.at(row)]), cp('b')] },
   );
 }
@@ -225,7 +225,7 @@ function buildInitChoiceOrder(): Op[] {
 function buildTextboxRow(row: number, left: number, fill: number | 'clear', right: number): Op[] {
   const interior = SCREEN_COLS - 2;
   return [
-    ld('hl', u16(tilemapAddr(row, 0))),
+    ld('hl', tilemapAddr(row, 0)),
     ld('a', left),
     ld(['hl+'], 'a'),
     fill === 'clear' ? xor('a') : ld('a', fill),
@@ -254,7 +254,7 @@ const BOX_INTERIOR_COLS = SCREEN_COLS - 2;
 function buildClearTextbox(): Op[] {
   return [
     label(DLG_CLEAR_BOX),
-    ld('hl', u16(tilemapAddr(BOX_TOP_ROW + 1, 1))),
+    ld('hl', tilemapAddr(BOX_TOP_ROW + 1, 1)),
     ...repeat(BOX_ROWS - 2, [
       ...repeat(BOX_INTERIOR_COLS, [xor('a'), ...vramPut()], 'c'),
       // Skip to column 1 of the next row
@@ -339,7 +339,7 @@ export function buildTextNext(base: number): Op[] {
   ];
 }
 
-export function buildDialogueEngine(): Op[] {
+function buildDialogueEngine(): Op[] {
   const scoreDone = new Label('dlg_score_done');
   const badChoice = new Label('dlg_bad_choice');
   const saveCursor = new Label('dlg_cursor_save');

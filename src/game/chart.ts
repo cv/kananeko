@@ -113,7 +113,7 @@ export function chartIndexOf(kana: string): number {
 
 const LAYOUT = { titleRow: 1, top: 3, leftCol: 1, rightCol: 11, nextRow: 17 } as const;
 export const CHART_TITLE = 'かなの きろく';
-export const CHART_NEXT = 'つぎへ';
+const CHART_NEXT = 'つぎへ';
 export const CHART_PASSWORD_ROW = 15;
 const BLOCK_ROWS = 5;
 
@@ -139,7 +139,7 @@ const UNSEEN = requireTile('─');
 const NO_ENTRY = 0xff;
 
 /** chart_of_tile: tile index → chart entry (NO_ENTRY if not a kana); chart_layout: address, tile */
-export function buildChartData(): Op[] {
+function buildChartData(): Op[] {
   const tileCount = Math.max(...Object.values(CHAR_MAP)) + 1;
   const ofTile = Array<number>(tileCount).fill(NO_ENTRY);
   for (const [ch, tile] of Object.entries(CHAR_MAP)) {
@@ -166,7 +166,7 @@ export function buildChartData(): Op[] {
  * chart_bit                  A = entry, HL = a bit set → HL = its byte, B = its bit
  * chart_show                 the chart screen; C = 1 to show the password too
  */
-export function buildChartRoutines(fade: Label): Op[] {
+function buildChartRoutines(fade: Label): Op[] {
   const markDone = new Label('chart_mark_done');
   const markEntry = new Label('chart_mark');
   const missed = paletteOf(CHART_COLORS, 'missed');

@@ -114,18 +114,18 @@ const sceneLabel = (part: string): ((sceneIndex: number) => Label) =>
   labelFamily((sceneIndex: number) => `scene${String(sceneIndex)}_${part}`);
 
 export const sceneDialogueLabel = sceneLabel('dlg');
-export const sceneChancesLabel = sceneLabel('chances');
+const sceneChancesLabel = sceneLabel('chances');
 export const sceneRoundsLabel = sceneLabel('rounds');
-export const sceneFadeLabel = sceneLabel('fade');
-export const sceneAnimationLabel = sceneLabel('anim');
-export const sceneColorsLabel = sceneLabel('colors');
+const sceneFadeLabel = sceneLabel('fade');
+const sceneAnimationLabel = sceneLabel('anim');
+const sceneColorsLabel = sceneLabel('colors');
 export const sceneTilesLabel = sceneLabel('tiles');
 export const sceneBackdropLabel = sceneLabel('backdrop');
 const castTilesLabel = sceneLabel('npc_tiles');
 const castPalettesLabel = sceneLabel('npc_palettes');
 const castTableLabel = sceneLabel('npc_table');
 
-export function castLabels(sceneIndex: number): { tiles: Label; palettes: Label; table: Label } {
+function castLabels(sceneIndex: number): { tiles: Label; palettes: Label; table: Label } {
   return {
     tiles: castTilesLabel(sceneIndex),
     palettes: castPalettesLabel(sceneIndex),
@@ -237,7 +237,7 @@ function scenesModule(packedScenes: readonly PackedScene[]): GameModule {
       ...sceneWord('backdrop'),
       ld('d', 'h'),
       ld('e', 'l'),
-      ...invoke(DRAW_RUNS, { hl: u16(tilemapAddr(BACKDROP.top, 0)), de: 'de' }),
+      ...invoke(DRAW_RUNS, { hl: tilemapAddr(BACKDROP.top, 0), de: 'de' }),
 
       // The cast: sprite tiles, GBC sprite palettes 1..n, who speaks when, where they stand
       ...copySceneBlock(u16(MEM.OBJ_TILES + NPC_TILE_BASE * 16), 'castTiles', 'castTilesLength'),
@@ -267,7 +267,7 @@ function scenesModule(packedScenes: readonly PackedScene[]): GameModule {
         ...sceneWord('colors'),
         ld('d', 'h'),
         ld('e', 'l'),
-        ...invoke(DRAW_RUNS, { hl: u16(tilemapAddr(BACKDROP.top, 0)), de: 'de' }),
+        ...invoke(DRAW_RUNS, { hl: tilemapAddr(BACKDROP.top, 0), de: 'de' }),
       ]),
       call(KANA_DRAW_HUD), // hearts + score on row 0
       call(DLG_DRAW_BOX),

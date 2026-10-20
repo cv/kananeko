@@ -15,9 +15,9 @@ export const INK = rgb(0x4b, 0x2d, 0x3c);
 /** The page: text boxes, quiz cards, title */
 export const PAPER = rgb(0xff, 0xf4, 0xe0);
 /** Tinted paper: box fills, the HUD ribbon */
-export const LATTE = rgb(0xf2, 0xdc, 0xc0);
+const LATTE = rgb(0xf2, 0xdc, 0xc0);
 /** Soft shadow under boxes */
-export const COCOA = rgb(0xb9, 0x8a, 0x78);
+const COCOA = rgb(0xb9, 0x8a, 0x78);
 
 /** Soft hues as [light, mid]; the dark shade is always INK */
 export const HUES = {
@@ -34,7 +34,7 @@ export const HUES = {
   stone: [rgb(0xe8, 0xe0, 0xd8), rgb(0xb8, 0xac, 0xa4)],
 } as const satisfies Record<string, readonly [number, number]>;
 
-export type Hue = keyof typeof HUES;
+type Hue = keyof typeof HUES;
 
 /** A hue's ramp: its light and mid shades, outlined in the shared ink */
 export function inked(hue: Hue): Ramp {

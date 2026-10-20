@@ -12,7 +12,7 @@ import { type KanaQuestion, MAX_KANA_WORD_LENGTH } from './kana';
 import type { DialogueNode } from './dialogue';
 
 /** Anything with words in it: a dialogue node, or a reply */
-export type Line = Pick<DialogueNode, 'text'>;
+type Line = Pick<DialogueNode, 'text'>;
 
 /** Kana that are easy to mix up, most similar first */
 const LOOKALIKES: readonly string[] = [
