@@ -392,7 +392,7 @@ function buildKanaEngine(): Op[] {
     // Out of questions? End the round with the last question still on screen.
     ...loadPointer('hl', MEM.KANA_DATA),
     ld('a', ['hl']),
-    cp(0),
+    or('a'),
     jp('z', allDone),
 
     // The round's first question gets a fresh screen; later ones keep the frame and
@@ -413,7 +413,7 @@ function buildKanaEngine(): Op[] {
     // Read word_length; 0 = end of the question list
     ld('a', ['de']),
     inc('de'),
-    cp(0),
+    or('a'),
     jp('z', allDone),
     ld('c', 'a'),
     and(MATCH_FLAG),
@@ -578,7 +578,6 @@ function buildKanaEngine(): Op[] {
     call(KANA_REVEAL), // show the answer before moving on
 
     ...decByte(MEM.KANA_LIVES),
-    cp(0),
     jp('z', allDone), // no lives left: end the round now
 
     // Show feedback, then move on to the next question

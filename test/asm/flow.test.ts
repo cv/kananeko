@@ -149,6 +149,11 @@ describe('compare, ifEquals and ifNotEquals', () => {
     compare(LIGHT, Mood.CROSS + 4);
     expect(compare(LIGHT, Light.BROKEN)).toHaveLength(2);
   });
+
+  it('tests for 0 with OR A, a byte shorter than CP 0', () => {
+    const [, test] = compare(LIGHT, Light.OFF);
+    expect(test?.kind === 'inst' ? [...test.bytes] : []).toEqual([0xb7]);
+  });
 });
 
 describe('dispatch', () => {
@@ -189,7 +194,8 @@ describe('dispatch', () => {
       BLINK: 'ret',
       BROKEN: new Label(),
     });
-    expect(ops.filter((op) => op.kind === 'inst' && op.bytes[0] === 0xfe)).toHaveLength(3); // CP n
+    const tests = ops.filter((op) => op.kind === 'inst' && [0xfe, 0xb7].includes(op.bytes[0] ?? 0));
+    expect(tests).toHaveLength(3); // CP n, or OR A for 0
   });
 
   it('needs a case for every value, from the variable’s own enum', () => {

@@ -30,6 +30,7 @@ import {
   ld,
   ldh,
   nop,
+  or,
   pop,
   push,
   ret,
@@ -317,7 +318,7 @@ function buildDrawRuns(): Op[] {
     ...loop((again) => [
       ld('a', ['de']),
       inc('de'),
-      cp(0),
+      or('a'),
       ret('z'),
       ld('b', 'a'), // run length
       ld('a', ['de']),
@@ -452,7 +453,7 @@ function buildFadeRoutines(): Op[] {
       dec('b'),
       ...invoke(FADE_APPLY, { b: 'b', hl: 'hl' }),
       ld('a', 'b'),
-      cp(0),
+      or('a'),
     ]),
     ret(),
 

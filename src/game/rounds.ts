@@ -254,7 +254,7 @@ export function engineLoop(loop: Label, update: Label, stateAddr: U16): Op[] {
     call(JOY_READ),
     call(update),
     ld('a', [stateAddr]),
-    cp(0),
+    or('a'),
     jr('nz', loop),
   ];
 }

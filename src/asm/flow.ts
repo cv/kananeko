@@ -12,7 +12,7 @@
  */
 
 import type { ByteValue } from './ram';
-import { cp, dec, jp, label, ld, ret } from './sm83';
+import { cp, dec, jp, label, ld, or, ret } from './sm83';
 import { type CCName, Label, type Op, type U16 } from './types';
 import { lo } from './util';
 
@@ -94,7 +94,12 @@ export function loop(body: (again: Label, done: Label) => readonly Op[]): Op[] {
  * compares with values of its own kind.
  */
 export function compare<A extends U16>(variable: A, value: ByteValue<A>): Op[] {
-  return [ld('a', [variable]), cp(value)];
+  return [ld('a', [variable]), compareA(value)];
+}
+
+/** CP value, or OR A for 0: a byte shorter, with the same flags but N (only DAA reads it) */
+function compareA(value: number): Op {
+  return value === 0 ? or('a') : cp(value);
 }
 
 /** Run `body` only when the variable holds `value` (A = the variable). */
@@ -155,7 +160,7 @@ export function dispatch<A extends U16, const E extends Readonly<Record<string, 
     ...tested.flatMap(([name, value], i) => {
       const action = cases[name] as Exclude<Case, 'continue'>;
       if (!falls && i === tested.length - 1) return [action === 'ret' ? ret() : jp(action)];
-      return [cp(value), action === 'ret' ? ret('z') : jp('z', action)];
+      return [compareA(value), action === 'ret' ? ret('z') : jp('z', action)];
     }),
   ];
 }

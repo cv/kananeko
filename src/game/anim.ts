@@ -6,7 +6,7 @@
 import { ifThen, repeat } from '../asm/flow';
 import { incByte, loadPointer } from '../asm/macros';
 import { gameModule } from '../asm/program';
-import { add, and, cp, inc, label, ld, pop, push, ret, swap, xor } from '../asm/sm83';
+import { add, and, cp, inc, label, ld, or, pop, push, ret, swap, xor } from '../asm/sm83';
 import type { Op } from '../asm/types';
 import type { SceneArt } from './backdrop';
 import { encodeGlyph } from './font';
@@ -60,7 +60,7 @@ function buildAnimRoutines(): Op[] {
     ld('a', ['hl+']),
     ld('d', 'a'),
     ld('a', ['hl+']),
-    cp(0),
+    or('a'),
     ret('z'), // no animation in this scene
     ld('b', 'a'), // B = frame count
     ld('a', ['hl+']),

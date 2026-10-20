@@ -558,7 +558,7 @@ function buildDialogueEngine(): Op[] {
     and(BAD_CHOICE_FLAG),
     jr('nz', badChoice),
     ld('a', 'c'),
-    cp(0),
+    or('a'),
     ...ifThen('nz', [
       ...buildClearDelta(), // ok: nothing changes
       jr(scoreDone),
@@ -582,8 +582,7 @@ function buildDialogueEngine(): Op[] {
     jr('z', scoreDone), // already at 0
     dec('a'),
     ld([MEM.KANA_LIVES], 'a'),
-    // If lives just hit 0, end conversation → skip to kana
-    cp(0),
+    // If lives just hit 0 (DEC set Z), end conversation → skip to kana
     jr('nz', scoreDone),
     ...storeByte(MEM.DLG_NODE_ID, END_OF_CONVERSATION),
 
