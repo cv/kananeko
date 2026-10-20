@@ -1,6 +1,7 @@
 /**
  * When kana rounds happen: a short round about what was just said each time a
- * conversation ends, and the scene's review round when its dialogue is over.
+ * conversation ends, and the scene's review round when its dialogue is over. Its
+ * routines (roundsModule) find and play them.
  *
  * ROM layout of a scene's rounds (see buildRoundsData):
  *   count
@@ -9,14 +10,49 @@
  *   question lists (see buildKanaData)
  */
 
+import { ifElse, loop } from '../asm/flow';
+import { MEM } from './ram';
+import { gameModule } from '../asm/program';
+import {
+  CAT_TICK,
+  NPC_HIDE,
+  JOY_READ,
+  KANA_START,
+  KANA_UPDATE,
+  HUD_UPDATE,
+  PLAY_ROUND,
+} from './labels';
+import { buildKanaData, type KanaQuestion } from './kana';
+import { runDma } from './sprites';
+import { frameWait } from './video';
+import { loadPointer, storeByte, zeroBytes } from '../asm/macros';
+import {
+  add,
+  and,
+  call,
+  cp,
+  dec,
+  inc,
+  jr,
+  label,
+  ld,
+  or,
+  pop,
+  push,
+  ret,
+  sla,
+  xor,
+  invoke,
+} from '../asm/sm83';
+import { type Op, type U16, Label, routine } from '../asm/types';
+import { CAT_TILES } from './font-data';
+import { BAD_PICK, END_OF_CONVERSATION, KanaMode, MAX_LIVES } from './state';
+
 import { hi, lo } from '../asm/util';
 import type { DialogueNode } from './dialogue';
 import { choiceRating } from './dialogue-data';
-import { CAT_TILES } from './font-data';
-import { buildKanaData, type KanaQuestion } from './kana';
 import { type QuizHistory, generateQuestions, matchQuestionFor, phrasesOf } from './quiz';
 import type { SceneCast } from './scenes/npcs';
-import { END_OF_CONVERSATION } from './state';
 
 /** Rounds per scene are tracked in one byte of "already played" flags */
 export const MAX_ROUNDS = 8;
@@ -177,3 +213,153 @@ export function buildRoundsData(rounds: readonly KanaCheckpoint[]): Uint8Array {
   }
   return buildQuestionTable(rounds.map(({ at, questions }) => ({ key: at, questions })));
 }
+
+// ---------------------------------------------------------------------------
+// The routines that run the rounds
+// ---------------------------------------------------------------------------
+
+const TABLE_FIND = routine('table_find', {
+  in: ['d', 'hl'],
+  out: ['c', 'de', 'f'],
+  clobbers: ['a', 'b', 'hl'],
+});
+export const ROUND_CHECK = routine('round_check', { clobbers: ['a', 'bc', 'de', 'hl'] });
+export const CHANCE_CHECK = routine('chance_check', { clobbers: ['a', 'bc', 'de', 'hl'] });
+
+/** Reset score, delta flash, streak, and lives (plus any extra bytes to zero) for a new run. */
+export function resetRunState(...alsoZero: U16[]): Op[] {
+  return [
+    ...zeroBytes(
+      ...alsoZero,
+      MEM.KANA_SCORE.lo,
+      MEM.KANA_SCORE.hi,
+      MEM.DELTA_TYPE,
+      MEM.DELTA_TIMER,
+      MEM.KANA_STREAK,
+    ),
+    ...storeByte(MEM.KANA_LIVES, MAX_LIVES),
+  ];
+}
+
+/**
+ * Per-frame engine loop: wait a frame, refresh HUD and input, run `update`,
+ * and repeat while the engine's state byte is non-zero.
+ */
+export function engineLoop(loop: Label, update: Label, stateAddr: U16): Op[] {
+  return [
+    label(loop),
+    ...frameWait(),
+    ...runDma(),
+    call(HUD_UPDATE), // refresh HUD early in VBlank window
+    call(CAT_TICK),
+    call(JOY_READ),
+    call(update),
+    ld('a', [stateAddr]),
+    cp(0),
+    jr('nz', loop),
+  ];
+}
+
+/**
+ * Kana rounds inside a scene:
+ * - table_find: HL = question table (see buildQuestionTable), D = key.
+ *   Z if absent; NZ with DE = the question list and C = the entry's bit (1 << index).
+ * - round_check: play the unplayed round at DLG_NODE_ID, if any.
+ * - chance_check: after a bad answer, a chance to win the life back; after picking a
+ *   reply to fill in, the fill-in.
+ * - play_round: DE = question list, KANA_MODE set; hides the speaker, plays, sets ROUND_RAN.
+ */
+function buildRoundRoutines(): Op[] {
+  const found = new Label('table_found');
+  return [
+    label(TABLE_FIND),
+    push('hl'), // table start, for the offset
+    ld('a', ['hl+']),
+    ld('b', 'a'), // entries left
+    ld('c', 1),
+    ...loop((again, done) => [
+      ld('a', 'b'),
+      or('a'),
+      jr('z', done),
+      ld('a', ['hl+']),
+      cp('d'),
+      jr('z', found),
+      inc('hl'), // skip the offset
+      inc('hl'),
+      sla('c'),
+      dec('b'),
+      jr(again),
+    ]),
+    pop('hl'),
+    xor('a'), // Z
+    ret(),
+    label(found),
+    ld('a', ['hl+']),
+    ld('e', 'a'),
+    ld('d', ['hl']), // DE = offset
+    pop('hl'),
+    add('hl', 'de'),
+    ld('d', 'h'),
+    ld('e', 'l'),
+    ld('a', 1),
+    or('a'), // NZ
+    ret(),
+
+    label(ROUND_CHECK),
+    ...loadPointer('hl', MEM.ROUNDS),
+    ld('a', [MEM.DLG_NODE_ID]),
+    ...invoke(TABLE_FIND, { d: 'a', hl: 'hl' }),
+    ret('z'),
+    ld('a', [MEM.ROUNDS_DONE]),
+    and('c'),
+    ret('nz'), // already played (the dialogue looped back)
+    ld('a', [MEM.ROUNDS_DONE]),
+    or('c'),
+    ld([MEM.ROUNDS_DONE], 'a'),
+    ...storeByte(MEM.KANA_MODE, KanaMode.NORMAL),
+    jr(PLAY_ROUND),
+
+    label(CHANCE_CHECK),
+    ld('a', [MEM.DLG_PICK]),
+    ld('b', 'a'),
+    and(BAD_PICK),
+    ...ifElse(
+      'nz',
+      [
+        ld('a', [MEM.KANA_LIVES]),
+        or('a'),
+        ret('z'), // the conversation is over anyway
+        ld('a', [MEM.DLG_FROM_NODE]),
+        or(REDEEM_KEY),
+        ld('d', 'a'),
+        ld('a', KanaMode.REDEEM),
+      ],
+      [
+        ld('a', 'b'),
+        or('a'),
+        ret('nz'), // only the first reply can be a fill-in
+        ld('a', [MEM.DLG_FROM_NODE]),
+        ld('d', 'a'),
+        ld('a', KanaMode.SAY_IT),
+      ],
+    ),
+    ld([MEM.KANA_MODE], 'a'),
+    ...loadPointer('hl', MEM.CHANCES),
+    ...invoke(TABLE_FIND, { d: 'd', hl: 'hl' }),
+    ret('z'),
+
+    label(PLAY_ROUND),
+    push('de'),
+    call(NPC_HIDE),
+    pop('de'),
+    ...invoke(KANA_START, { de: 'de' }),
+    ...engineLoop(new Label('round_loop'), KANA_UPDATE, MEM.KANA_STATE),
+    ...storeByte(MEM.ROUND_RAN, 1),
+    ret(),
+  ];
+}
+
+export const roundsModule = gameModule({
+  name: 'rounds',
+  code: buildRoundRoutines,
+});

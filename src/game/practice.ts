@@ -285,5 +285,5 @@ export function buildPracticeLoop(): Op[] {
 export const practiceModule = gameModule({
   name: 'practice',
   code: () => [...buildPracticeRoutines(SPEED_ROUND_DATA), ...buildPracticeLoop()],
-  data: buildPracticeData,
+  data: () => [...buildPracticeData(), label(SPEED_ROUND_DATA), db(buildKanaData(SPEED_ROUND))],
 });

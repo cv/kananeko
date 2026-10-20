@@ -10,6 +10,7 @@
  * any other choice is "bad" (-5 score, -1 life, conversation ends at 0 lives).
  */
 
+import type { TextCodec } from './text-codec';
 import { ifHeld, pressed } from './joypad';
 import { playSfx } from './sound';
 import {
@@ -55,6 +56,7 @@ import {
   push,
   xor,
   invoke,
+  db,
 } from '../asm/sm83';
 import { type Op, u16, Label, routine } from '../asm/types';
 import { hi, lo } from '../asm/util';
@@ -652,9 +654,12 @@ export function buildDialogueEngine(): Op[] {
 }
 
 /** The dialogue engine, for text compressed with a dictionary whose codes start at \`codeBase\` */
-export function dialogueModule(codeBase: () => number): GameModule {
+/** The dialogue engine, and the dictionary of the text's compression `codec` */
+export function dialogueModule(codec: () => TextCodec): GameModule {
   return gameModule({
     name: 'dialogue',
-    code: () => [...buildDialogueEngine(), ...buildTextNext(codeBase())],
+    code: () => [...buildDialogueEngine(), ...buildTextNext(codec().base)],
+    // two bytes per code (text-codec.ts)
+    data: () => [label(TEXT_DICT), db(codec().pairs.flat())],
   });
 }

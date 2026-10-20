@@ -35,7 +35,7 @@ import {
 import { HW } from '../asm/hardware';
 import { type Op, Label } from '../asm/types';
 import { addAToHl, storeByte, zeroBytes } from '../asm/macros';
-import { paletteOf } from './color';
+import { paletteOf, buildPaletteSet } from './color';
 import { CHAR_MAP, requireTile, textToTiles } from './font';
 import { PASSWORD_LABEL, passwordLineCol } from './password';
 import { CHART_COLORS } from './scenes/colors';
@@ -321,5 +321,5 @@ export function buildChartRoutines(fade: Label): Op[] {
 export const chartModule = gameModule({
   name: 'chart',
   code: () => buildChartRoutines(CHART_FADE),
-  data: buildChartData,
+  data: () => [...buildChartData(), label(CHART_FADE), db(buildPaletteSet(CHART_COLORS))],
 });
