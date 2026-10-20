@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { REG, effect } from '@asm/analysis';
 import { assemble } from '@asm/assembler';
-import { call, inc, jp, jr, label, ld, nop, pop, push, ret, xor } from '@asm/sm83';
+import { call, cp, inc, invoke, jp, jr, label, ld, nop, pop, push, ret, xor } from '@asm/sm83';
 import { type ExternalRoutine, Label, type Op, routine, u16 } from '@asm/types';
 
 const HEADER = { title: 'TEST' };
@@ -141,5 +141,65 @@ describe('contracts', () => {
     ];
     // main → mid (2) → push (2) → leaf (2), and an interrupt there (2 + 2)
     expect(check(program, handler)).toBe(10);
+  });
+});
+
+describe('arguments', () => {
+  it('pass when a routine takes exactly the registers it reads first', () => {
+    const r = routine('r', { in: ['b'], out: ['a'] });
+    expect(check([...main(...invoke(r, { b: 1 })), label(r), ld('a', 'b'), ret()])).toBe(2);
+  });
+
+  it('fail when a routine reads a register it doesn’t take', () => {
+    const r = routine('r', { out: ['a'] });
+    expect(() => check([...main(call(r)), label(r), ld('a', 'b'), ret()])).toThrow(
+      /r reads B before setting it: add it to its contract's in/,
+    );
+  });
+
+  it('fail when a routine takes a register it never reads', () => {
+    const r = routine('r', { in: ['c'], clobbers: ['a'] });
+    expect(() => check([...main(...invoke(r, { c: 1 })), label(r), xor('a'), ret()])).toThrow(
+      /r takes C \(in\) but never reads it/,
+    );
+  });
+
+  it('count what a routine passes on to the routines it calls', () => {
+    const inner = routine('inner', { in: ['d'], out: ['a'] });
+    const outer = routine('outer', { out: ['a'] });
+    expect(() =>
+      check([
+        ...main(call(outer)),
+        label(outer),
+        ...invoke(inner, { d: 'd' }),
+        ret(),
+        label(inner),
+        ld('a', 'd'),
+        ret(),
+      ]),
+    ).toThrow(/outer reads D before setting it/);
+  });
+
+  it('don’t count an output set on only some paths as read', () => {
+    const r = routine('r', { in: ['a'], out: ['b'] });
+    expect(
+      check([...main(...invoke(r, { a: 0 })), label(r), cp(0), ret('z'), ld('b', 1), ret()]),
+    ).toBe(2);
+  });
+
+  it('find a register needed by a later call but changed by an earlier one', () => {
+    const takesB = routine('takes_b', { in: ['b'], clobbers: ['a'] });
+    const changesB = routine('changes_b', { clobbers: ['b'] });
+    expect(() =>
+      check([
+        ...main(ld('b', 5), call(changesB), ...invoke(takesB, { b: 'b' })),
+        label(changesB),
+        ld('b', 0),
+        ret(),
+        label(takesB),
+        ld('a', 'b'),
+        ret(),
+      ]),
+    ).toThrow(/still needs B after calling changes_b/);
   });
 });

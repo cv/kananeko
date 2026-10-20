@@ -138,9 +138,17 @@ function buildLoseLife(): Op[] {
   - plain branches and loops use `src/asm/flow.ts`, which makes the labels for you: `ifThen` and `ifElse` for short branches, `block((done) => …)` to jump forward to a common exit, and `repeat`, `doWhile` and `loop((again, done) => …)` for loops. Their labels are named after the label before them in the `.sym` file (`kana_update.3`).
 - **Branching on a variable's value**: `dispatch(MEM.KANA_STATE, KanaState, { IDLE: 'ret', AWAITING: 'continue', … })` needs a case for every value of the variable's enum: a label to jump to, `'ret'`, or `'continue'`. `compare`, `ifEquals` and `ifNotEquals` only take values of the variable's own kind.
 - **Common sequences**: `incByte`, `decByte`, `copyByte`, `copyWord`, `tableEntry(table, stride)` and `addAToHl` in `src/asm/macros.ts`; `pressed`, `held`, `ifPressed` and `ifHeld` for the buttons in `src/game/joypad.ts`.
-- **Routines** are labels with a register contract: `routine('name', { out: ['a'], clobbers: ['bc'] })`. The build follows each routine through its jumps, calls and PUSH/POP pairs, and fails in these cases:
+- **Routines** are labels with a register contract: `routine('name', { in: ['a', 'hl'], out: ['hl'], clobbers: ['bc'] })`. A routine that takes arguments (`in`) is called with `invoke`, which needs one for each register:
+
+  ```ts
+  ...invoke(CAT_PLACE, { b: spot.x, c: spot.y }) // LD B,x / LD C,y / CALL cat_place
+  ...invoke(VRAM_PUT, { a: 'a', hl: 'hl' })      // already in A and HL: just CALL
+  ```
+
+  A plain `call()` to it, or a missing or extra argument, is a type error. The build follows each routine through its jumps, calls and PUSH/POP pairs, and fails in these cases:
+  - the routine reads a register before setting it that isn't in its `in`, or takes one it never reads;
   - the routine changes a register its contract doesn't allow;
-  - a caller still needs a register the routine clobbers;
+  - a caller still needs a register the routine clobbers, including one a later call takes as an argument;
   - the VBlank handler doesn't restore what it uses.
 
   It also works out the deepest the stack can go. `npm run contracts` suggests contracts from what the code does.

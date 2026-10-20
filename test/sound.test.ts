@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { MEM } from '@game/ram';
-import { call, db, dec, jr, label, ld } from '@asm/sm83';
+import { call, db, dec, invoke, jr, label, ld } from '@asm/sm83';
 import { type Op, u16, Label } from '@asm/types';
 import {
   NOTE_NAMES,
@@ -132,7 +132,7 @@ function runSound(setup: readonly Op[], count: number, data: readonly Op[] = [])
   );
 }
 
-const play = (name: keyof typeof SFX): Op[] => [ld('a', sfxId(name)), call(SFX_PLAY)];
+const play = (name: keyof typeof SFX): Op[] => invoke(SFX_PLAY, { a: sfxId(name) });
 
 /** Point voice 0 (pulse channel 2) at a sequence labelled `seq` */
 const startVoice0: Op[] = [
@@ -202,7 +202,7 @@ describe('Given the songs', () => {
   });
 });
 
-const playSong = (id: number): Op[] => [ld('a', id), call(MUSIC_PLAY)];
+const playSong = (id: number): Op[] => invoke(MUSIC_PLAY, { a: id });
 
 describe('Given a song starts', () => {
   it('plays its melody and bass on the music voices', () => {

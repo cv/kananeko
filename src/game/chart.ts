@@ -30,6 +30,7 @@ import {
   sla,
   srl,
   cpl,
+  invoke,
 } from '../asm/sm83';
 import { HW } from '../asm/hardware';
 import { type Op, Label } from '../asm/types';
@@ -190,7 +191,7 @@ export function buildChartRoutines(fade: Label): Op[] {
     pop('hl'),
     cp(NO_ENTRY),
     jr('z', markDone),
-    call(CHART_BIT),
+    ...invoke(CHART_BIT, { a: 'a', hl: 'hl' }),
     ld('a', ['hl']),
     or('b'),
     ld(['hl'], 'a'),
@@ -213,8 +214,7 @@ export function buildChartRoutines(fade: Label): Op[] {
     ld('a', ['hl']),
     cp(NO_ENTRY),
     jr('z', markDone),
-    ld('hl', MEM.KANA_MISSED.address),
-    call(CHART_BIT),
+    ...invoke(CHART_BIT, { hl: MEM.KANA_MISSED.address, a: 'a' }),
     ld('a', 'b'),
     cpl(),
     and(['hl']),
@@ -251,9 +251,7 @@ export function buildChartRoutines(fade: Label): Op[] {
       ld('h', 'a'),
       push('hl'), // the cell's address
       push('de'),
-      ld('a', 'c'),
-      ld('hl', MEM.KANA_SEEN.address),
-      call(CHART_BIT),
+      ...invoke(CHART_BIT, { a: 'c', hl: MEM.KANA_SEEN.address }),
       ld('a', ['hl']),
       and('b'),
       pop('de'),
@@ -269,9 +267,7 @@ export function buildChartRoutines(fade: Label): Op[] {
         jr('z', done),
         push('hl'),
         push('de'),
-        ld('a', 'c'),
-        ld('hl', MEM.KANA_MISSED.address),
-        call(CHART_BIT),
+        ...invoke(CHART_BIT, { a: 'c', hl: MEM.KANA_MISSED.address }),
         ld('a', ['hl']),
         and('b'),
         pop('de'),
@@ -298,7 +294,7 @@ export function buildChartRoutines(fade: Label): Op[] {
         tilemapAddr(CHART_PASSWORD_ROW, passwordLineCol()),
         textToTiles(`${PASSWORD_LABEL} `),
       ),
-      call(PASS_DRAW),
+      ...invoke(PASS_DRAW, { hl: 'hl' }),
     ]),
     ...fadeIn(fade),
     // The paw beside つぎへ

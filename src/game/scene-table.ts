@@ -7,7 +7,7 @@
 
 import { MEM } from './ram';
 import { loadPointer, storePointer, tableEntry } from '../asm/macros';
-import { add, call, dec, dw, inc, jr, label, ld, or, pop, push, ret } from '../asm/sm83';
+import { add, dec, dw, inc, jr, label, ld, or, pop, push, ret, invoke } from '../asm/sm83';
 import { type Op, type U16, Label, routine } from '../asm/types';
 import { at } from '../asm/util';
 import { SCENE_DESC } from './labels';
@@ -16,9 +16,12 @@ import { type FieldsOf, type RecordOf, byte, struct, word } from '../asm/struct'
 
 // Labels placed in this module
 const SCENE_TABLE = new Label('scene_table');
-const SCENE_WORD = routine('scene_word', { out: ['hl'], clobbers: ['a', 'de'] });
-const SCENE_BYTE = routine('scene_byte', { out: ['a'], clobbers: ['de', 'hl'] });
-const COPY_BLOCK = routine('copy_block', { clobbers: ['a', 'bc', 'de', 'hl'] });
+const SCENE_WORD = routine('scene_word', { in: ['a'], out: ['hl'], clobbers: ['a', 'de'] });
+const SCENE_BYTE = routine('scene_byte', { in: ['a'], out: ['a'], clobbers: ['de', 'hl'] });
+const COPY_BLOCK = routine('copy_block', {
+  in: ['bc', 'de', 'hl'],
+  clobbers: ['a', 'bc', 'de', 'hl'],
+});
 
 /** One scene's entry in scene_table: what the engine loads for it */
 export const SCENE_ENTRY = struct('scene entry', {
@@ -108,12 +111,12 @@ export function buildSceneTableRoutines(): Op[] {
 
 /** HL = a word field of the current scene */
 export function sceneWord(field: SceneWord): Op[] {
-  return [ld('a', SCENE_ENTRY.offset[field]), call(SCENE_WORD)];
+  return invoke(SCENE_WORD, { a: SCENE_ENTRY.offset[field] });
 }
 
 /** A = a byte field of the current scene */
 export function sceneByte(field: SceneByte): Op[] {
-  return [ld('a', SCENE_ENTRY.offset[field]), call(SCENE_BYTE)];
+  return invoke(SCENE_BYTE, { a: SCENE_ENTRY.offset[field] });
 }
 
 /**
@@ -128,8 +131,7 @@ export function copySceneBlock(dst: U16, source: SceneWord, length: SceneWord): 
     ld('b', 'h'),
     ld('c', 'l'),
     pop('de'),
-    ld('hl', dst),
-    call(COPY_BLOCK),
+    ...invoke(COPY_BLOCK, { hl: dst, bc: 'bc', de: 'de' }),
   ];
 }
 

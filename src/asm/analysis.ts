@@ -464,6 +464,13 @@ export function analyze(
   /** What's live after a POP: it falls through to the next instruction */
   const liveOut = (i: number): number => live(nextInst(i + 1));
 
+  /**
+   * What a RET needs: the routine's outputs. Left out when working out a routine's
+   * arguments, so an output it only sets on some paths doesn't count as read.
+   */
+  let useOutputs = true;
+  const outsAt = (i: number): number => (useOutputs ? (retOut.get(i) ?? 0) : 0);
+
   const transfer = (
     i: number,
   ): { out: number; in: number; clobbered: number; callee?: Label | string } => {
@@ -493,13 +500,13 @@ export function analyze(
       case 'jumpcc':
         if (isTailCall(target, i, undefined)) {
           const contract = contractOf(target);
-          out = retOut.get(i) ?? 0;
+          out = outsAt(i);
           reads |= regBits(contract?.in);
           writes |= summaries.get(target)?.writes ?? 0;
         } else if (targetIndex !== undefined) {
           out = live(nextInst(targetIndex));
         } else if (op.callee !== undefined) {
-          out = retOut.get(i) ?? 0;
+          out = outsAt(i);
           reads |= regBits(op.callee.in);
           writes |= allowedBits(op.callee);
         }
@@ -518,10 +525,10 @@ export function analyze(
         break;
       }
       case 'ret':
-        out = retOut.get(i) ?? 0;
+        out = outsAt(i);
         break;
       case 'retcc':
-        out = (retOut.get(i) ?? 0) | live(next);
+        out = outsAt(i) | live(next);
         break;
       case 'unknown':
         out = ALL;
@@ -536,17 +543,21 @@ export function analyze(
   };
 
   const order = [...nodes].sort((a, b) => b - a);
-  for (let round = 0; round < 200; round++) {
-    let changed = false;
-    for (const i of order) {
-      const t = transfer(i).in;
-      if (t !== (liveIn.get(i) ?? 0)) {
-        liveIn.set(i, t);
-        changed = true;
+  const solve = (): void => {
+    liveIn.clear();
+    for (let round = 0; round < 200; round++) {
+      let changed = false;
+      for (const i of order) {
+        const t = transfer(i).in;
+        if (t !== (liveIn.get(i) ?? 0)) {
+          liveIn.set(i, t);
+          changed = true;
+        }
       }
+      if (!changed) break;
     }
-    if (!changed) break;
-  }
+  };
+  solve();
 
   const lost: Lost[] = [];
   for (const i of order) {
@@ -561,11 +572,29 @@ export function analyze(
     }
   }
 
+  // Arguments: what each routine's code reads before setting it
+  useOutputs = false;
+  solve();
   const inputs = new Map<Label, number>();
   for (const entry of entries) {
     const start = labelAt.get(entry);
     if (start === undefined) continue;
-    inputs.set(entry, live(nextInst(start)));
+    const reads = live(nextInst(start));
+    inputs.set(entry, reads);
+    // Arguments: a routine reads exactly the registers its contract takes (flags aside)
+    const contract = interrupts.includes(entry) ? undefined : contractOf(entry);
+    if (contract === undefined) continue;
+    const declared = regBits(contract.in);
+    const missing = reads & ~declared & ~REG.f;
+    const unread = declared & ~reads;
+    if (missing !== 0) {
+      violation(
+        `${nameOf(entry)} reads ${regNames(missing)} before setting it: add it to its contract's in`,
+      );
+    }
+    if (unread !== 0) {
+      violation(`${nameOf(entry)} takes ${regNames(unread)} (in) but never reads it`);
+    }
   }
   return { summaries, mainDepth: main.depth, violations, lost, inputs };
 }

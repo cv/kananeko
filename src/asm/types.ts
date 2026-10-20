@@ -130,14 +130,17 @@ export class Label {
 /** A register, a pair, or F (the flags) */
 export type RegName = 'a' | 'f' | 'b' | 'c' | 'd' | 'e' | 'h' | 'l' | 'af' | 'bc' | 'de' | 'hl';
 
+/** A register a routine can take an argument in */
+export type ArgReg = 'a' | 'b' | 'c' | 'd' | 'e' | 'h' | 'l' | 'bc' | 'de' | 'hl';
+
 /**
  * What a routine promises about registers, checked by the assembler against its code
  * (see analysis.ts): it changes only `out` and `clobbers` (and F, unless
  * `keepsFlags`), and callers mustn't still need a clobbered register after calling it.
  */
 export interface RoutineContract {
-  /** Registers it reads as arguments */
-  readonly in?: readonly RegName[];
+  /** Registers it reads before setting them: its arguments */
+  readonly in?: readonly ArgReg[];
   /** Registers it returns results in (F if a flag is a result) */
   readonly out?: readonly RegName[];
   /** Registers it changes that aren't results */
@@ -148,9 +151,14 @@ export interface RoutineContract {
   readonly depth?: number;
 }
 
-/** A label that's called: a subroutine with a register contract */
-export class Routine extends Label {
+/**
+ * A label that's called: a subroutine with a register contract. `In` is its
+ * arguments (contract.in), so a call can be checked for them: see invoke() in sm83.ts.
+ */
+export class Routine<In extends ArgReg = ArgReg> extends Label {
   readonly contract: RoutineContract;
+  /** Only for the type checker: the registers it takes */
+  declare readonly inputs: readonly In[];
 
   constructor(name: string, contract: RoutineContract) {
     super(name);
@@ -166,8 +174,11 @@ export interface ExternalRoutine {
 }
 
 /** A subroutine's label, with what it promises about registers */
-export function routine(name: string, contract: RoutineContract = {}): Routine {
-  return new Routine(name, contract);
+export function routine<const In extends ArgReg = never>(
+  name: string,
+  contract: RoutineContract & { readonly in?: readonly In[] } = {},
+): Routine<In> {
+  return new Routine<In>(name, contract);
 }
 
 /**

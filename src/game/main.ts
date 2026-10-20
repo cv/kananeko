@@ -58,6 +58,7 @@ import {
   ret,
   sla,
   xor,
+  invoke,
 } from '../asm/sm83';
 import { type Op, type U16, u16, Label, labelFamily, routine } from '../asm/types';
 import { SCENE_TILE_BASE } from './backdrop';
@@ -137,7 +138,11 @@ import {
 } from './labels';
 
 // Labels placed in this module
-const TABLE_FIND = routine('table_find', { out: ['c', 'f'], clobbers: ['a', 'b', 'de', 'hl'] });
+const TABLE_FIND = routine('table_find', {
+  in: ['d', 'hl'],
+  out: ['c', 'de', 'f'],
+  clobbers: ['a', 'b', 'hl'],
+});
 const ROUND_CHECK = routine('round_check', { clobbers: ['a', 'bc', 'de', 'hl'] });
 const CHANCE_CHECK = routine('chance_check', { clobbers: ['a', 'bc', 'de', 'hl'] });
 const DRAW_STAMPS = routine('draw_stamps', { clobbers: ['a', 'hl'] });
@@ -324,8 +329,7 @@ function buildRoundRoutines(): Op[] {
     label(ROUND_CHECK),
     ...loadPointer('hl', MEM.ROUNDS),
     ld('a', [MEM.DLG_NODE_ID]),
-    ld('d', 'a'),
-    call(TABLE_FIND),
+    ...invoke(TABLE_FIND, { d: 'a', hl: 'hl' }),
     ret('z'),
     ld('a', [MEM.ROUNDS_DONE]),
     and('c'),
@@ -362,14 +366,14 @@ function buildRoundRoutines(): Op[] {
     ),
     ld([MEM.KANA_MODE], 'a'),
     ...loadPointer('hl', MEM.CHANCES),
-    call(TABLE_FIND),
+    ...invoke(TABLE_FIND, { d: 'd', hl: 'hl' }),
     ret('z'),
 
     label(PLAY_ROUND),
     push('de'),
     call(NPC_HIDE),
     pop('de'),
-    call(KANA_START),
+    ...invoke(KANA_START, { de: 'de' }),
     ...engineLoop(new Label('round_loop'), KANA_UPDATE, MEM.KANA_STATE),
     ...storeByte(MEM.ROUND_RAN, 1),
     ret(),
@@ -460,7 +464,7 @@ function buildResultScreen(screen: ResultScreen): Op[] {
             tilemapAddr(ENDING_ROWS.password, passwordLineCol()),
             textToTiles(`${PASSWORD_LABEL} `),
           ),
-          call(PASS_DRAW),
+          ...invoke(PASS_DRAW, { hl: 'hl' }),
         ]
       : []),
     ...fadeIn(resultFadeLabel(screen)),
@@ -627,7 +631,7 @@ function buildMain(): Op[] {
     ...sceneWord('dialogue'),
     ld('d', 'h'),
     ld('e', 'l'),
-    call(DLG_OPEN_TREE), // initialize tree and open node 0
+    ...invoke(DLG_OPEN_TREE, { de: 'de' }), // initialize tree and open node 0
 
     // Process nodes until the conversation ends
     ...engineLoop(SCENE_DLG_LOOP, DLG_UPDATE, MEM.DLG_STATE),
@@ -660,17 +664,15 @@ function buildMain(): Op[] {
 
     ...incByte(MEM.SCENE_ID),
     cp(SCENES.length),
-    ...ifThen('c', [ld('c', 1), call(CHART_SHOW), jp(SCENE_LOAD)]),
+    ...ifThen('c', [...invoke(CHART_SHOW, { c: 1 }), jp(SCENE_LOAD)]),
 
     // ==== Bonus: the speed round ====
     ...storeByte(MEM.KANA_MODE, KanaMode.SPEED),
     call(PRACTICE_RAND),
     ld([MEM.PRACTICE_NEXT], 'a'),
     call(SPEED_FILL), // the missed kana first, then the round's own questions
-    ld('de', MEM.PRACTICE_BUF.address),
-    call(PLAY_ROUND),
-    ld('c', 0),
-    call(CHART_SHOW), // the whole trip's kana, then the ending
+    ...invoke(PLAY_ROUND, { de: MEM.PRACTICE_BUF.address }),
+    ...invoke(CHART_SHOW, { c: 0 }), // the whole trip's kana, then the ending
 
     // ==== Game complete — ending screen, then back to the title ====
     ...buildResultScreen(ENDING),
@@ -697,8 +699,7 @@ function gameFlow(packedScenes: readonly PackedScene[]): GameModule {
       ...sceneWord('backdrop'),
       ld('d', 'h'),
       ld('e', 'l'),
-      ld('hl', u16(tilemapAddr(BACKDROP.top, 0))),
-      call(DRAW_RUNS),
+      ...invoke(DRAW_RUNS, { hl: u16(tilemapAddr(BACKDROP.top, 0)), de: 'de' }),
 
       // The cast: sprite tiles, GBC sprite palettes 1..n, who speaks when, where they stand
       ...copySceneBlock(u16(MEM.OBJ_TILES + NPC_TILE_BASE * 16), 'castTiles', 'castTilesLength'),
@@ -728,8 +729,7 @@ function gameFlow(packedScenes: readonly PackedScene[]): GameModule {
         ...sceneWord('colors'),
         ld('d', 'h'),
         ld('e', 'l'),
-        ld('hl', u16(tilemapAddr(BACKDROP.top, 0))),
-        call(DRAW_RUNS),
+        ...invoke(DRAW_RUNS, { hl: u16(tilemapAddr(BACKDROP.top, 0)), de: 'de' }),
       ]),
       call(KANA_DRAW_HUD), // hearts + score on row 0
       call(DLG_DRAW_BOX),
@@ -738,9 +738,9 @@ function gameFlow(packedScenes: readonly PackedScene[]): GameModule {
       push('hl'),
       ...sceneWord('nameAddress'),
       pop('de'),
-      call(DRAW_TILES),
+      ...invoke(DRAW_TILES, { de: 'de', hl: 'hl' }),
       ...sceneWord('fade'),
-      call(FADE_IN),
+      ...invoke(FADE_IN, { hl: 'hl' }),
       ...catFace(CAT_REST, 'neutral'),
       ...placeCat(CAT_SPOTS.dialogue),
       ret(),

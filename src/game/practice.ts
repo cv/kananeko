@@ -33,6 +33,7 @@ import {
   ret,
   srl,
   sub,
+  invoke,
 } from '../asm/sm83';
 import { type Op, Label, routine } from '../asm/types';
 import { at } from '../asm/util';
@@ -56,9 +57,17 @@ import { SPEED_ROUND_DATA } from './labels';
 
 // Labels placed in this module
 const PRACTICE_TABLE = new Label('practice_table');
-const PRACTICE_PICK = routine('practice_pick', { clobbers: ['a', 'd', 'bc'] });
-const PRACTICE_COPY = routine('practice_copy', { out: ['hl'], clobbers: ['a', 'b', 'de'] });
-const QUESTION_COPY = routine('question_copy', { out: ['hl'], clobbers: ['a', 'b', 'de'] });
+const PRACTICE_PICK = routine('practice_pick', { out: ['a'], clobbers: ['d', 'bc'] });
+const PRACTICE_COPY = routine('practice_copy', {
+  in: ['a', 'hl'],
+  out: ['hl'],
+  clobbers: ['a', 'b', 'de'],
+});
+const QUESTION_COPY = routine('question_copy', {
+  in: ['de', 'hl'],
+  out: ['de', 'hl'],
+  clobbers: ['a', 'b'],
+});
 const PRACTICE_FILL = routine('practice_fill', { clobbers: ['a', 'b', 'de', 'hl'] });
 
 /** Words for kana no line of dialogue has */
@@ -135,8 +144,7 @@ export function buildPracticeRoutines(speedRound: Label): Op[] {
         ld('a', 'c'),
         push('hl'),
         push('de'), // chart_bit uses DE (D counts the entries left to look at)
-        ld('hl', MEM.KANA_MISSED.address),
-        call(CHART_BIT),
+        ...invoke(CHART_BIT, { hl: MEM.KANA_MISSED.address, a: 'a' }),
         ld('a', ['hl']),
         pop('de'),
         pop('hl'),
@@ -183,7 +191,7 @@ export function buildPracticeRoutines(speedRound: Label): Op[] {
       push('hl'),
       call(PRACTICE_PICK),
       pop('hl'),
-      call(PRACTICE_COPY),
+      ...invoke(PRACTICE_COPY, { a: 'a', hl: 'hl' }),
       pop('bc'),
     ]),
     ld(['hl'], 0),
@@ -222,7 +230,7 @@ export function buildPracticeRoutines(speedRound: Label): Op[] {
         push('hl'),
         call(PRACTICE_PICK),
         pop('hl'),
-        call(PRACTICE_COPY),
+        ...invoke(PRACTICE_COPY, { a: 'a', hl: 'hl' }),
         pop('bc'),
         dec('b'),
       ]),
@@ -234,7 +242,12 @@ export function buildPracticeRoutines(speedRound: Label): Op[] {
       inc('a'), // A = the round's length - C
       ld('c', 'a'),
       ld('de', speedRound),
-      ...doWhile('nz', [push('bc'), call(QUESTION_COPY), pop('bc'), dec('c')]),
+      ...doWhile('nz', [
+        push('bc'),
+        ...invoke(QUESTION_COPY, { de: 'de', hl: 'hl' }),
+        pop('bc'),
+        dec('c'),
+      ]),
     ]),
     ld(['hl'], 0),
     ret(),
@@ -259,8 +272,7 @@ export function buildPracticeLoop(): Op[] {
     ...doWhile('z', [
       call(PRACTICE_FILL),
       ...storeByte(MEM.KANA_MODE, KanaMode.PRACTICE),
-      ld('de', MEM.PRACTICE_BUF.address),
-      call(PLAY_ROUND),
+      ...invoke(PLAY_ROUND, { de: MEM.PRACTICE_BUF.address }),
       ld('a', [MEM.PRACTICE_QUIT]),
       or('a'),
     ]),

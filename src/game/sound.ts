@@ -25,7 +25,6 @@ import { MEM } from './ram';
 import {
   add,
   and,
-  call,
   cp,
   db,
   dec,
@@ -41,6 +40,7 @@ import {
   ret,
   sub,
   xor,
+  invoke,
 } from '../asm/sm83';
 import { type Op, type U16, ioReg, u16, Label, labelFamily, routine } from '../asm/types';
 import { copyBytes, storeByte, tableEntry } from '../asm/macros';
@@ -49,7 +49,7 @@ import { gameModule } from '../asm/program';
 import { byte, struct } from '../asm/struct';
 
 // Labels placed in this module
-const VOICE_TICK = routine('voice_tick', { clobbers: ['a', 'bc', 'de', 'hl'] });
+const VOICE_TICK = routine('voice_tick', { in: ['c', 'hl'], clobbers: ['a', 'bc', 'de', 'hl'] });
 const NOTE_PERIODS = new Label('note_periods');
 const WAVE_DATA = new Label('wave_data');
 const SFX_TABLE = new Label('sfx_table');
@@ -265,7 +265,7 @@ export function songId(name: SongName): number {
 
 /** Play a song, unless it's already playing. Preserves every register and the flags. */
 export function playMusic(name: SongName): Op[] {
-  return [push('af'), ld('a', songId(name)), call(MUSIC_PLAY), pop('af')];
+  return [push('af'), ...invoke(MUSIC_PLAY, { a: songId(name) }), pop('af')];
 }
 
 /** How many frames a sequence lasts, up to its end or loop */
@@ -298,7 +298,7 @@ export function sfxId(name: SfxName): number {
 
 /** Play a sound effect. Preserves every register and the flags. */
 export function playSfx(name: SfxName): Op[] {
-  return [push('af'), ld('a', sfxId(name)), call(SFX_PLAY), pop('af')];
+  return [push('af'), ...invoke(SFX_PLAY, { a: sfxId(name) }), pop('af')];
 }
 
 // ---------------------------------------------------------------------------
@@ -368,9 +368,7 @@ export function buildSoundDriver(): Op[] {
   return [
     label(SOUND_TICK),
     ...VOICE_CHANNELS.flatMap((channel, voice) => [
-      ld('hl', voiceField(voice, 'PTR_LO')),
-      ld('c', channel),
-      call(VOICE_TICK),
+      ...invoke(VOICE_TICK, { hl: voiceField(voice, 'PTR_LO'), c: channel }),
     ]),
     ret(),
 

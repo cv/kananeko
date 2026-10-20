@@ -51,6 +51,7 @@ import {
   or,
   srl,
   sub,
+  invoke,
 } from '../asm/sm83';
 import { type Op, type TileIndex, u16, Label, routine } from '../asm/types';
 import { at } from '../asm/util';
@@ -264,9 +265,7 @@ function buildRoundFrame(): Op[] {
     ld('hl', u16(tilemapAddr(row, left))),
     ld('a', requireTile(l)),
     ld(['hl+'], 'a'),
-    ld('a', requireTile(edge)),
-    ld('b', innerWidth),
-    call(FILL_TILES),
+    ...invoke(FILL_TILES, { a: requireTile(edge), b: innerWidth, hl: 'hl' }),
     ld('a', requireTile(r)),
     ld(['hl+'], 'a'),
   ];

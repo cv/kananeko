@@ -17,7 +17,7 @@ import { compare, doWhile, ifThen, repeat } from '../asm/flow';
 import { HW } from '../asm/hardware';
 import { MEM } from './ram';
 import { copyBlock, decByte, incByte, storeByte, zeroBytes } from '../asm/macros';
-import { add, call, cp, dec, inc, jp, jr, label, ld, ldh, db, or, ret, and } from '../asm/sm83';
+import { add, cp, dec, inc, jp, jr, label, ld, ldh, db, or, ret, and, invoke } from '../asm/sm83';
 import { type Op, u16, Label, routine } from '../asm/types';
 import { hi, lo } from '../asm/util';
 import { sliceArt } from './art';
@@ -31,7 +31,7 @@ import { gameModule } from '../asm/program';
 
 // Labels placed in this module
 const CAT_TILES = new Label('cat_tiles');
-const CAT_PLACE = routine('cat_place', { clobbers: ['a', 'bc', 'de', 'hl'] });
+const CAT_PLACE = routine('cat_place', { in: ['b', 'c'], clobbers: ['a', 'bc', 'de', 'hl'] });
 
 export { CAT_FACES, type CatFace };
 
@@ -79,12 +79,12 @@ export function faceTile(face: CatFace): number {
 
 /** Call cat_place for a spot */
 export function placeCat(spot: { readonly x: number; readonly y: number }): Op[] {
-  return [ld('b', spot.x), ld('c', spot.y), call(CAT_PLACE)];
+  return invoke(CAT_PLACE, { b: spot.x, c: spot.y });
 }
 
 /** Call CAT_REACT or CAT_REST with a face */
 export function catFace(routine: typeof CAT_REACT, face: CatFace): Op[] {
-  return [ld('a', FACE[face]), call(routine)];
+  return invoke(routine, { a: FACE[face] });
 }
 
 /** At boot: copy the cat's tiles to sprite memory and set its GBC palette */

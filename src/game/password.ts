@@ -39,6 +39,7 @@ import {
   swap,
   srl,
   xor,
+  invoke,
 } from '../asm/sm83';
 import { HW } from '../asm/hardware';
 import { type Op, type U16, s8, u16, Label, routine } from '../asm/types';
@@ -77,7 +78,7 @@ import { TITLE_FADE } from './labels';
 const PASS_CHECK = routine('pass_check', { out: ['a'], clobbers: ['b'] });
 const PASS_XOR = routine('pass_xor', { clobbers: ['a', 'hl'] });
 const PASS_SHIFT = routine('pass_shift', { clobbers: ['hl'] });
-const PASS_TILE = routine('pass_tile', { clobbers: ['a'] });
+const PASS_TILE = routine('pass_tile', { in: ['a'], out: ['a'] });
 const PASS_ALPHABET = new Label('pass_alphabet');
 const PASS_DRAW_SLOTS = routine('pass_draw_slots', { clobbers: ['a', 'bc', 'de', 'hl'] });
 const PASS_CURSOR = routine('pass_cursor', { clobbers: ['a'] });
@@ -300,8 +301,8 @@ export function buildPasswordRoutines(sceneCount: number): Op[] {
     ...loop((again) => [
       ld('a', ['de']),
       inc('de'),
-      call(PASS_TILE),
-      call(VRAM_PUT),
+      ...invoke(PASS_TILE, { a: 'a' }),
+      ...invoke(VRAM_PUT, { a: 'a', hl: 'hl' }),
       dec('b'),
       ret('z'),
       jr(again),
@@ -474,11 +475,11 @@ export function buildPasswordScreen(fade: Label): Op[] {
     ...repeat(PASSWORD_LENGTH, [
       ld('a', ['de']),
       inc('de'),
-      call(PASS_TILE),
+      ...invoke(PASS_TILE, { a: 'a' }),
       dec('c'),
       bit(7, 'c'), // past the entered kana?
       ...ifThen('nz', [ld('a', EMPTY_SLOT)]),
-      call(VRAM_PUT),
+      ...invoke(VRAM_PUT, { a: 'a', hl: 'hl' }),
       inc('hl'),
     ]),
     ret(),

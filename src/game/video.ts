@@ -35,6 +35,7 @@ import {
   reti,
   sub,
   xor,
+  invoke,
 } from '../asm/sm83';
 import { type Op, u16, Label, Pooled, routine } from '../asm/types';
 import type { Quad } from './fixed';
@@ -56,9 +57,12 @@ import { gameModule } from '../asm/program';
 // Labels placed in this module
 const FRAME_WAIT = routine('frame_wait', { keepsFlags: true });
 const CLEAR_SCREEN = routine('clear_screen', { clobbers: ['a', 'bc', 'hl'] });
-const PALETTE_PUT = routine('palette_put', { keepsFlags: true });
-const FADE_APPLY = routine('fade_apply', { clobbers: ['a', 'c', 'd'] });
-const FADE_PALETTES = routine('fade_palettes', { clobbers: ['a', 'c', 'd', 'hl'] });
+const PALETTE_PUT = routine('palette_put', { in: ['a'], keepsFlags: true });
+const FADE_APPLY = routine('fade_apply', { in: ['b', 'hl'], clobbers: ['a', 'c', 'd'] });
+const FADE_PALETTES = routine('fade_palettes', {
+  in: ['b', 'd', 'hl'],
+  clobbers: ['a', 'c', 'd', 'hl'],
+});
 const FADE_WAIT = routine('fade_wait', { clobbers: ['a', 'c'] });
 const FADE_IN_CURRENT = routine('fade_in_current', { clobbers: ['a', 'd', 'bc', 'hl'] });
 const FADE_OUT = routine('fade_out', { clobbers: ['a', 'd', 'bc', 'hl'] });
@@ -166,7 +170,7 @@ export function buildVramPut(): Op[] {
 
 /** Write A to [HL+] safely while the LCD is on (see buildVramPut). */
 export function vramPut(): Op[] {
-  return [call(VRAM_PUT)];
+  return invoke(VRAM_PUT, { a: 'a', hl: 'hl' });
 }
 
 /** Ends a tile list drawn by draw_tiles (no tile has this index) */
@@ -193,7 +197,7 @@ export function buildDrawTiles(): Op[] {
     inc('de'),
     cp(TILES_END),
     ret('z'),
-    call(VRAM_PUT),
+    ...invoke(VRAM_PUT, { a: 'a', hl: 'hl' }),
     jr(DRAW_TILES),
 
     label(FILL_TILES),
@@ -207,13 +211,7 @@ export function buildDrawTiles(): Op[] {
 /** Draw tiles at a tilemap address from a shared tile list (safe with the LCD on) */
 export function drawTiles(address: number, tiles: readonly number[]): Op[] {
   // draw_tiles walks the list with DE: save the caller's
-  return [
-    push('de'),
-    ld('hl', u16(address)),
-    ld('de', tileList(tiles)),
-    call(DRAW_TILES),
-    pop('de'),
-  ];
+  return [push('de'), ...invoke(DRAW_TILES, { hl: u16(address), de: tileList(tiles) }), pop('de')];
 }
 
 /** Write a row of tiles horizontally centered on the visible screen (safe with the LCD on) */
@@ -358,7 +356,7 @@ const FADE_BGP_SHADES = [0xe4, 0x90, 0x40, 0x00] as const;
 
 /** Fade in the palette set at `setLabel`, turning the LCD on first. */
 export function fadeIn(setLabel: Label): Op[] {
-  return [ld('hl', setLabel), call(FADE_IN)];
+  return invoke(FADE_IN, { hl: setLabel });
 }
 
 /** Fade the palette set currently on screen back in (e.g. after redrawing). */
@@ -401,13 +399,11 @@ export function buildFadeRoutines(): Op[] {
     ldh([HW.BCPS], 'a'),
     // The UI and HUD palettes every screen shares, then the set's own
     push('hl'),
-    ld('hl', SHARED_PALETTES),
-    ld('d', SHARED_PALETTE_COUNT),
-    call(FADE_PALETTES),
+    ...invoke(FADE_PALETTES, { hl: SHARED_PALETTES, d: SHARED_PALETTE_COUNT, b: 'b' }),
     pop('hl'),
     ld('a', ['hl+']),
-    ld('d', 'a'), // D = palettes in the set
-    call(FADE_PALETTES),
+    // D = palettes in the set
+    ...invoke(FADE_PALETTES, { d: 'a', b: 'b', hl: 'hl' }),
     pop('hl'),
     ret(),
 
@@ -424,10 +420,8 @@ export function buildFadeRoutines(): Op[] {
         add('l'),
         ld('l', 'a'),
         ...ifThen('c', [inc('h')]),
-        ld('a', ['hl+']),
-        call(PALETTE_PUT),
-        ld('a', ['hl']),
-        call(PALETTE_PUT),
+        ...invoke(PALETTE_PUT, { a: ['hl+'] }),
+        ...invoke(PALETTE_PUT, { a: ['hl'] }),
         pop('hl'),
         inc('c'),
         ld('a', 'c'),
@@ -451,10 +445,15 @@ export function buildFadeRoutines(): Op[] {
     ...loadPointer('hl', MEM.FADE_TABLE),
     label(FADE_IN),
     ...storePointer('hl', MEM.FADE_TABLE),
-    ld('b', FADE_STEPS - 1),
-    call(FADE_APPLY),
+    ...invoke(FADE_APPLY, { b: FADE_STEPS - 1, hl: 'hl' }),
     ...screenOn(),
-    ...doWhile('nz', [call(FADE_WAIT), dec('b'), call(FADE_APPLY), ld('a', 'b'), cp(0)]),
+    ...doWhile('nz', [
+      call(FADE_WAIT),
+      dec('b'),
+      ...invoke(FADE_APPLY, { b: 'b', hl: 'hl' }),
+      ld('a', 'b'),
+      cp(0),
+    ]),
     ret(),
 
     // fade_out: step the current set to paper. HALT never wakes with the LCD
@@ -469,7 +468,7 @@ export function buildFadeRoutines(): Op[] {
     ...doWhile('nz', [
       call(FADE_WAIT),
       inc('b'),
-      call(FADE_APPLY),
+      ...invoke(FADE_APPLY, { b: 'b', hl: 'hl' }),
       ld('a', 'b'),
       cp(FADE_STEPS - 1),
     ]),

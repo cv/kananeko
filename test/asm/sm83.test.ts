@@ -12,6 +12,7 @@ import {
   cp,
   dec,
   inc,
+  invoke,
   jp,
   jr,
   ld,
@@ -26,7 +27,7 @@ import {
   swap,
   xor,
 } from '@asm/sm83';
-import { type Op, ioReg, Label, u8, u16 } from '@asm/types';
+import { type Op, ioReg, Label, routine, u8, u16 } from '@asm/types';
 
 const X = new Label('x');
 const { V } = allocate('test', 0xc000, 1, { V: byte() }).vars;
@@ -104,5 +105,38 @@ describe('the mnemonic layer', () => {
     expect(() => ld('a', V)).toThrow(RangeError);
     // @ts-expect-error ADD only adds 16-bit pairs to HL
     expect(() => add('de', 'bc')).toThrow(/add has no form/);
+  });
+});
+
+describe('invoke', () => {
+  const R = routine('r', { in: ['a', 'hl'] });
+  const bytesOf = (ops: readonly Op[]): number[] =>
+    ops.flatMap((o) => (o.kind === 'inst' ? [...o.bytes] : [])); // CALL nn with nn filled in later
+
+  it('loads the arguments in the order written, then calls', () => {
+    expect(bytesOf(invoke(R, { hl: 0x1234, a: 'b' }))).toEqual([
+      0x21, 0x34, 0x12, 0x78, 0xcd, 0, 0,
+    ]);
+  });
+
+  it('loads nothing for an argument that is already in place', () => {
+    expect(bytesOf(invoke(R, { a: 'a', hl: 'hl' }))).toEqual([0xcd, 0, 0]);
+  });
+
+  it('rejects a load from a register an earlier argument set', () => {
+    expect(() => invoke(R, { hl: 0x1234, a: 'l' })).toThrow(/a is loaded from l/);
+    expect(() => invoke(R, { hl: 0x1234, a: ['hl'] })).toThrow(/a is loaded from hl/);
+  });
+
+  it('needs every argument the contract takes, and no others', () => {
+    // @ts-expect-error: hl is missing
+    expect(() => invoke(R, { a: 1 })).toThrow(/takes a, hl, given a/);
+    // @ts-expect-error: R takes arguments, so call() won't do
+    call(R);
+    // @ts-expect-error: nor a conditional call
+    call('z', R);
+    // @ts-expect-error: HL can't be loaded from another pair
+    expect(() => invoke(R, { a: 1, hl: 'de' })).toThrow();
+    expect(call(routine('n'))).toMatchObject({ kind: 'inst' });
   });
 });

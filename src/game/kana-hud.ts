@@ -16,7 +16,22 @@
 import { playSfx } from './sound';
 import { compare, ifNotEquals, ifThen, loop } from '../asm/flow';
 import { type Op, type TileIndex, type U16, u16, Label, routine } from '../asm/types';
-import { adc, add, call, cp, dec, inc, jp, jr, label, ld, ret, sbc, sub } from '../asm/sm83';
+import {
+  adc,
+  add,
+  call,
+  cp,
+  dec,
+  inc,
+  jp,
+  jr,
+  label,
+  ld,
+  ret,
+  sbc,
+  sub,
+  invoke,
+} from '../asm/sm83';
 import { MEM } from './ram';
 import { copyByte, copyWord, switchCases, zeroBytes } from '../asm/macros';
 import { at, hi, lo } from '../asm/util';
@@ -30,8 +45,8 @@ import { SCORE_DIGITS, HUD_UPDATE, KANA_DRAW_HUD } from './labels';
 import { gameModule } from '../asm/program';
 
 // Labels placed in this module
-const SCORE_ADD = routine('score_add', { clobbers: ['a', 'b'] });
-const SCORE_SUB = routine('score_sub', { clobbers: ['a', 'b'] });
+const SCORE_ADD = routine('score_add', { in: ['a'], clobbers: ['a', 'b'] });
+const SCORE_SUB = routine('score_sub', { in: ['a'], clobbers: ['a', 'b'] });
 const HUD_REDRAW = new Label('hud_redraw');
 
 // ---------------------------------------------------------------------------
@@ -103,13 +118,13 @@ export const MAX_SCORE = 50_000; // well past a perfect run; adding at most 255 
 
 /** Add to the score, capped at MAX_SCORE (clobbers A, B). */
 export function buildAddScore(delta: ScoreDelta): Op[] {
-  return [ld('a', delta), call(SCORE_ADD)];
+  return invoke(SCORE_ADD, { a: delta });
 }
 
 /** Generate 16-bit score subtract: SCORE -= delta */
 /** Subtract from the score, stopping at zero (clobbers A, B). */
 export function buildSubScore(delta: ScoreDelta): Op[] {
-  return [ld('a', delta), call(SCORE_SUB)];
+  return invoke(SCORE_SUB, { a: delta });
 }
 
 /** Decimal places converted by score_digits (the ones digit is what remains) */

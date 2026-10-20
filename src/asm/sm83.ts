@@ -17,6 +17,7 @@
 
 import * as op from './ops';
 import {
+  type ArgReg,
   type CCName,
   type ExternalRoutine,
   type Imm,
@@ -26,6 +27,7 @@ import {
   type R8Name,
   type R16Name,
   type R16StackName,
+  type Routine,
   type Target,
   type U16,
   u8,
@@ -230,12 +232,77 @@ export function jp(a: CCName | U16 | Label | ExternalRoutine, b?: U16 | Label): 
   return b === undefined ? op.jp(a as U16 | Label) : op.jp_cc(a as CCName, b);
 }
 
+/** A call target, unless it's a routine that takes arguments: those are called with invoke() */
+export type CallTarget<T> =
+  T extends Routine<infer In>
+    ? [In] extends [never]
+      ? T
+      : { readonly 'takes arguments: call it with invoke()': In }
+    : T;
+
 /** CALL nn or CALL cc,nn */
-export function call(target: U16 | Label | ExternalRoutine): Op;
-export function call(cc: CCName, target: U16 | Label): Op;
+export function call<T extends U16 | Label | ExternalRoutine>(target: T & CallTarget<T>): Op;
+export function call<T extends U16 | Label>(cc: CCName, target: T & CallTarget<T>): Op;
 export function call(a: CCName | U16 | Label | ExternalRoutine, b?: U16 | Label): Op {
   if (isExternal(a)) return toExternal(op.call(a.address), a);
   return b === undefined ? op.call(a as U16 | Label) : op.call_cc(a as CCName, b);
+}
+
+/** What an argument register can be loaded from: its own name means it's already there */
+export type ArgSource<R extends ArgReg> = R extends 'a'
+  ? R8 | AtHL | Imm | AccumulatorMem
+  : R extends R8
+    ? R8 | AtHL | Imm
+    : number | Target | R;
+
+const HALVES: Readonly<Record<string, readonly string[]>> = {
+  bc: ['b', 'c'],
+  de: ['d', 'e'],
+  hl: ['h', 'l'],
+  'hl+': ['h', 'l'],
+  'hl-': ['h', 'l'],
+};
+
+/** The 8-bit registers loading from `src` reads */
+function readsOf(src: unknown): readonly string[] {
+  if (typeof src === 'string') return HALVES[src] ?? [src];
+  if (isMem(src) && typeof src[0] === 'string') return HALVES[src[0]] ?? [src[0]];
+  return [];
+}
+
+/**
+ * Call a routine, loading its arguments first: one for each register in its contract's
+ * `in`, so a missing or extra one is a type error.
+ *
+ *   ...invoke(CAT_PLACE, { b: 40, c: 'c' })   // LD B,40 / CALL cat_place, C already set
+ *
+ * The loads happen in the order written; one can't read a register an earlier one set.
+ */
+export function invoke<In extends ArgReg>(
+  target: Routine<In>,
+  args: { readonly [K in In]: ArgSource<K> },
+): Op[] {
+  const declared = target.contract.in ?? [];
+  const given = Object.keys(args);
+  if (given.length !== declared.length || !declared.every((r) => given.includes(r))) {
+    throw new Error(
+      `invoke ${target.toString()}: takes ${declared.join(', ') || 'nothing'}, given ${given.join(', ') || 'nothing'}`,
+    );
+  }
+  const set: string[] = [];
+  const loads: Op[] = [];
+  for (const [reg, src] of Object.entries(args) as [ArgReg, unknown][]) {
+    if (src === reg) continue;
+    const clash = readsOf(src).filter((r) => set.includes(r));
+    if (clash.length > 0) {
+      throw new Error(
+        `invoke ${target.toString()}: ${reg} is loaded from ${clash.join('')}, which an earlier argument just set`,
+      );
+    }
+    loads.push((ld as (dst: unknown, src: unknown) => Op)(reg, src));
+    set.push(...readsOf(reg));
+  }
+  return [...loads, op.call(target)];
 }
 
 /** RET or RET cc */

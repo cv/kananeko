@@ -54,6 +54,7 @@ import {
   pop,
   push,
   xor,
+  invoke,
 } from '../asm/sm83';
 import { type Op, u16, Label, routine } from '../asm/types';
 import { hi, lo } from '../asm/util';
@@ -226,8 +227,7 @@ function buildTextboxRow(row: number, left: number, fill: number | 'clear', righ
     ld('a', left),
     ld(['hl+'], 'a'),
     fill === 'clear' ? xor('a') : ld('a', fill),
-    ld('b', interior),
-    call(FILL_TILES),
+    ...invoke(FILL_TILES, { b: interior, a: 'a', hl: 'hl' }),
     ld('a', right),
     ld(['hl+'], 'a'),
   ];
