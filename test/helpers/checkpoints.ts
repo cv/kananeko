@@ -11,10 +11,11 @@
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+
+import { STACK_REGION } from '@game/ram';
 import { SCENES, SPEED_ROUND } from '@game/scene';
 import { DialogueState } from '@game/state';
-import { STACK_REGION } from '@game/ram';
-import { FADE_STEPS, FADE_STEP_FRAMES } from '@game/video';
+import { FADE_STEP_FRAMES, FADE_STEPS } from '@game/video';
 
 /** Long enough for a screen change to fade out and back in */
 export const SETTLE_FRAMES = 2 * FADE_STEPS * FADE_STEP_FRAMES + 10;

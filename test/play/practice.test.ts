@@ -1,11 +1,12 @@
 /** れんしゅう: practicing missed kana from the title menu, and in the speed round. */
 
-import { describe, expect, it } from 'vitest';
 import { CHART_KANA, chartIndexOf } from '@game/chart';
 import { menuPick } from '@game/menu';
 import { PRACTICE_ROUND } from '@game/practice';
 import { SCENES, SPEED_ROUND } from '@game/scene';
 import { KanaMode, MAX_LIVES } from '@game/state';
+import { describe, expect, it } from 'vitest';
+
 import { checkpoint, runnerAt } from '../helpers/checkpoints';
 import { GameRunner } from '../helpers/game-runner';
 

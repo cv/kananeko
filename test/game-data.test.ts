@@ -1,33 +1,33 @@
 /** Font, kana question, and scene-data builders. */
 
-import { describe, expect, it } from 'vitest';
+import { packAnimation } from '@game/anim';
+import { BACKDROP, buildSceneArt, SCENE_TILE_BASE, SCENE_TILE_CAPACITY } from '@game/backdrop';
 import {
-  CHAR_MAP,
-  TILE_COUNT,
+  attributeOfCell,
+  buildPaletteSet,
+  buildSharedPalettes,
+  PAL,
+  paletteOf,
+  paletteOfCell,
+} from '@game/color';
+import { buildDialogueTree, type DialogueNode } from '@game/dialogue';
+import {
   buildTileData,
+  CHAR_MAP,
   encodeGlyph,
   glyphOf,
   requireTile,
   textToTiles,
+  TILE_COUNT,
 } from '@game/font';
-import { MAX_KANA_WORD_LENGTH, buildKanaData, defineKanaQuestion } from '@game/kana';
-import { type DialogueNode, buildDialogueTree } from '@game/dialogue';
+import { buildKanaData, defineKanaQuestion, MAX_KANA_WORD_LENGTH } from '@game/kana';
+import { MAX_CAST, packCast } from '@game/npc';
+import { HUD_PALETTE, INK, inked, UI_PALETTE } from '@game/palette';
 import { packScene, SCENES } from '@game/scene';
+import { ENDING_COLORS, GAME_OVER_COLORS, TITLE_COLORS } from '@game/scenes/colors';
 import { centerStartCol, tilemapAddr, tilePos } from '@game/tilemap';
 import { bgTileAddr, encodeRuns, rgb } from '@game/video';
-import { HUD_PALETTE, INK, UI_PALETTE, inked } from '@game/palette';
-import {
-  PAL,
-  attributeOfCell,
-  buildPaletteSet,
-  buildSharedPalettes,
-  paletteOf,
-  paletteOfCell,
-} from '@game/color';
-import { MAX_CAST, packCast } from '@game/npc';
-import { packAnimation } from '@game/anim';
-import { ENDING_COLORS, GAME_OVER_COLORS, TITLE_COLORS } from '@game/scenes/colors';
-import { BACKDROP, SCENE_TILE_BASE, SCENE_TILE_CAPACITY, buildSceneArt } from '@game/backdrop';
+import { describe, expect, it } from 'vitest';
 
 describe('font', () => {
   it('maps space to the blank tile 0 and every glyph to a later tile', () => {

@@ -6,71 +6,18 @@
  * rounds.ts) → the speed round → the ending, or game over (results.ts) → title
  */
 
-import { titleModule, titleScreen } from './title';
-import { CHANCE_CHECK, ROUND_CHECK, engineLoop, resetRunState, roundsModule } from './rounds';
-import { ENDING, GAME_OVER_SCREEN, resultScreen, resultsModule } from './results';
-import { buildBoot, fontModule } from './boot';
+import { assemble, type AssembleResult, type ROMHeader } from '../asm/assembler';
 import { compare, doWhile, ifElse, ifThen } from '../asm/flow';
-import { type AssembleResult, type ROMHeader, assemble } from '../asm/assembler';
 import { HW } from '../asm/hardware';
-import { MEM } from './ram';
-import { type GameModule, gameModule, link } from '../asm/program';
-import {
-  CAT_REST,
-  DLG_OPEN_TREE,
-  DLG_OPEN_NODE,
-  DLG_DRAW_BOX,
-  DLG_UPDATE,
-  KANA_DRAW_HUD,
-  SCENE_DESC,
-  CHART_SHOW,
-  PRACTICE_RAND,
-  SPEED_FILL,
-  VBLANK_HANDLER,
-  DRAW_RUNS,
-  DRAW_TILES,
-  FADE_IN,
-  PLAY_ROUND,
-  SCENE_LOAD,
-  SHARED_PALETTES,
-} from './labels';
-import type { PackedScene } from './scene';
-import { animModule } from './anim';
-import { catModule, CAT_SPOTS, catFace, placeCat } from './cat';
-import { chartModule } from './chart';
-import { dialogueModule, DIALOGUE_LAYOUT } from './dialogue';
-import { joypadModule } from './joypad';
-import { kanaModule } from './kana';
-import { hudModule } from './kana-hud';
-import { menuModule } from './menu';
-import { npcModule, NPC_NONE, NPC_TILE_BASE } from './npc';
-import { passwordModule } from './password';
-import { practiceModule } from './practice';
-import {
-  sceneTableModule,
-  buildSceneTable,
-  copySceneBlock,
-  sceneByte,
-  sceneWord,
-} from './scene-table';
-import { soundModule, playMusic } from './sound';
-import { spritesModule } from './sprites';
-import {
-  videoModule,
-  bgTileAddr,
-  tileList,
-  cgbAttributes,
-  clearScreen,
-  fadeOut,
-  screenOff,
-} from './video';
 import { incByte, storeByte, storePointer, zeroBytes } from '../asm/macros';
+import { type GameModule, gameModule, link } from '../asm/program';
 import {
   call,
   cp,
-  dec,
   db,
+  dec,
   ei,
+  invoke,
   jp,
   jr,
   label,
@@ -81,16 +28,69 @@ import {
   push,
   ret,
   xor,
-  invoke,
 } from '../asm/sm83';
-import { type Op, u16, Label, labelFamily, routine } from '../asm/types';
-import { SCENE_TILE_BASE, BACKDROP } from './backdrop';
+import { Label, labelFamily, type Op, routine, u16 } from '../asm/types';
+import { animModule } from './anim';
+import { BACKDROP, SCENE_TILE_BASE } from './backdrop';
+import { buildBoot, fontModule } from './boot';
+import { CAT_SPOTS, catFace, catModule, placeCat } from './cat';
+import { chartModule } from './chart';
+import { buildSharedPalettes } from './color';
+import { DIALOGUE_LAYOUT, dialogueModule } from './dialogue';
 import { requireTile } from './font';
 import { UI_TILES } from './font-data';
-import { tilemapAddr } from './tilemap';
-import { SCENES, buildSceneData, dialogueCodec } from './scene';
+import { joypadModule } from './joypad';
+import { kanaModule } from './kana';
+import { hudModule } from './kana-hud';
+import {
+  CAT_REST,
+  CHART_SHOW,
+  DLG_DRAW_BOX,
+  DLG_OPEN_NODE,
+  DLG_OPEN_TREE,
+  DLG_UPDATE,
+  DRAW_RUNS,
+  DRAW_TILES,
+  FADE_IN,
+  KANA_DRAW_HUD,
+  PLAY_ROUND,
+  PRACTICE_RAND,
+  SCENE_DESC,
+  SCENE_LOAD,
+  SHARED_PALETTES,
+  SPEED_FILL,
+  VBLANK_HANDLER,
+} from './labels';
+import { menuModule } from './menu';
+import { NPC_NONE, NPC_TILE_BASE, npcModule } from './npc';
+import { passwordModule } from './password';
+import { practiceModule } from './practice';
+import { MEM } from './ram';
+import { ENDING, GAME_OVER_SCREEN, resultScreen, resultsModule } from './results';
+import { CHANCE_CHECK, engineLoop, resetRunState, ROUND_CHECK, roundsModule } from './rounds';
+import type { PackedScene } from './scene';
+import { buildSceneData, dialogueCodec, SCENES } from './scene';
+import {
+  buildSceneTable,
+  copySceneBlock,
+  sceneByte,
+  sceneTableModule,
+  sceneWord,
+} from './scene-table';
+import { playMusic, soundModule } from './sound';
+import { spritesModule } from './sprites';
 import { END_OF_CONVERSATION, KanaMode } from './state';
-import { buildSharedPalettes } from './color';
+import { tilemapAddr } from './tilemap';
+import { titleModule, titleScreen } from './title';
+import {
+  bgTileAddr,
+  cgbAttributes,
+  clearScreen,
+  fadeOut,
+  screenOff,
+  tileList,
+  videoModule,
+} from './video';
 
 // Labels placed in this module
 const SCENE_DRAW = routine('scene_draw', { clobbers: ['a', 'bc', 'de', 'hl'] });

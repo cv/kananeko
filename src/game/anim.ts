@@ -3,18 +3,18 @@
  * into the tile's VRAM, so every copy of it on screen animates at once.
  */
 
-import { MEM } from './ram';
 import { ifThen, repeat } from '../asm/flow';
 import { incByte, loadPointer } from '../asm/macros';
+import { gameModule } from '../asm/program';
 import { add, and, cp, inc, label, ld, pop, push, ret, swap, xor } from '../asm/sm83';
 import type { Op } from '../asm/types';
 import type { SceneArt } from './backdrop';
 import { encodeGlyph } from './font';
-import { SCENERY, isProp } from './scenery';
+import { ANIM_TICK } from './labels';
+import { MEM } from './ram';
+import { isProp, SCENERY } from './scenery';
 import type { TileAnimation } from './scenes/animations';
 import { bgTileAddr, vramPut } from './video';
-import { ANIM_TICK } from './labels';
-import { gameModule } from '../asm/program';
 
 // Labels placed in this module
 

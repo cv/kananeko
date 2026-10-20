@@ -5,9 +5,9 @@
  * after the named label before them, so they need no names of their own.
  */
 
-import { add, cp, dec, inc, jp, jr, label, ld, ldh, or, ret, xor } from './sm83';
 import { HW } from './hardware';
 import type { ByteValue, WordVar } from './ram';
+import { add, cp, dec, inc, jp, jr, label, ld, ldh, or, ret, xor } from './sm83';
 import { Label, type Op, type Target, type U16 } from './types';
 import { lo } from './util';
 

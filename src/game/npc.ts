@@ -4,18 +4,18 @@
  * speaker is chosen per dialogue node from the scene's segment table.
  */
 
-import { MEM } from './ram';
 import { compare, ifThen, loop } from '../asm/flow';
 import { incByte, loadPointer, storeByte, zeroBytes } from '../asm/macros';
-import { add, cp, dec, inc, jp, jr, label, ld, and, ret } from '../asm/sm83';
+import { gameModule } from '../asm/program';
+import { add, and, cp, dec, inc, jp, jr, label, ld, ret } from '../asm/sm83';
 import type { Op } from '../asm/types';
 import { sliceArt } from './art';
 import { encodeGlyph } from './font';
-import { type NpcLook, npcArt } from './npc-art';
+import { NPC_HIDE, NPC_SELECT, NPC_UPDATE } from './labels';
+import { npcArt, type NpcLook } from './npc-art';
+import { MEM } from './ram';
 import type { SceneCast } from './scenes/npcs';
-import { OAM_X_OFFSET, OAM_Y_OFFSET, SPRITE_SLOT, oamField } from './sprites';
-import { NPC_SELECT, NPC_UPDATE, NPC_HIDE } from './labels';
-import { gameModule } from '../asm/program';
+import { OAM_X_OFFSET, OAM_Y_OFFSET, oamField, SPRITE_SLOT } from './sprites';
 
 // Labels placed in this module
 

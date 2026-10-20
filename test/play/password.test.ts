@@ -1,21 +1,22 @@
 /** The title menu, the password at game over, and typing it back in. */
 
-import { describe, expect, it } from 'vitest';
-import { MEM } from '@game/ram';
 import { MENU_TEXT_COL, MENU_TOP_ROW, TITLE_MENU } from '@game/menu';
 import {
-  PASSWORD_LABEL,
-  PASSWORD_LENGTH,
-  PASSWORD_PROMPT,
-  PASSWORD_LAYOUT,
-  PASSWORD_WRONG_TEXT,
   decodePassword,
   encodePassword,
+  PASSWORD_LABEL,
+  PASSWORD_LAYOUT,
+  PASSWORD_LENGTH,
+  PASSWORD_PROMPT,
+  PASSWORD_WRONG_TEXT,
   passwordLineCol,
 } from '@game/password';
+import { MEM } from '@game/ram';
 import { SCENES } from '@game/scene';
 import { DialogueState, MAX_LIVES } from '@game/state';
 import { centerStartCol } from '@game/tilemap';
+import { describe, expect, it } from 'vitest';
+
 import { checkpoint, runnerAt } from '../helpers/checkpoints';
 import { GameRunner } from '../helpers/game-runner';
 import { loseOneKanaLife } from '../helpers/play';

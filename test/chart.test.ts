@@ -1,9 +1,9 @@
 /** The kana chart: its 46 kana, what counts toward each, and where they're drawn. */
 
-import { describe, expect, it } from 'vitest';
 import { CHART_KANA, chartCell, chartIndexOf } from '@game/chart';
 import { CHAR_MAP } from '@game/font';
-import { SCENES, SPEED_ROUND, sceneRounds } from '@game/scene';
+import { sceneRounds, SCENES, SPEED_ROUND } from '@game/scene';
+import { describe, expect, it } from 'vitest';
 
 describe('Given the chart', () => {
   it('has the 46 basic hiragana, all in the font', () => {

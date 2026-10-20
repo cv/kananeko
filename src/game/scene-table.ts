@@ -5,14 +5,14 @@
  * (scene_word, scene_byte), instead of switching on the scene for every load.
  */
 
-import { MEM } from './ram';
 import { loadPointer, storePointer, tableEntry } from '../asm/macros';
-import { add, dec, dw, inc, jr, label, ld, or, pop, push, ret, invoke } from '../asm/sm83';
-import { type Op, type U16, Label, routine } from '../asm/types';
+import { gameModule } from '../asm/program';
+import { add, dec, dw, inc, invoke, jr, label, ld, or, pop, push, ret } from '../asm/sm83';
+import { byte, type FieldsOf, type RecordOf, struct, word } from '../asm/struct';
+import { Label, type Op, routine, type U16 } from '../asm/types';
 import { at } from '../asm/util';
 import { SCENE_DESC } from './labels';
-import { gameModule } from '../asm/program';
-import { type FieldsOf, type RecordOf, byte, struct, word } from '../asm/struct';
+import { MEM } from './ram';
 
 // Labels placed in this module
 const SCENE_TABLE = new Label('scene_table');

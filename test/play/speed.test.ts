@@ -1,9 +1,10 @@
 /** The speed round before the ending */
 
-import { describe, expect, it } from 'vitest';
 import { CLOCK_POSITION, KANA_LAYOUT, KANA_MESSAGES, SPEED_SECONDS } from '@game/kana';
 import { SCENES, SPEED_ROUND } from '@game/scene';
 import { KanaMode, KanaState } from '@game/state';
+import { describe, expect, it } from 'vitest';
+
 import { checkpoint, runnerAt } from '../helpers/checkpoints';
 import type { GameRunner } from '../helpers/game-runner';
 import { readText, waitForPicture } from '../helpers/screen';

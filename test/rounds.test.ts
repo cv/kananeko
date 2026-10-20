@@ -1,20 +1,20 @@
-import { describe, expect, it } from 'vitest';
-import { SCENES, sceneRounds } from '@game/scene';
+import type { DialogueNode } from '@game/dialogue';
+import { BAD_CHOICE_FLAG } from '@game/dialogue-data';
+import { CHAR_MAP } from '@game/font';
+import { buildKanaData, type KanaQuestion } from '@game/kana';
+import { phrasesOf } from '@game/quiz';
 import {
-  MAX_ROUNDS,
-  QUESTIONS_PER_BREAK,
   buildRoundsData,
   conversationBreaks,
-  REDEEM_KEY,
+  MAX_ROUNDS,
   planQuiz,
+  QUESTIONS_PER_BREAK,
+  REDEEM_KEY,
 } from '@game/rounds';
-import type { DialogueNode } from '@game/dialogue';
-import { CHAR_MAP } from '@game/font';
-import { phrasesOf } from '@game/quiz';
-import { type KanaQuestion, buildKanaData } from '@game/kana';
-import { BAD_PICK, END_OF_CONVERSATION } from '@game/state';
-import { BAD_CHOICE_FLAG } from '@game/dialogue-data';
+import { sceneRounds, SCENES } from '@game/scene';
 import type { SceneCast } from '@game/scenes/npcs';
+import { BAD_PICK, END_OF_CONVERSATION } from '@game/state';
+import { describe, expect, it } from 'vitest';
 
 const q = (word: string): KanaQuestion => ({
   word,

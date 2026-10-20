@@ -29,8 +29,8 @@ import {
   type R16StackName,
   type Routine,
   type Target,
-  type U16,
   u8,
+  type U16,
   u16,
 } from './types';
 

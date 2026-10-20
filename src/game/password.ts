@@ -13,21 +13,24 @@
 
 import { compare, ifThen, loop, repeat } from '../asm/flow';
 import { JOY } from '../asm/hardware';
-import { MEM } from './ram';
+import { HW } from '../asm/hardware';
+import { copyByte, incByte, storeByte, tableEntry, zeroBytes } from '../asm/macros';
+import { gameModule } from '../asm/program';
 import {
-  add,
-  bit,
-  ld,
   adc,
+  add,
   and,
+  bit,
   call,
   cp,
   db,
   dec,
   inc,
+  invoke,
   jp,
   jr,
   label,
+  ld,
   ldh,
   or,
   pop,
@@ -36,19 +39,30 @@ import {
   rl,
   rlca,
   sla,
-  swap,
   srl,
+  swap,
   xor,
-  invoke,
 } from '../asm/sm83';
-import { HW } from '../asm/hardware';
-import { type Op, type U16, s8, Label, routine } from '../asm/types';
+import { Label, type Op, routine, s8, type U16 } from '../asm/types';
 import { hi, lo } from '../asm/util';
-import { copyByte, incByte, storeByte, tableEntry, zeroBytes } from '../asm/macros';
 import { requireTile, textToTiles } from './font';
 import { MAX_SCORE } from './kana-hud';
+import {
+  JOY_READ,
+  PASS_APPLY,
+  PASS_DECODE,
+  PASS_DRAW,
+  PASS_ENCODE,
+  PASSWORD_SCREEN,
+  SCENE_LOAD,
+  TITLE_SCREEN,
+  VRAM_PUT,
+} from './labels';
+import { TITLE_FADE } from './labels';
+import { MEM } from './ram';
+import { SCENES } from './scene';
 import { playSfx } from './sound';
-import { SPRITE_SLOT, SPRITE_TILE, oamField, runDma } from './sprites';
+import { oamField, runDma, SPRITE_SLOT, SPRITE_TILE } from './sprites';
 import { centerStartCol, tilemapAddr } from './tilemap';
 import {
   clearScreen,
@@ -59,20 +73,6 @@ import {
   screenOff,
   writeCenteredRow,
 } from './video';
-import {
-  VRAM_PUT,
-  JOY_READ,
-  SCENE_LOAD,
-  TITLE_SCREEN,
-  PASS_ENCODE,
-  PASS_DECODE,
-  PASS_APPLY,
-  PASS_DRAW,
-  PASSWORD_SCREEN,
-} from './labels';
-import { gameModule } from '../asm/program';
-import { SCENES } from './scene';
-import { TITLE_FADE } from './labels';
 
 // Labels placed in this module
 const PASS_CHECK = routine('pass_check', { out: ['a'], clobbers: ['b'] });

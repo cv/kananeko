@@ -3,11 +3,11 @@
  * Used to test assembler macros by behavior rather than by byte patterns.
  */
 
-import Gameboy from 'serverboy';
 import { assemble } from '@asm/assembler';
-import { di, jr, label, ld } from '@asm/sm83';
 import { storeByte } from '@asm/macros';
-import { type Op, u16, Label } from '@asm/types';
+import { di, jr, label, ld } from '@asm/sm83';
+import { Label, type Op, u16 } from '@asm/types';
+import Gameboy from 'serverboy';
 
 // Labels placed in this module
 const __HALT = new Label('__halt');

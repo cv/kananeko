@@ -14,10 +14,10 @@
 
 export type Glyph = [string, string, string, string, string, string, string, string];
 
-import { LATIN_UPPER, DIGITS_PUNCT, BORDER } from './glyphs-latin';
 import { HIRAGANA } from './glyphs-hiragana';
-import { KATAKANA } from './glyphs-katakana';
 import { MARKS, SCENE_ICONS, UI_ICONS } from './glyphs-icons';
+import { KATAKANA } from './glyphs-katakana';
+import { BORDER, DIGITS_PUNCT, LATIN_UPPER } from './glyphs-latin';
 import { LOGO_GLYPHS } from './logo';
 
 /**

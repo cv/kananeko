@@ -1,9 +1,9 @@
 /** Linking modules into a program. */
 
-import { describe, expect, it } from 'vitest';
 import { gameModule, link } from '@asm/program';
 import { db, nop, ret } from '@asm/sm83';
 import type { Op } from '@asm/types';
+import { describe, expect, it } from 'vitest';
 
 const tag = (n: number): Op => db([n]);
 

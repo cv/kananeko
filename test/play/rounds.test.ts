@@ -1,8 +1,9 @@
 /** Kana rounds between conversations */
 
-import { describe, expect, it } from 'vitest';
-import { SCENES, sceneRounds } from '@game/scene';
+import { sceneRounds, SCENES } from '@game/scene';
 import { KanaState } from '@game/state';
+import { describe, expect, it } from 'vitest';
+
 import { checkpoint, runnerAt } from '../helpers/checkpoints';
 import type { GameRunner } from '../helpers/game-runner';
 

@@ -1,10 +1,10 @@
 /** Register contracts, checked against what routines' code does. */
 
-import { describe, expect, it } from 'vitest';
-import { REG, effect } from '@asm/analysis';
+import { effect, REG } from '@asm/analysis';
 import { assemble } from '@asm/assembler';
 import { call, cp, inc, invoke, jp, jr, label, ld, nop, pop, push, ret, xor } from '@asm/sm83';
 import { type ExternalRoutine, Label, type Op, routine, u16 } from '@asm/types';
+import { describe, expect, it } from 'vitest';
 
 const HEADER = { title: 'TEST' };
 

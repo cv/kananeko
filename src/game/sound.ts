@@ -21,7 +21,8 @@
 
 import { block, ifElse, ifThen } from '../asm/flow';
 import { HW } from '../asm/hardware';
-import { MEM } from './ram';
+import { copyBytes, storeByte, tableEntry } from '../asm/macros';
+import { gameModule } from '../asm/program';
 import {
   add,
   and,
@@ -30,6 +31,7 @@ import {
   dec,
   dw,
   inc,
+  invoke,
   jr,
   label,
   ld,
@@ -40,13 +42,11 @@ import {
   ret,
   sub,
   xor,
-  invoke,
 } from '../asm/sm83';
-import { type Op, type U16, ioReg, u16, Label, labelFamily, routine } from '../asm/types';
-import { copyBytes, storeByte, tableEntry } from '../asm/macros';
-import { SOUND_TICK, SFX_PLAY, MUSIC_PLAY } from './labels';
-import { gameModule } from '../asm/program';
 import { byte, struct } from '../asm/struct';
+import { ioReg, Label, labelFamily, type Op, routine, type U16, u16 } from '../asm/types';
+import { MUSIC_PLAY, SFX_PLAY, SOUND_TICK } from './labels';
+import { MEM } from './ram';
 
 // Labels placed in this module
 const VOICE_TICK = routine('voice_tick', { in: ['c', 'hl'], clobbers: ['a', 'bc', 'de', 'hl'] });

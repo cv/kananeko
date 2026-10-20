@@ -10,9 +10,6 @@
  * any other choice is "bad" (-5 score, -1 life, conversation ends at 0 lives).
  */
 
-import type { TextCodec } from './text-codec';
-import { ifHeld, pressed } from './joypad';
-import { playSfx } from './sound';
 import {
   compare,
   dispatch,
@@ -24,7 +21,6 @@ import {
   repeat,
 } from '../asm/flow';
 import { HW, JOY } from '../asm/hardware';
-import { MEM } from './ram';
 import {
   copyByte,
   countDownOrReturn,
@@ -36,60 +32,64 @@ import {
   tableEntry,
   zeroBytes,
 } from '../asm/macros';
+import { type GameModule, gameModule } from '../asm/program';
 import {
   adc,
   add,
   and,
   call,
   cp,
+  db,
   dec,
   inc,
+  invoke,
   jp,
   jr,
   label,
   ld,
   ldh,
-  ret,
-  sub,
   or,
   pop,
   push,
+  ret,
+  sub,
   xor,
-  invoke,
-  db,
 } from '../asm/sm83';
-import { type Op, Label, routine } from '../asm/types';
+import { Label, type Op, routine } from '../asm/types';
 import { hi, lo } from '../asm/util';
+import { catFace } from './cat';
 import { BAD_CHOICE_FLAG, NEXT_END, TEXT_END } from './dialogue-data';
 import type { Triple } from './fixed';
 import { requireTile } from './font';
+import { ifHeld, pressed } from './joypad';
 import {
-  DELTA_MINUS_5,
-  DELTA_PLUS_10,
   buildAddScore,
   buildClearDelta,
   buildSetDelta,
   buildSubScore,
+  DELTA_MINUS_5,
+  DELTA_PLUS_10,
 } from './kana-hud';
-import { DialogueState, END_OF_CONVERSATION, MAX_LIVES } from './state';
-import { SCREEN_COLS, type TilePosition, tilePos, tilemapAddr } from './tilemap';
-import { OAM_X_OFFSET, OAM_Y_OFFSET, SPRITE_SLOT, SPRITE_TILE, oamField } from './sprites';
-import { vramPut } from './video';
-import { catFace } from './cat';
 import {
-  FILL_TILES,
-  CAT_REACT,
-  TEXT_DICT,
-  NPC_UPDATE,
-  NPC_SELECT,
   ANIM_TICK,
+  CAT_REACT,
   DLG_DRAW_BOX,
-  TEXT_NEXT,
-  DLG_UPDATE,
-  DLG_OPEN_TREE,
   DLG_OPEN_NODE,
+  DLG_OPEN_TREE,
+  DLG_UPDATE,
+  FILL_TILES,
+  NPC_SELECT,
+  NPC_UPDATE,
+  TEXT_DICT,
+  TEXT_NEXT,
 } from './labels';
-import { type GameModule, gameModule } from '../asm/program';
+import { MEM } from './ram';
+import { playSfx } from './sound';
+import { OAM_X_OFFSET, OAM_Y_OFFSET, oamField, SPRITE_SLOT, SPRITE_TILE } from './sprites';
+import { DialogueState, END_OF_CONVERSATION, MAX_LIVES } from './state';
+import type { TextCodec } from './text-codec';
+import { SCREEN_COLS, tilemapAddr, tilePos, type TilePosition } from './tilemap';
+import { vramPut } from './video';
 const DLG_CLEAR_BOX = routine('dlg_clear_box', { clobbers: ['a', 'bc', 'hl'] });
 const DLG_PRINT_CHAR = routine('dlg_print_char', { clobbers: ['a', 'bc', 'hl'] });
 const DLG_DRAW_CURSOR = routine('dlg_draw_cursor', { clobbers: ['a'] });

@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { PROGRAM_START, formatSymbolFile } from '../src/asm/assembler';
+
+import { formatSymbolFile, PROGRAM_START } from '../src/asm/assembler';
 import { hex } from '../src/asm/util';
 import { buildRom } from '../src/game/main';
 import { ramSymbols } from '../src/game/ram';

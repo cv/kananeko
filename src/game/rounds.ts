@@ -11,21 +11,8 @@
  */
 
 import { ifElse, loop } from '../asm/flow';
-import { MEM } from './ram';
-import { gameModule } from '../asm/program';
-import {
-  CAT_TICK,
-  NPC_HIDE,
-  JOY_READ,
-  KANA_START,
-  KANA_UPDATE,
-  HUD_UPDATE,
-  PLAY_ROUND,
-} from './labels';
-import { buildKanaData, type KanaQuestion } from './kana';
-import { runDma } from './sprites';
-import { frameWait } from './video';
 import { loadPointer, storeByte, zeroBytes } from '../asm/macros';
+import { gameModule } from '../asm/program';
 import {
   add,
   and,
@@ -33,6 +20,7 @@ import {
   cp,
   dec,
   inc,
+  invoke,
   jr,
   label,
   ld,
@@ -42,17 +30,28 @@ import {
   ret,
   sla,
   xor,
-  invoke,
 } from '../asm/sm83';
-import { type Op, type U16, Label, routine } from '../asm/types';
-import { CAT_TILES } from './font-data';
-import { BAD_PICK, END_OF_CONVERSATION, KanaMode, MAX_LIVES } from './state';
-
+import { Label, type Op, routine, type U16 } from '../asm/types';
 import { hi, lo } from '../asm/util';
 import type { DialogueNode } from './dialogue';
 import { choiceRating } from './dialogue-data';
-import { type QuizHistory, generateQuestions, matchQuestionFor, phrasesOf } from './quiz';
+import { CAT_TILES } from './font-data';
+import { buildKanaData, type KanaQuestion } from './kana';
+import {
+  CAT_TICK,
+  HUD_UPDATE,
+  JOY_READ,
+  KANA_START,
+  KANA_UPDATE,
+  NPC_HIDE,
+  PLAY_ROUND,
+} from './labels';
+import { generateQuestions, matchQuestionFor, phrasesOf, type QuizHistory } from './quiz';
+import { MEM } from './ram';
 import type { SceneCast } from './scenes/npcs';
+import { runDma } from './sprites';
+import { BAD_PICK, END_OF_CONVERSATION, KanaMode, MAX_LIVES } from './state';
+import { frameWait } from './video';
 
 /** Rounds per scene are tracked in one byte of "already played" flags */
 export const MAX_ROUNDS = 8;

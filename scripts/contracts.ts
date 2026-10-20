@@ -17,7 +17,7 @@ import {
   Routine,
   type RoutineContract,
 } from '../src/asm/types';
-import { ROM_HEADER, buildProgram } from '../src/game/main';
+import { buildProgram, ROM_HEADER } from '../src/game/main';
 
 const SINGLE: readonly ArgReg[] = ['a', 'b', 'c', 'd', 'e', 'h', 'l'];
 const F = regBits(['f']);

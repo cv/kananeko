@@ -1,8 +1,8 @@
 /** Text-art slicing helpers. */
 
-import { describe, expect, it } from 'vitest';
 import { artChar, artVariant, mirrorHalf, sliceArt } from '@game/art';
 import { CAT_FACES, catArt } from '@game/cat-art';
+import { describe, expect, it } from 'vitest';
 
 const block = (fill: string): string[] => Array<string>(8).fill(fill.repeat(8));
 

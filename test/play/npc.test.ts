@@ -1,8 +1,9 @@
 /** Conversation partners shown as sprites. */
 
-import { describe, expect, it } from 'vitest';
 import { NPC_TILE_BASE } from '@game/npc';
 import { STATION_CAST } from '@game/scenes/npcs';
+import { describe, expect, it } from 'vitest';
+
 import { checkpoint, runnerAt } from '../helpers/checkpoints';
 import type { GameRunner } from '../helpers/game-runner';
 

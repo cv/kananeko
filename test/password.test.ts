@@ -1,26 +1,27 @@
 /** Kana passwords: the reference codec, and the game's routines agreeing with it. */
 
-import { describe, expect, it } from 'vitest';
-import { MEM } from '@game/ram';
+import { storeByte } from '@asm/macros';
 import { call, ld } from '@asm/sm83';
 import { u16 } from '@asm/types';
-import { storeByte } from '@asm/macros';
 import { CHAR_MAP } from '@game/font';
 import { MAX_SCORE } from '@game/kana-hud';
+import { PASS_APPLY, PASS_DECODE, PASS_ENCODE } from '@game/labels';
 import {
-  PASSWORD_ALPHABET,
-  PASSWORD_LENGTH,
-  type Progress,
   buildPasswordData,
   buildPasswordRoutines,
   decodePassword,
   encodePassword,
+  PASSWORD_ALPHABET,
+  PASSWORD_LENGTH,
+  type Progress,
 } from '@game/password';
+import { MEM } from '@game/ram';
 import { SCENES } from '@game/scene';
 import { MAX_LIVES } from '@game/state';
 import { buildVramPut } from '@game/video';
-import { SCRATCH, runProgram } from './helpers/run-program';
-import { PASS_ENCODE, PASS_DECODE, PASS_APPLY } from '@game/labels';
+import { describe, expect, it } from 'vitest';
+
+import { runProgram, SCRATCH } from './helpers/run-program';
 
 const SCENE_COUNT = SCENES.length;
 const SCORES = [0, 5, 255, 256, 1234, 12345, MAX_SCORE];

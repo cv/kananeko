@@ -8,7 +8,8 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { SCENES, sceneRounds } from '../src/game/scene';
+
+import { sceneRounds, SCENES } from '../src/game/scene';
 import { checkpoint, runnerAt } from '../test/helpers/checkpoints';
 import { GameRunner } from '../test/helpers/game-runner';
 import { blit, createImage, encodePng, type Image, scale } from './png';

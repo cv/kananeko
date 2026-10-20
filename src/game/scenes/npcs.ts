@@ -4,8 +4,8 @@
  */
 
 import type { NpcLook } from '../npc-art';
-import { rgb } from '../video';
 import { INK } from '../palette';
+import { rgb } from '../video';
 
 const SKIN = {
   light: rgb(0xf8, 0xd8, 0xb8),

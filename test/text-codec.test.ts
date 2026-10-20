@@ -1,17 +1,18 @@
 /** Dialogue compression: the codec, the game's dictionary, and the engine's decoder */
 
-import { describe, expect, it } from 'vitest';
-import { MEM } from '@game/ram';
 import { storePointer, zeroBytes } from '@asm/macros';
 import { call, cp, db, jr, label, ld } from '@asm/sm83';
-import { u16, Label } from '@asm/types';
-import { TEXT_END } from '@game/dialogue-data';
+import { Label, u16 } from '@asm/types';
 import { buildTextNext } from '@game/dialogue';
+import { TEXT_END } from '@game/dialogue-data';
 import { textToTiles } from '@game/font';
-import { SCENES, dialogueCodec, sceneQuiz } from '@game/scene';
-import { TEXT_STACK_SIZE, buildTextCodec } from '@game/text-codec';
-import { SCRATCH, runProgram } from './helpers/run-program';
 import { TEXT_DICT, TEXT_NEXT } from '@game/labels';
+import { MEM } from '@game/ram';
+import { dialogueCodec, sceneQuiz, SCENES } from '@game/scene';
+import { buildTextCodec, TEXT_STACK_SIZE } from '@game/text-codec';
+import { describe, expect, it } from 'vitest';
+
+import { runProgram, SCRATCH } from './helpers/run-program';
 
 // Labels placed in this module
 const NEXT = new Label('next');

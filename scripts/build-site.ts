@@ -7,12 +7,14 @@
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+
 import { build } from 'esbuild';
-import { buildRom } from '../src/game/main';
-import { catArt } from '../src/game/cat-art';
+
 import { CAT_PALETTE } from '../src/game/cat';
+import { catArt } from '../src/game/cat-art';
+import { buildRom } from '../src/game/main';
 import { PAPER } from '../src/game/palette';
-import { createImage, encodePng, scale, blit, type Image } from './png';
+import { blit, createImage, encodePng, type Image, scale } from './png';
 
 const ROOT = path.join(import.meta.dirname, '..');
 const SITE = path.join(ROOT, 'site');

@@ -1,18 +1,18 @@
 /** The RAM allocator: layout order, page boundaries, variable kinds, sharing, and errors. */
 
-import { describe, expect, expectTypeOf, it } from 'vitest';
 import { storeByte } from '@asm/macros';
 import {
-  type ByteVar,
-  type WordVar,
   allocate,
   buffer,
   byte,
   byteOf,
+  type ByteVar,
   checkRegions,
   same,
   word,
+  type WordVar,
 } from '@asm/ram';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 
 const State = { IDLE: 0, BUSY: 2 } as const;
 

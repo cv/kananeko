@@ -1,13 +1,14 @@
 /** The kana chart between scenes and before the ending. */
 
-import { describe, expect, it } from 'vitest';
-import { MEM } from '@game/ram';
 import { CHART_KANA, CHART_PASSWORD_ROW, CHART_TITLE, chartCell, chartIndexOf } from '@game/chart';
 import { CHAR_MAP } from '@game/font';
-import { PASSWORD_LABEL, PASSWORD_LENGTH, decodePassword, passwordLineCol } from '@game/password';
+import { decodePassword, PASSWORD_LABEL, PASSWORD_LENGTH, passwordLineCol } from '@game/password';
+import { MEM } from '@game/ram';
 import { SCENES } from '@game/scene';
 import { DialogueState } from '@game/state';
 import { centerStartCol } from '@game/tilemap';
+import { describe, expect, it } from 'vitest';
+
 import { checkpoint, runnerAt } from '../helpers/checkpoints';
 import type { GameRunner } from '../helpers/game-runner';
 import { asSeenOnScreen, readText } from '../helpers/screen';

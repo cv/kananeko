@@ -1,7 +1,8 @@
 /** Animated backdrop tiles. */
 
+import { buildSceneData, SCENES } from '@game/scene';
 import { describe, expect, it } from 'vitest';
-import { SCENES, buildSceneData } from '@game/scene';
+
 import { checkpoint, runnerAt } from '../helpers/checkpoints';
 
 const packed = buildSceneData();

@@ -1,11 +1,13 @@
 import eslint from '@eslint/js';
 import { defineConfig } from 'eslint/config';
+import simpleImportSort from 'eslint-plugin-simple-import-sort';
 import tseslint from 'typescript-eslint';
 
 export default defineConfig(
   eslint.configs.recommended,
   tseslint.configs.strictTypeChecked,
   {
+    plugins: { 'simple-import-sort': simpleImportSort },
     languageOptions: {
       parserOptions: {
         projectService: true,
@@ -25,6 +27,7 @@ export default defineConfig(
       // With verbatimModuleSyntax, `import { type X }` keeps an empty import at runtime
       '@typescript-eslint/consistent-type-imports': ['error', { fixStyle: 'inline-type-imports' }],
       '@typescript-eslint/no-import-type-side-effects': 'error',
+      'simple-import-sort/imports': 'error',
       eqeqeq: ['error', 'always'],
       'no-console': ['error', { allow: ['warn', 'error'] }],
     },

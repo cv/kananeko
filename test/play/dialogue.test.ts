@@ -1,13 +1,14 @@
 /** Dialogue engine behavior in the opening conversation. */
 
-import { describe, expect, it } from 'vitest';
+import { type ChoiceRating, choiceRating, type DialogueNode } from '@game/dialogue-data';
 import { DELTA_MINUS_5, DELTA_PLUS_10 } from '@game/kana-hud';
+import { SCENES } from '@game/scene';
 import { DialogueState, END_OF_CONVERSATION, KanaState, MAX_LIVES } from '@game/state';
+import { describe, expect, it } from 'vitest';
+
 import { checkpoint, runnerAt } from '../helpers/checkpoints';
 import type { GameRunner } from '../helpers/game-runner';
 import { loseDialogueLives } from '../helpers/play';
-import { type ChoiceRating, type DialogueNode, choiceRating } from '@game/dialogue-data';
-import { SCENES } from '@game/scene';
 
 const openingDialogue = (): GameRunner => runnerAt(checkpoint.sceneStart(0));
 

@@ -12,13 +12,13 @@
  */
 
 import { ifThen } from '../asm/flow';
-import { copyByte } from '../asm/macros';
-import type { Op } from '../asm/types';
-import { label, ld, ldh, cpl, and, or, swap, ret } from '../asm/sm83';
 import { HW } from '../asm/hardware';
-import { MEM } from './ram';
-import { JOY_READ } from './labels';
+import { copyByte } from '../asm/macros';
 import { gameModule } from '../asm/program';
+import { and, cpl, label, ld, ldh, or, ret, swap } from '../asm/sm83';
+import type { Op } from '../asm/types';
+import { JOY_READ } from './labels';
+import { MEM } from './ram';
 
 /** NZ if any of `buttons` (JOY flags) was pressed this frame. Clobbers A. */
 export function pressed(buttons: number): Op[] {

@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { LOGO_ROWS, LOGO_TEXT, buildLogo, logoArt } from '@game/logo';
 import type { Glyph } from '@game/font-data';
+import { buildLogo, LOGO_ROWS, LOGO_TEXT, logoArt } from '@game/logo';
+import { describe, expect, it } from 'vitest';
 
 const dot: Glyph = [
   '#.......',

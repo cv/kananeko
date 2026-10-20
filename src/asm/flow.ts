@@ -11,8 +11,8 @@
  * The jumps they make are left to the assembler, which uses JR whenever it reaches.
  */
 
-import { cp, dec, jp, label, ld, ret } from './sm83';
 import type { ByteValue } from './ram';
+import { cp, dec, jp, label, ld, ret } from './sm83';
 import { type CCName, Label, type Op, type U16 } from './types';
 import { lo } from './util';
 

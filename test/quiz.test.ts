@@ -1,4 +1,3 @@
-import { describe, expect, it } from 'vitest';
 import type { DialogueNode } from '@game/dialogue';
 import {
   distractorsFor,
@@ -8,6 +7,7 @@ import {
   pick,
   questionFor,
 } from '@game/quiz';
+import { describe, expect, it } from 'vitest';
 
 const line = (text: string): DialogueNode => ({ text, choices: [{ text: 'はい', next: null }] });
 

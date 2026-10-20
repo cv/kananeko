@@ -15,19 +15,19 @@
 
 import { compare, doWhile, ifThen, repeat } from '../asm/flow';
 import { HW } from '../asm/hardware';
-import { MEM } from './ram';
 import { copyBlock, decByte, incByte, storeByte, zeroBytes } from '../asm/macros';
-import { add, cp, dec, inc, jp, jr, label, ld, ldh, db, or, ret, and, invoke } from '../asm/sm83';
-import { type Op, u16, Label, routine } from '../asm/types';
+import { gameModule } from '../asm/program';
+import { add, and, cp, db, dec, inc, invoke, jp, jr, label, ld, ldh, or, ret } from '../asm/sm83';
+import { Label, type Op, routine, u16 } from '../asm/types';
 import { hi, lo } from '../asm/util';
 import { sliceArt } from './art';
-import { CAT_FACES, type CatFace, catArt } from './cat-art';
+import { CAT_FACES, catArt, type CatFace } from './cat-art';
 import { encodeGlyph } from './font';
+import { CAT_REACT, CAT_REST, CAT_TICK } from './labels';
 import { HUES, INK, PAPER } from './palette';
-import { OAM_X_OFFSET, OAM_Y_OFFSET, SPRITE_SLOT, oamField } from './sprites';
+import { MEM } from './ram';
+import { OAM_X_OFFSET, OAM_Y_OFFSET, oamField, SPRITE_SLOT } from './sprites';
 import type { Palette } from './video';
-import { CAT_REST, CAT_REACT, CAT_TICK } from './labels';
-import { gameModule } from '../asm/program';
 
 // Labels placed in this module
 const CAT_TILES = new Label('cat_tiles');

@@ -1,10 +1,10 @@
 /** Record layouts. */
 
-import { describe, expect, expectTypeOf, it } from 'vitest';
 import { assemble } from '@asm/assembler';
-import { type FieldsOf, byte, struct, word } from '@asm/struct';
 import { label } from '@asm/sm83';
+import { byte, type FieldsOf, struct, word } from '@asm/struct';
 import { Label } from '@asm/types';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 
 const ENTRY = struct('entry', { ptr: word(), count: byte(), flags: byte(), size: word() });
 

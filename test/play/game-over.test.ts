@@ -1,12 +1,13 @@
 /** Game over and recovery across dialogue and kana. */
 
-import { describe, expect, it } from 'vitest';
-import { DialogueState, KanaState, MAX_LIVES } from '@game/state';
 import { SCENES } from '@game/scene';
-import { SETTLE_FRAMES, checkpoint, runnerAt } from '../helpers/checkpoints';
+import { DialogueState, KanaState, MAX_LIVES } from '@game/state';
+import { describe, expect, it } from 'vitest';
+
+import { checkpoint, runnerAt, SETTLE_FRAMES } from '../helpers/checkpoints';
 import type { GameRunner } from '../helpers/game-runner';
-import { asSeenOnScreen, readText, waitForPicture } from '../helpers/screen';
 import { loseAllKanaLives, loseDialogueLives, returnToTitleAfterGameOver } from '../helpers/play';
+import { asSeenOnScreen, readText, waitForPicture } from '../helpers/screen';
 
 const SCREEN_COLS = 20;
 const row = (runner: GameRunner, r: number): string => readText(runner, r, 0, SCREEN_COLS).trim();

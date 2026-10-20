@@ -1,8 +1,9 @@
 /** Holding B fast-forwards the dialogue text. */
 
-import { describe, expect, it } from 'vitest';
 import { DIALOGUE_LAYOUT } from '@game/dialogue';
 import { DialogueState } from '@game/state';
+import { describe, expect, it } from 'vitest';
+
 import { checkpoint, runnerAt } from '../helpers/checkpoints';
 import type { GameRunner } from '../helpers/game-runner';
 import { readText } from '../helpers/screen';

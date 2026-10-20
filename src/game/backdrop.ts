@@ -7,9 +7,9 @@
 
 import { at } from '../asm/util';
 import { sliceArt } from './art';
-import { TILE_COUNT, encodeGlyph } from './font';
+import { encodeGlyph, TILE_COUNT } from './font';
 import type { Glyph } from './font-data';
-import { type Prop, SCENERY, isProp } from './scenery';
+import { isProp, type Prop, SCENERY } from './scenery';
 import { SCREEN_COLS } from './tilemap';
 
 /** Where backdrops sit: rows 1-8, between the HUD and the dialogue box */

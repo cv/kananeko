@@ -3,6 +3,7 @@
  */
 
 import { ALL_GLYPHS } from '@game/font-data';
+
 import type { GameRunner } from './game-runner';
 
 export const SCREEN_W = 160;

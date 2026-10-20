@@ -1,7 +1,8 @@
 /** Which sound effect plays when, in the game itself. */
 
-import { describe, expect, it } from 'vitest';
 import { MAX_LIVES } from '@game/state';
+import { describe, expect, it } from 'vitest';
+
 import { checkpoint, runnerAt } from '../helpers/checkpoints';
 import { GameRunner } from '../helpers/game-runner';
 import { loseOneKanaLife } from '../helpers/play';

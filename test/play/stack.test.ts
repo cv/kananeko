@@ -1,8 +1,9 @@
 /** How deep the stack goes over a whole playthrough. */
 
-import { describe, expect, it } from 'vitest';
 import { STACK_REGION, STACK_TOP } from '@game/ram';
-import { STACK_CANARY, checkpoint, runnerAt } from '../helpers/checkpoints';
+import { describe, expect, it } from 'vitest';
+
+import { checkpoint, runnerAt, STACK_CANARY } from '../helpers/checkpoints';
 import { stackDepth } from '../helpers/game-runner';
 
 describe('Given the player plays through the whole game', () => {

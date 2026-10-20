@@ -1,17 +1,18 @@
 /** The assembled game ROM: header, layout, and embedded data. */
 
-import { describe, expect, it } from 'vitest';
-import { ROM_SIZE, globalChecksum, headerChecksum } from '@asm/assembler';
-import { ONE_BIT_TILES, buildPackedTileData } from '@game/font';
+import { globalChecksum, headerChecksum, ROM_SIZE } from '@asm/assembler';
+import type { Label } from '@asm/types';
+import { buildPackedTileData, ONE_BIT_TILES } from '@game/font';
 import {
   sceneBackdropLabel,
   sceneDialogueLabel,
   sceneRoundsLabel,
   sceneTilesLabel,
 } from '@game/main';
-import { SCENES, buildSceneData } from '@game/scene';
+import { buildSceneData, SCENES } from '@game/scene';
 import { SCENE_ENTRY } from '@game/scene-table';
-import type { Label } from '@asm/types';
+import { describe, expect, it } from 'vitest';
+
 import { rom, symbols, unreferenced } from './helpers/game-runner';
 
 function bytesAt(label: string | Label, length: number): Uint8Array {

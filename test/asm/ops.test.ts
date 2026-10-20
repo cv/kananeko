@@ -1,9 +1,9 @@
 /** Opcode encodings, checked against the published SM83 opcode table. */
 
-import { describe, expect, it } from 'vitest';
 import * as op from '@asm/ops';
-import { type Op, ioReg, s8, u8, u16, Label } from '@asm/types';
+import { ioReg, Label, type Op, s8, u8, u16 } from '@asm/types';
 import { hi, lo } from '@asm/util';
+import { describe, expect, it } from 'vitest';
 
 // Labels placed in this module
 const HERE = new Label('here');

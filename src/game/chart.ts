@@ -7,18 +7,21 @@
  * Every kana answer counts toward its basic hiragana: カ, が and ガ all count as か.
  */
 
-import { pressed } from './joypad';
 import { block, doWhile, ifThen, loop } from '../asm/flow';
 import { JOY } from '../asm/hardware';
-import { MEM } from './ram';
+import { HW } from '../asm/hardware';
+import { addAToHl, storeByte, zeroBytes } from '../asm/macros';
+import { gameModule } from '../asm/program';
 import {
   add,
   and,
   call,
   cp,
+  cpl,
   db,
   dec,
   inc,
+  invoke,
   jr,
   label,
   ld,
@@ -29,18 +32,27 @@ import {
   ret,
   sla,
   srl,
-  cpl,
-  invoke,
 } from '../asm/sm83';
-import { HW } from '../asm/hardware';
-import { type Op, Label } from '../asm/types';
-import { addAToHl, storeByte, zeroBytes } from '../asm/macros';
-import { paletteOf, buildPaletteSet } from './color';
+import { Label, type Op } from '../asm/types';
+import { buildPaletteSet, paletteOf } from './color';
 import { CHAR_MAP, requireTile, textToTiles } from './font';
+import { pressed } from './joypad';
+import {
+  CHART_BIT,
+  CHART_MISSED,
+  CHART_SEEN,
+  CHART_SHOW,
+  CHART_UNMISS,
+  JOY_READ,
+  PASS_DRAW,
+  PASS_ENCODE,
+} from './labels';
+import { CHART_FADE } from './labels';
 import { PASSWORD_LABEL, passwordLineCol } from './password';
+import { MEM } from './ram';
 import { CHART_COLORS } from './scenes/colors';
 import { playSfx } from './sound';
-import { SPRITE_SLOT, SPRITE_TILE, oamField, runDma } from './sprites';
+import { oamField, runDma, SPRITE_SLOT, SPRITE_TILE } from './sprites';
 import { centerStartCol, tilemapAddr } from './tilemap';
 import {
   clearScreen,
@@ -51,18 +63,6 @@ import {
   screenOff,
   writeCenteredRow,
 } from './video';
-import {
-  PASS_ENCODE,
-  PASS_DRAW,
-  JOY_READ,
-  CHART_SEEN,
-  CHART_MISSED,
-  CHART_UNMISS,
-  CHART_BIT,
-  CHART_SHOW,
-} from './labels';
-import { gameModule } from '../asm/program';
-import { CHART_FADE } from './labels';
 
 // Labels placed in this module
 const CHART_OF_TILE = new Label('chart_of_tile');

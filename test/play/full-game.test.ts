@@ -3,9 +3,10 @@
  * (see helpers/checkpoints.ts), so these tests check that playthrough's milestones.
  */
 
-import { describe, expect, it } from 'vitest';
-import { SCENES, sceneRounds } from '@game/scene';
+import { sceneRounds, SCENES } from '@game/scene';
 import { DialogueState, KanaState, MAX_LIVES } from '@game/state';
+import { describe, expect, it } from 'vitest';
+
 import { checkpoint, runnerAt } from '../helpers/checkpoints';
 import type { GameRunner } from '../helpers/game-runner';
 import { readText, waitForPicture } from '../helpers/screen';

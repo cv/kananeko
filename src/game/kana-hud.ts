@@ -13,9 +13,9 @@
  *   buildSetDelta  — set delta type + timer after score changes
  */
 
-import { playSfx } from './sound';
 import { compare, ifNotEquals, ifThen, loop } from '../asm/flow';
-import { type Op, type TileIndex, type U16, Label, routine } from '../asm/types';
+import { copyByte, copyWord, switchCases, zeroBytes } from '../asm/macros';
+import { gameModule } from '../asm/program';
 import {
   adc,
   add,
@@ -23,6 +23,7 @@ import {
   cp,
   dec,
   inc,
+  invoke,
   jp,
   jr,
   label,
@@ -30,19 +31,18 @@ import {
   ret,
   sbc,
   sub,
-  invoke,
 } from '../asm/sm83';
-import { MEM } from './ram';
-import { copyByte, copyWord, switchCases, zeroBytes } from '../asm/macros';
+import { Label, type Op, routine, type TileIndex, type U16 } from '../asm/types';
 import { at, hi, lo } from '../asm/util';
+import type { Quad } from './fixed';
 import { requireTile, requireTiles } from './font';
 import { CAT_TILES } from './font-data';
-import type { Quad } from './fixed';
+import { HUD_UPDATE, KANA_DRAW_HUD, SCORE_DIGITS } from './labels';
+import { MEM } from './ram';
+import { playSfx } from './sound';
 import { MAX_LIVES } from './state';
 import { tilemapAddr, type TilePosition } from './tilemap';
 import { vramPut } from './video';
-import { SCORE_DIGITS, HUD_UPDATE, KANA_DRAW_HUD } from './labels';
-import { gameModule } from '../asm/program';
 
 // Labels placed in this module
 const SCORE_ADD = routine('score_add', { in: ['a'], clobbers: ['a', 'b'] });

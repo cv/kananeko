@@ -1,20 +1,20 @@
 import {
+  CC,
+  type CCName,
+  type IoRegOffset,
+  Label,
   type Op,
   type OpRef,
+  Pooled,
   R8,
   type R8Name,
   R16,
   type R16Name,
   R16Stack,
   type R16StackName,
-  CC,
-  type CCName,
-  Label,
-  Pooled,
   type Target,
   type U8,
   type U16,
-  type IoRegOffset,
 } from './types';
 import { hi, lo } from './util';
 

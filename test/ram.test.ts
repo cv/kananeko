@@ -1,6 +1,5 @@
 /** The game's RAM map agrees with the engines that use it. */
 
-import { describe, expect, expectTypeOf, it } from 'vitest';
 import { storeByte } from '@asm/macros';
 import type { ByteVar, ValuesOf } from '@asm/ram';
 import { CHART_BYTES } from '@game/chart';
@@ -14,15 +13,16 @@ import {
   MEM,
   PRACTICE_REGION,
   RAM_REGIONS,
+  ramSymbols,
   STACK_TOP,
   VARIABLES,
-  ramSymbols,
 } from '@game/ram';
 import { SPEED_ROUND } from '@game/scene';
-import { DialogueState, type KanaMode, type KanaState } from '@game/state';
 import { SOUND_VOICES, VOICE_SIZE } from '@game/sound';
 import { DMA_ROUTINE_BYTES } from '@game/sprites';
+import { DialogueState, type KanaMode, type KanaState } from '@game/state';
 import { TEXT_STACK_SIZE } from '@game/text-codec';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 
 function sizeOf(name: string): number | undefined {
   return RAM_REGIONS.flatMap((r) => r.variables).find((v) => v.name === name)?.size;

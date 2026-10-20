@@ -1,7 +1,8 @@
 /** The web player's input logic (site/src/input.ts) */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { type Button, Joypad, KEYS, dpadDirections } from '../site/src/input';
+
+import { type Button, dpadDirections, Joypad, KEYS } from '../site/src/input';
 
 describe('dpadDirections', () => {
   it.each([

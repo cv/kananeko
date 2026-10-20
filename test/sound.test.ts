@@ -1,29 +1,30 @@
 /** The sound driver: notes, the sequence notation, and voices stepping in the emulator. */
 
-import { describe, expect, it } from 'vitest';
-import { MEM } from '@game/ram';
 import { call, db, dec, invoke, jr, label, ld } from '@asm/sm83';
-import { type Op, u16, Label } from '@asm/types';
+import { Label, type Op, u16 } from '@asm/types';
+import { MUSIC_PLAY, SFX_PLAY, SOUND_TICK } from '@game/labels';
+import { MEM } from '@game/ram';
 import {
-  NOTE_NAMES,
-  SEQ,
-  SFX,
-  SFX_VOICE,
-  SONGS,
-  SEQ as STEP,
-  songId,
-  sequenceFrames,
   buildSoundData,
   buildSoundDriver,
   buildSoundInit,
   encodeSequence,
+  NOTE_NAMES,
   noteFrequency,
   notePeriods,
+  SEQ,
+  SEQ as STEP,
+  sequenceFrames,
+  SFX,
+  SFX_VOICE,
   sfxId,
+  songId,
+  SONGS,
   voiceField,
 } from '@game/sound';
-import { SCRATCH, runProgram } from './helpers/run-program';
-import { SOUND_TICK, SFX_PLAY, MUSIC_PLAY } from '@game/labels';
+import { describe, expect, it } from 'vitest';
+
+import { runProgram, SCRATCH } from './helpers/run-program';
 
 // Labels placed in this module
 const SEQ_DATA = new Label('seq_data');

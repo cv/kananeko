@@ -1,20 +1,21 @@
 /** Score arithmetic subroutines, run in the emulator. */
 
-import { describe, expect, it } from 'vitest';
-import { MEM } from '@game/ram';
 import { storeByte } from '@asm/macros';
 import { call } from '@asm/sm83';
 import {} from '@asm/types';
 import { textToTiles } from '@game/font';
 import {
-  MAX_SCORE,
   buildAddScore,
   buildScoreDigits,
   buildScoreRoutines,
   buildSubScore,
+  MAX_SCORE,
 } from '@game/kana-hud';
-import { runProgram } from './helpers/run-program';
 import { SCORE_DIGITS } from '@game/labels';
+import { MEM } from '@game/ram';
+import { describe, expect, it } from 'vitest';
+
+import { runProgram } from './helpers/run-program';
 
 function scoreAfter(start: number, ops: ReturnType<typeof buildAddScore>): number {
   const mem = runProgram(

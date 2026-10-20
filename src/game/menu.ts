@@ -5,17 +5,17 @@
 
 import { block, ifThen } from '../asm/flow';
 import { JOY } from '../asm/hardware';
-import { MEM } from './ram';
-import { add, and, cp, dec, inc, jr, label, ld, or, ret } from '../asm/sm83';
-import { type Op, Label } from '../asm/types';
 import { storeByte, zeroBytes } from '../asm/macros';
+import { gameModule } from '../asm/program';
+import { add, and, cp, dec, inc, jr, label, ld, or, ret } from '../asm/sm83';
+import { Label, type Op } from '../asm/types';
 import { textToTiles } from './font';
+import { MENU_DRAW, MENU_UPDATE } from './labels';
+import { MEM } from './ram';
 import { playSfx } from './sound';
-import { SPRITE_SLOT, SPRITE_TILE, oamField } from './sprites';
+import { oamField, SPRITE_SLOT, SPRITE_TILE } from './sprites';
 import { centerStartCol } from './tilemap';
 import { writeCenteredRow } from './video';
-import { MENU_DRAW, MENU_UPDATE } from './labels';
-import { gameModule } from '../asm/program';
 
 // Labels placed in this module
 const MENU_CURSOR = new Label('menu_cursor');

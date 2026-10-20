@@ -6,8 +6,8 @@
 
 import { HW_MEM } from '../asm/hardware';
 import { allocate, buffer, byte, byteOf, checkRegions, same, word } from '../asm/ram';
-import { DialogueState, KanaMode, KanaState } from './state';
 import { type U16, u16 } from '../asm/types';
+import { DialogueState, KanaMode, KanaState } from './state';
 
 /** Bytes per sound voice: see VOICE in sound.ts */
 const VOICE_BYTES = 8;

@@ -1,15 +1,14 @@
 /** Assembler macros, verified by running them in the emulator. */
 
-import { describe, expect, it } from 'vitest';
 import {
   addAToHl,
   copyBlock,
   copyByte,
   copyBytes,
-  copyWord,
-  decByte,
   copyPages,
+  copyWord,
   countDownOrReturn,
+  decByte,
   expandOneBit,
   incByte,
   loadPointer,
@@ -17,14 +16,16 @@ import {
   storePointer,
   switchCases,
   tableEntry,
-  zeroBytes,
   zeroBlock,
+  zeroBytes,
   zeroPages,
 } from '@asm/macros';
+import { allocate, type ByteVar, word } from '@asm/ram';
 import { add, call, cp, db, jr, label, ld, ret } from '@asm/sm83';
-import { type ByteVar, allocate, word } from '@asm/ram';
-import { type Op, u16, Label } from '@asm/types';
-import { SCRATCH, runProgram } from '../helpers/run-program';
+import { Label, type Op, u16 } from '@asm/types';
+import { describe, expect, it } from 'vitest';
+
+import { runProgram, SCRATCH } from '../helpers/run-program';
 
 // Labels placed in this module
 const TICK = new Label('tick');

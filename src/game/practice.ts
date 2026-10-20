@@ -10,22 +10,23 @@
 
 import { doWhile, ifThen, loop, repeat } from '../asm/flow';
 import { HW } from '../asm/hardware';
-import { MEM } from './ram';
+import { storeByte, tableEntry, zeroBytes } from '../asm/macros';
+import { gameModule } from '../asm/program';
 import {
   add,
-  cpl,
-  ld,
-  xor,
   and,
   call,
   cp,
+  cpl,
   db,
   dec,
   dw,
   inc,
+  invoke,
   jp,
   jr,
   label,
+  ld,
   ldh,
   or,
   pop,
@@ -33,27 +34,26 @@ import {
   ret,
   srl,
   sub,
-  invoke,
+  xor,
 } from '../asm/sm83';
-import { type Op, Label, routine } from '../asm/types';
+import { Label, type Op, routine } from '../asm/types';
 import { at } from '../asm/util';
-import { storeByte, tableEntry, zeroBytes } from '../asm/macros';
 import { CHART_KANA } from './chart';
-import { type KanaQuestion, MAX_KANA_WORD_LENGTH, buildKanaData } from './kana';
-import { distractorsFor, phrasesOf } from './quiz';
-import { SCENES, SPEED_ROUND } from './scene';
-import { KanaMode, MAX_LIVES } from './state';
-import { fadeOut, screenOff } from './video';
+import { buildKanaData, type KanaQuestion, MAX_KANA_WORD_LENGTH } from './kana';
 import {
   CHART_BIT,
   PLAY_ROUND,
-  TITLE_SCREEN,
   PRACTICE_RAND,
-  SPEED_FILL,
   PRACTICE_START,
+  SPEED_FILL,
+  TITLE_SCREEN,
 } from './labels';
-import { gameModule } from '../asm/program';
 import { SPEED_ROUND_DATA } from './labels';
+import { distractorsFor, phrasesOf } from './quiz';
+import { MEM } from './ram';
+import { SCENES, SPEED_ROUND } from './scene';
+import { KanaMode, MAX_LIVES } from './state';
+import { fadeOut, screenOff } from './video';
 
 // Labels placed in this module
 const PRACTICE_TABLE = new Label('practice_table');

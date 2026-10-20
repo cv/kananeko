@@ -6,7 +6,7 @@
  */
 
 import type { ColorScheme } from '../color';
-import { HUES, INK, PAPER, inked } from '../palette';
+import { HUES, INK, inked, PAPER } from '../palette';
 import { rgb } from '../video';
 
 /** Cream clouds on a blue sky */

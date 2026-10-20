@@ -1,17 +1,18 @@
 /** What the player sees: layout checks on the rendered LCD image. */
 
-import { describe, expect, it } from 'vitest';
-import { SCENES } from '@game/scene';
-import { checkpoint, runnerAt } from '../helpers/checkpoints';
-import { GameRunner } from '../helpers/game-runner';
 import { BACKDROP } from '@game/backdrop';
 import { DIALOGUE_LAYOUT } from '@game/dialogue';
 import { UI_TILES } from '@game/font-data';
+import { SCENES } from '@game/scene';
 import { DialogueState } from '@game/state';
+import { describe, expect, it } from 'vitest';
+
+import { checkpoint, runnerAt } from '../helpers/checkpoints';
+import { GameRunner } from '../helpers/game-runner';
 import {
+  darkestLuma,
   inkBounds,
   inkCount,
-  darkestLuma,
   isBlank,
   readText,
   waitForPicture,

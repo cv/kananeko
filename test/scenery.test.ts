@@ -1,5 +1,5 @@
+import { Canvas, isProp, SCENERY, tile } from '@game/scenery';
 import { describe, expect, it } from 'vitest';
-import { Canvas, SCENERY, isProp, tile } from '@game/scenery';
 
 describe('Canvas', () => {
   it('outlines a rounded box in ink around its fill', () => {

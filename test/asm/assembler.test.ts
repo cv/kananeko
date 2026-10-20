@@ -1,17 +1,17 @@
 /** Assembler layout, label resolution, validation, header, and symbol output. */
 
-import { describe, expect, it } from 'vitest';
 import {
-  NINTENDO_LOGO,
-  PROGRAM_START,
-  ROM_SIZE,
   assemble,
   formatSymbolFile,
   globalChecksum,
   headerChecksum,
+  NINTENDO_LOGO,
+  PROGRAM_START,
+  ROM_SIZE,
 } from '@asm/assembler';
 import { call, db, dw, jp, jr, label, ld, nop, org, pool, ret } from '@asm/sm83';
-import { type Op, Label, Pooled, labelFamily, u16 } from '@asm/types';
+import { Label, labelFamily, type Op, Pooled, u16 } from '@asm/types';
+import { describe, expect, it } from 'vitest';
 
 // Labels placed in this module
 const START = new Label('start');

@@ -3,12 +3,11 @@
  * text layout limits, kana questions, and their ROM encodings.
  */
 
-import { describe, expect, it } from 'vitest';
 import {
-  MAX_CHOICE_TEXT_WIDTH,
-  MAX_NPC_TEXT_WIDTH,
   buildDialogueTree,
   type DialogueNode,
+  MAX_CHOICE_TEXT_WIDTH,
+  MAX_NPC_TEXT_WIDTH,
 } from '@game/dialogue';
 import { choiceRating } from '@game/dialogue-data';
 import { textToTiles } from '@game/font';
@@ -16,6 +15,8 @@ import { buildKanaData } from '@game/kana';
 import { SCENES } from '@game/scene';
 import { END_OF_CONVERSATION } from '@game/state';
 import { SCREEN_COLS } from '@game/tilemap';
+import { describe, expect, it } from 'vitest';
+
 import { decodeDialogueTree, decodeKanaData } from './helpers/decode';
 
 const width = (text: string): number => Array.from(text).length;

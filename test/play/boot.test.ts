@@ -1,13 +1,14 @@
 /** Boot, title screen, and joypad input. */
 
-import { describe, expect, it } from 'vitest';
 import { JOY } from '@asm/hardware';
+import { buildTileData, TILE_COUNT } from '@game/font';
 import { BUFFERS, MEM, VARIABLES } from '@game/ram';
 import { DialogueState } from '@game/state';
-import { TILE_COUNT, buildTileData } from '@game/font';
 import { bgTileAddr } from '@game/video';
-import { GameRunner } from '../helpers/game-runner';
+import { describe, expect, it } from 'vitest';
+
 import { checkpoint, runnerAt } from '../helpers/checkpoints';
+import { GameRunner } from '../helpers/game-runner';
 
 const BOOT_FRAMES = 120;
 const TILE_BYTES = 16;

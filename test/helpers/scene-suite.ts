@@ -2,10 +2,11 @@
  * Shared emulator test suite for one scene: dialogue paths plus the kana round.
  */
 
+import { sceneRounds, SCENES } from '@game/scene';
 import { describe, expect, it } from 'vitest';
-import { SCENES, sceneRounds } from '@game/scene';
+
 import { checkpoint, runnerAt } from './checkpoints';
-import { type Detours, answerKanaAndCheckDelta, firstTryPoints, playDialoguePath } from './play';
+import { answerKanaAndCheckDelta, type Detours, firstTryPoints, playDialoguePath } from './play';
 
 export interface DialoguePath {
   /** What the path explores, e.g. "tired clerk" */

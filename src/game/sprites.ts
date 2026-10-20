@@ -5,18 +5,18 @@
 
 import { repeat } from '../asm/flow';
 import { HW } from '../asm/hardware';
-import { MEM } from './ram';
 import { copyBytes, zeroPages } from '../asm/macros';
+import { gameModule } from '../asm/program';
 import { call, db, inc, jp, label, ld, ldh } from '../asm/sm83';
-import { type Op, type U16, u16, Label } from '../asm/types';
+import { byte, struct } from '../asm/struct';
+import { Label, type Op, type U16, u16 } from '../asm/types';
 import { hi, lo } from '../asm/util';
 import { encodeGlyph, glyphOf } from './font';
-import type { Palette } from './video';
-import { HUES, INK, PAPER } from './palette';
 import { UI_TILES } from './font-data';
 import { OAM_DMA, SPRITES_OFF } from './labels';
-import { gameModule } from '../asm/program';
-import { byte, struct } from '../asm/struct';
+import { HUES, INK, PAPER } from './palette';
+import { MEM } from './ram';
+import type { Palette } from './video';
 
 // Labels placed in this module
 const DMA_ROUTINE = new Label('dma_routine');

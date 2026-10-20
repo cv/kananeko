@@ -1,10 +1,10 @@
 /** Practice questions: one for every kana on the chart. */
 
-import { describe, expect, it } from 'vitest';
 import { CHART_KANA } from '@game/chart';
 import { CHAR_MAP } from '@game/font';
 import { MAX_KANA_WORD_LENGTH } from '@game/kana';
 import { practiceQuestionFor, practiceQuestions } from '@game/practice';
+import { describe, expect, it } from 'vitest';
 
 describe('Given the practice questions', () => {
   const questions = practiceQuestions();

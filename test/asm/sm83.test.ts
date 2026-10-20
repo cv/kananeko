@@ -1,6 +1,5 @@
 /** The mnemonic layer encodes exactly what the encoding layer does, and rejects what the CPU can't do. */
 
-import { describe, expect, it } from 'vitest';
 import * as op from '@asm/ops';
 import { allocate, byte } from '@asm/ram';
 import {
@@ -27,7 +26,8 @@ import {
   swap,
   xor,
 } from '@asm/sm83';
-import { type Op, ioReg, Label, routine, u8, u16 } from '@asm/types';
+import { ioReg, Label, type Op, routine, u8, u16 } from '@asm/types';
+import { describe, expect, it } from 'vitest';
 
 const X = new Label('x');
 const { V } = allocate('test', 0xc000, 1, { V: byte() }).vars;

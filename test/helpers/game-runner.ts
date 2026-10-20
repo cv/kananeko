@@ -5,16 +5,16 @@
  * game scenarios instead of raw frame counts and hex addresses.
  */
 
-import { CHAR_MAP } from '@game/font';
-import { PASSWORD_ALPHABET } from '@game/password';
-import { MUSIC_NONE, SFX, SFX_NONE, SONGS, type SfxName, type SongName } from '@game/sound';
-import Gameboy from 'serverboy';
-import { MEM } from '@game/ram';
 import { CAT_FACES, type CatFace, faceTile } from '@game/cat';
-import { SPRITE_SLOT, oamField } from '@game/sprites';
+import { CHAR_MAP } from '@game/font';
 import { buildRom } from '@game/main';
-import { SCENES, sceneRounds } from '@game/scene';
+import { PASSWORD_ALPHABET } from '@game/password';
+import { MEM } from '@game/ram';
+import { sceneRounds, SCENES } from '@game/scene';
+import { MUSIC_NONE, SFX, SFX_NONE, type SfxName, type SongName, SONGS } from '@game/sound';
+import { oamField, SPRITE_SLOT } from '@game/sprites';
 import { DialogueState, END_OF_CONVERSATION, KanaMode, KanaState } from '@game/state';
+import Gameboy from 'serverboy';
 
 // Build the ROM once per worker — shared across all tests
 const { rom, symbols, unreferenced, stackDepth } = buildRom();

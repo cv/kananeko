@@ -2,13 +2,14 @@
  * Scenario helpers for emulator-driven tests.
  */
 
-import { expect } from 'vitest';
 import type { DialogueNode } from '@game/dialogue';
 import { choiceRating } from '@game/dialogue-data';
+import { STREAK_BONUS, STREAK_LENGTH } from '@game/kana';
 import { SCENES } from '@game/scene';
 import { DialogueState, END_OF_CONVERSATION, KanaState, MAX_LIVES } from '@game/state';
-import { FADE_STEPS, FADE_STEP_FRAMES } from '@game/video';
-import { STREAK_BONUS, STREAK_LENGTH } from '@game/kana';
+import { FADE_STEP_FRAMES, FADE_STEPS } from '@game/video';
+import { expect } from 'vitest';
+
 import type { GameRunner } from './game-runner';
 
 /** Frames for the game over screen to fade in (and out again after START) */

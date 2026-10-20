@@ -1,6 +1,7 @@
 /** The player in real browsers: desktop Chrome, and WebKit on an iPhone-sized touch screen. */
 
-import { type Page, expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
+
 import { MEM } from '../src/game/ram';
 
 /** Average color of a band of the game screen (rows y0..y1 of 144) */

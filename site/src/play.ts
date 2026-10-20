@@ -9,7 +9,7 @@
  * or zoom the page.
  */
 
-import { type Button, DIRECTIONS, GAMEPAD, Joypad, KEYS, dpadDirections } from './input';
+import { type Button, DIRECTIONS, dpadDirections, GAMEPAD, Joypad, KEYS } from './input';
 
 const SCREEN_WIDTH = 160;
 const SCREEN_HEIGHT = 144;

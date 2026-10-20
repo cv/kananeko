@@ -4,7 +4,6 @@
 
 import { compare, doWhile, ifThen, loop, repeat } from '../asm/flow';
 import { HW, LCDC } from '../asm/hardware';
-import { MEM } from './ram';
 import {
   copyByte,
   incByte,
@@ -14,6 +13,7 @@ import {
   storePointer,
   zeroPages,
 } from '../asm/macros';
+import { gameModule } from '../asm/program';
 import {
   add,
   and,
@@ -23,6 +23,7 @@ import {
   dec,
   halt,
   inc,
+  invoke,
   jp,
   jr,
   label,
@@ -35,24 +36,23 @@ import {
   reti,
   sub,
   xor,
-  invoke,
 } from '../asm/sm83';
-import { type Op, Label, Pooled, routine } from '../asm/types';
+import { Label, type Op, Pooled, routine } from '../asm/types';
 import type { Quad } from './fixed';
-import { SCREEN_COLS, centerStartCol, tilemapAddr, tileRow } from './tilemap';
 import {
-  SOUND_TICK,
+  DRAW_RUNS,
+  DRAW_TILES,
+  FADE_IN,
+  FILL_TILES,
+  OAM_DMA,
   SHARED_PALETTES,
+  SOUND_TICK,
   SPRITES_OFF,
   VBLANK_HANDLER,
   VRAM_PUT,
-  DRAW_TILES,
-  FILL_TILES,
-  DRAW_RUNS,
-  FADE_IN,
-  OAM_DMA,
 } from './labels';
-import { gameModule } from '../asm/program';
+import { MEM } from './ram';
+import { centerStartCol, SCREEN_COLS, tilemapAddr, tileRow } from './tilemap';
 
 // Labels placed in this module
 const FRAME_WAIT = routine('frame_wait', { keepsFlags: true });

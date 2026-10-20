@@ -5,65 +5,65 @@
  * This file assembles scenes with their metadata, palettes, icons, and kana questions.
  */
 
-import { type DialogueNode, buildDialogueTree } from './dialogue';
-import { type KanaQuestion, defineKanaQuestion } from './kana';
-import { generateQuestions } from './quiz';
-import {
-  type KanaCheckpoint,
-  type QuizPlan,
-  buildQuestionTable,
-  buildRoundsData,
-  planQuiz,
-} from './rounds';
+import { packAnimation } from './anim';
+import { type Backdrop, buildSceneArt } from './backdrop';
+import { attributeOfCell, buildPaletteSet, type ColorScheme } from './color';
+import { buildDialogueTree, type DialogueNode } from './dialogue';
+import type { Pair, Quint } from './fixed';
 import { textToTiles } from './font';
 import { SCENE_ICON_TILES } from './font-data';
-import type { Pair, Quint } from './fixed';
-import { type ColorScheme, attributeOfCell, buildPaletteSet } from './color';
-import { type PackedCast, packCast } from './npc';
-import { packAnimation } from './anim';
+import { defineKanaQuestion, type KanaQuestion } from './kana';
+import { packCast, type PackedCast } from './npc';
+import { generateQuestions } from './quiz';
+import {
+  buildQuestionTable,
+  buildRoundsData,
+  type KanaCheckpoint,
+  planQuiz,
+  type QuizPlan,
+} from './rounds';
 import {
   CONBINI_ANIMATION,
   PARK_ANIMATION,
-  SHRINE_ANIMATION,
   RESTAURANT_ANIMATION,
+  SHRINE_ANIMATION,
   STATION_ANIMATION,
   STREET_ANIMATION,
   type TileAnimation,
 } from './scenes/animations';
 import {
-  CONBINI_CAST,
-  PARK_CAST,
-  SHRINE_CAST,
-  RESTAURANT_CAST,
-  STATION_CAST,
-  STREET_CAST,
-  type SceneCast,
-} from './scenes/npcs';
-import { encodeRuns } from './video';
-import { type TextCodec, buildTextCodec } from './text-codec';
-import { STATION_DIALOGUE } from './scenes/station';
-import { STREET_DIALOGUE } from './scenes/street';
-import { RESTAURANT_DIALOGUE } from './scenes/restaurant';
-import { CONBINI_DIALOGUE } from './scenes/conbini';
-import { PARK_DIALOGUE } from './scenes/park';
-import { SHRINE_DIALOGUE } from './scenes/shrine';
-import { type Backdrop, buildSceneArt } from './backdrop';
-import {
-  CONBINI_COLORS,
-  PARK_COLORS,
-  SHRINE_COLORS,
-  RESTAURANT_COLORS,
-  STATION_COLORS,
-  STREET_COLORS,
-} from './scenes/colors';
-import {
   CONBINI_BACKDROP,
   PARK_BACKDROP,
-  SHRINE_BACKDROP,
   RESTAURANT_BACKDROP,
+  SHRINE_BACKDROP,
   STATION_BACKDROP,
   STREET_BACKDROP,
 } from './scenes/backdrops';
+import {
+  CONBINI_COLORS,
+  PARK_COLORS,
+  RESTAURANT_COLORS,
+  SHRINE_COLORS,
+  STATION_COLORS,
+  STREET_COLORS,
+} from './scenes/colors';
+import { CONBINI_DIALOGUE } from './scenes/conbini';
+import {
+  CONBINI_CAST,
+  PARK_CAST,
+  RESTAURANT_CAST,
+  type SceneCast,
+  SHRINE_CAST,
+  STATION_CAST,
+  STREET_CAST,
+} from './scenes/npcs';
+import { PARK_DIALOGUE } from './scenes/park';
+import { RESTAURANT_DIALOGUE } from './scenes/restaurant';
+import { SHRINE_DIALOGUE } from './scenes/shrine';
+import { STATION_DIALOGUE } from './scenes/station';
+import { STREET_DIALOGUE } from './scenes/street';
+import { buildTextCodec, type TextCodec } from './text-codec';
+import { encodeRuns } from './video';
 
 // ---------------------------------------------------------------------------
 // Scene data types

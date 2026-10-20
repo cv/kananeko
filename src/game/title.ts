@@ -4,10 +4,14 @@
  */
 
 import { compare, doWhile, ifThen } from '../asm/flow';
-import { MEM } from './ram';
+import { incByte, zeroBytes } from '../asm/macros';
 import { gameModule } from '../asm/program';
+import { and, call, cp, db, jp, label, ld, or, ret } from '../asm/sm83';
+import { type Op, routine } from '../asm/types';
+import { CAT_SPOTS, catFace, placeCat } from './cat';
+import { buildPaletteSet, paletteOf } from './color';
+import { textToTiles } from './font';
 import {
-  TITLE_FADE,
   CAT_REST,
   CAT_TICK,
   JOY_READ,
@@ -16,28 +20,24 @@ import {
   MENU_UPDATE,
   PASSWORD_SCREEN,
   PRACTICE_START,
+  TITLE_FADE,
   TITLE_SCREEN,
 } from './labels';
-import { CAT_SPOTS, catFace, placeCat } from './cat';
+import { LOGO_ROWS } from './logo';
 import { menuPick } from './menu';
+import { MEM } from './ram';
+import { TITLE_COLORS } from './scenes/colors';
 import { playMusic, playSfx } from './sound';
 import { runDma } from './sprites';
+import { centerStartCol } from './tilemap';
 import {
   cgbAttributes,
   clearScreen,
   fadeIn,
-  frameWait,
   fillAttributes,
+  frameWait,
   writeCenteredRow,
 } from './video';
-import { incByte, zeroBytes } from '../asm/macros';
-import { and, call, cp, jp, label, ld, or, ret, db } from '../asm/sm83';
-import { type Op, routine } from '../asm/types';
-import { textToTiles } from './font';
-import { centerStartCol } from './tilemap';
-import { paletteOf, buildPaletteSet } from './color';
-import { LOGO_ROWS } from './logo';
-import { TITLE_COLORS } from './scenes/colors';
 
 export const DRAW_START_BOX = routine('draw_start_box', { clobbers: ['a', 'hl'] });
 export const TITLE_BLINK = routine('title_blink', { clobbers: ['a', 'b', 'hl'] });

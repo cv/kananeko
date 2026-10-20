@@ -1,6 +1,5 @@
 /** Structured control flow, run in the emulator. */
 
-import { describe, expect, it } from 'vitest';
 import {
   block,
   compare,
@@ -16,7 +15,9 @@ import {
 import type { ByteVar } from '@asm/ram';
 import { call, cp, dec, inc, jr, label, ld, ret } from '@asm/sm83';
 import { Label, u16 } from '@asm/types';
-import { SCRATCH, runProgram } from '../helpers/run-program';
+import { describe, expect, it } from 'vitest';
+
+import { runProgram, SCRATCH } from '../helpers/run-program';
 
 const OUT = u16(SCRATCH);
 

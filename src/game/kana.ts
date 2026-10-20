@@ -20,11 +20,8 @@
  *   0x00 sentinel (word_length = 0)
  */
 
-import { ifPressed } from './joypad';
-import { playMusic, playSfx } from './sound';
 import { compare, dispatch, doWhile, ifEquals, ifNotEquals, ifThen } from '../asm/flow';
 import { HW, JOY } from '../asm/hardware';
-import { MEM } from './ram';
 import {
   countDownOrReturn,
   decByte,
@@ -35,6 +32,7 @@ import {
   switchCases,
   zeroBytes,
 } from '../asm/macros';
+import { gameModule } from '../asm/program';
 import {
   add,
   and,
@@ -42,35 +40,50 @@ import {
   cp,
   dec,
   inc,
+  invoke,
   jp,
   jr,
   label,
   ld,
   ldh,
-  ret,
   or,
+  ret,
   srl,
   sub,
-  invoke,
 } from '../asm/sm83';
-import { type Op, type TileIndex, Label, routine } from '../asm/types';
+import { Label, type Op, routine, type TileIndex } from '../asm/types';
 import { at } from '../asm/util';
+import { CAT_SPOTS, catFace, placeCat } from './cat';
 import type { NonEmpty, Quad, Triple, TupleIndex } from './fixed';
 import { requireTile, requireTiles, textToTiles } from './font';
 import { CAT_TILES, UI_TILES } from './font-data';
+import { ifPressed } from './joypad';
 import {
-  DELTA_MINUS_100,
-  DELTA_PLUS_10,
-  DELTA_PLUS_150,
-  DELTA_PLUS_100,
   buildAddScore,
   buildClearDelta,
   buildDrawTileAt,
   buildSetDelta,
   buildSubScore,
+  DELTA_MINUS_100,
+  DELTA_PLUS_10,
+  DELTA_PLUS_100,
+  DELTA_PLUS_150,
 } from './kana-hud';
+import {
+  CAT_REACT,
+  CAT_REST,
+  CHART_MISSED,
+  CHART_SEEN,
+  CHART_UNMISS,
+  FILL_TILES,
+  KANA_DRAW_HUD,
+  KANA_START,
+  KANA_UPDATE,
+} from './labels';
+import { MEM } from './ram';
+import { playMusic, playSfx } from './sound';
 import { KanaMode, KanaState, MAX_LIVES } from './state';
-import { type TilePosition, tilePos, tilemapAddr } from './tilemap';
+import { tilemapAddr, tilePos, type TilePosition } from './tilemap';
 import {
   clearScreen,
   drawTiles,
@@ -80,19 +93,6 @@ import {
   vramPut,
   writeCenteredRow,
 } from './video';
-import { CAT_SPOTS, catFace, placeCat } from './cat';
-import {
-  KANA_DRAW_HUD,
-  FILL_TILES,
-  CAT_REACT,
-  CAT_REST,
-  CHART_SEEN,
-  CHART_UNMISS,
-  CHART_MISSED,
-  KANA_START,
-  KANA_UPDATE,
-} from './labels';
-import { gameModule } from '../asm/program';
 const KANA_DRAW_CLOCK = routine('kana_draw_clock', { clobbers: ['a', 'hl'] });
 const KANA_STREAK = new Label('kana_streak');
 const KANA_SHOW_PROMPT = routine('kana_show_prompt', { clobbers: ['a', 'hl'] });

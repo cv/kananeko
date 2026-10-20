@@ -1,9 +1,10 @@
 /** Kana round scoring, retries, and lives. */
 
-import { describe, expect, it } from 'vitest';
+import { FEEDBACK_FRAMES } from '@game/kana';
 import { DELTA_MINUS_100, DELTA_PLUS_10, DELTA_PLUS_100 } from '@game/kana-hud';
 import { KanaState, MAX_LIVES } from '@game/state';
-import { FEEDBACK_FRAMES } from '@game/kana';
+import { describe, expect, it } from 'vitest';
+
 import { checkpoint, runnerAt } from '../helpers/checkpoints';
 import type { GameRunner } from '../helpers/game-runner';
 import { answerKanaAndCheckDelta, loseAllKanaLives, loseOneKanaLife } from '../helpers/play';

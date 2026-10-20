@@ -1,45 +1,45 @@
 /** The screens a run ends on: the ending, and game over (with a password to continue). */
 
-import { buildPaletteSet } from './color';
-import { DRAW_START_BOX, TITLE_BLINK } from './title';
-import { resetRunState } from './rounds';
 import { JOY } from '../asm/hardware';
-import { MEM } from './ram';
+import { storeByte, zeroBytes } from '../asm/macros';
 import { gameModule } from '../asm/program';
+import { and, call, db, invoke, jp, jr, label, ld, ret } from '../asm/sm83';
+import { Label, labelFamily, type Op, routine } from '../asm/types';
+import { CAT_SPOTS, type CatFace, catFace, placeCat } from './cat';
+import type { ColorScheme } from './color';
+import { buildPaletteSet } from './color';
+import { requireTiles, textToTiles } from './font';
+import { pressed } from './joypad';
+import { buildDrawScoreDigits, SCORE_DIGIT_COUNT } from './kana-hud';
 import {
   CAT_REST,
   CAT_TICK,
   JOY_READ,
   KANA_DRAW_HUD,
-  SCORE_DIGITS,
-  PASS_ENCODE,
   PASS_DRAW,
+  PASS_ENCODE,
+  SCORE_DIGITS,
   TITLE_SCREEN,
 } from './labels';
-import { CAT_SPOTS, type CatFace, catFace, placeCat } from './cat';
-import { pressed } from './joypad';
-import { buildDrawScoreDigits, SCORE_DIGIT_COUNT } from './kana-hud';
 import { PASSWORD_LABEL, passwordLineCol } from './password';
-import { type SongName, playMusic, playSfx } from './sound';
+import { MEM } from './ram';
+import { resetRunState } from './rounds';
+import { SCENES } from './scene';
+import { ENDING_COLORS, GAME_OVER_COLORS } from './scenes/colors';
+import { playMusic, playSfx, type SongName } from './sound';
 import { runDma } from './sprites';
+import { MAX_LIVES } from './state';
+import { centerStartCol, tilemapAddr } from './tilemap';
+import { DRAW_START_BOX, TITLE_BLINK } from './title';
 import {
   clearScreen,
+  drawTiles,
   fadeIn,
-  frameWait,
   fadeOut,
+  frameWait,
   screenOff,
   writeCenteredRow,
-  drawTiles,
 } from './video';
-import { storeByte, zeroBytes } from '../asm/macros';
-import { and, call, jp, jr, label, ld, ret, invoke, db } from '../asm/sm83';
-import { type Op, Label, labelFamily, routine } from '../asm/types';
-import { requireTiles, textToTiles } from './font';
-import { centerStartCol, tilemapAddr } from './tilemap';
-import { SCENES } from './scene';
-import { MAX_LIVES } from './state';
-import type { ColorScheme } from './color';
-import { ENDING_COLORS, GAME_OVER_COLORS } from './scenes/colors';
 
 const DRAW_STAMPS = routine('draw_stamps', { clobbers: ['a', 'hl'] });
 

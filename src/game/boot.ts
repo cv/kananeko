@@ -1,15 +1,15 @@
 /** Boot: the CPU, RAM and the font, before the modules' inits. */
 
-import { gameModule } from '../asm/program';
-import { resetRunState } from './rounds';
 import { ifThen } from '../asm/flow';
-import { BUFFERS, MEM, STACK_TOP, VARIABLES } from './ram';
-import { bgTileAddr, screenOff } from './video';
 import { copyBlock, expandOneBit, storeByte, zeroBlock, zeroBytes, zeroPages } from '../asm/macros';
-import { cp, di, inc, label, ld, pop, push, db } from '../asm/sm83';
-import { type Op, u16, Label } from '../asm/types';
-import { ONE_BIT_TILES, TILE_COUNT, buildPackedTileData } from './font';
+import { gameModule } from '../asm/program';
+import { cp, db, di, inc, label, ld, pop, push } from '../asm/sm83';
+import { Label, type Op, u16 } from '../asm/types';
+import { buildPackedTileData, ONE_BIT_TILES, TILE_COUNT } from './font';
+import { BUFFERS, MEM, STACK_TOP, VARIABLES } from './ram';
+import { resetRunState } from './rounds';
 import { END_OF_CONVERSATION } from './state';
+import { bgTileAddr, screenOff } from './video';
 
 // ---------------------------------------------------------------------------
 // Font in ROM: 1-bit tiles first (expanded at boot), then 2-bit tiles, each split
