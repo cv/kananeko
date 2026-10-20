@@ -7,9 +7,12 @@
 
 import { HW } from './hardware';
 import {
+  add_hl_rr,
+  add_r,
   cp_n,
   dec_r,
   dec_rr,
+  inc_r,
   inc_rr,
   jp,
   jp_cc,
@@ -61,9 +64,54 @@ export function zeroBytes(...addrs: U16[]): Op[] {
   return [xor_r('a'), ...addrs.map((addr) => ld_nn_a(addr))];
 }
 
+/** Add 1 to a byte in memory: A = the new value, Z set if it wrapped to 0. */
+export function incByte(addr: U16): Op[] {
+  return [ld_a_nn(addr), inc_r('a'), ld_nn_a(addr)];
+}
+
+/** Take 1 from a byte in memory: A = the new value, Z set if it reached 0. */
+export function decByte(addr: U16): Op[] {
+  return [ld_a_nn(addr), dec_r('a'), ld_nn_a(addr)];
+}
+
 /** Decrement a memory counter and return from the subroutine while it is still non-zero. */
 export function countDownOrReturn(addr: U16): Op[] {
-  return [ld_a_nn(addr), dec_r('a'), ld_nn_a(addr), ret_cc('nz')];
+  return [...decByte(addr), ret_cc('nz')];
+}
+
+/**
+ * Copy a byte in memory (A = the byte). A variable declared with byteOf only takes
+ * bytes of the same kind.
+ */
+export function copyByte<D extends U16, S extends U16>(
+  dst: D,
+  src: S & (ByteValue<S> extends ByteValue<D> ? unknown : never),
+): Op[] {
+  return [ld_a_nn(src), ld_nn_a(dst)];
+}
+
+/** Copy a word variable (A = its high byte). */
+export function copyWord(dst: WordVar, src: WordVar): Op[] {
+  return [ld_a_nn(src.lo), ld_nn_a(dst.lo), ld_a_nn(src.hi), ld_nn_a(dst.hi)];
+}
+
+/**
+ * HL = the entry of a table whose entries are `stride` bytes, for the index in A.
+ * A × stride must stay under 256. Clobbers A (with a stride over 1) and DE.
+ */
+export function tableEntry(table: U16 | Target, stride: 1 | 2 | 4 | 8 = 1): Op[] {
+  return [
+    ...Array.from({ length: Math.log2(stride) }, () => add_r('a')),
+    ld_r_r('e', 'a'),
+    ld_r_n('d', u8(0)),
+    ld_rr_nn('hl', table),
+    add_hl_rr('de'),
+  ];
+}
+
+/** HL += A. Clobbers DE. */
+export function addAToHl(): Op[] {
+  return [ld_r_r('e', 'a'), ld_r_n('d', u8(0)), add_hl_rr('de')];
 }
 
 // ---------------------------------------------------------------------------

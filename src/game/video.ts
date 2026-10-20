@@ -2,10 +2,18 @@
  * Screen helpers shared by the title screen, scenes, and engines.
  */
 
-import { doWhile, ifThen, loop, repeat } from '../asm/flow';
+import { compare, doWhile, ifThen, loop, repeat } from '../asm/flow';
 import { HW, LCDC } from '../asm/hardware';
 import { MEM } from './ram';
-import { lcdOff, lcdOn, loadPointer, storePointer, zeroPages } from '../asm/macros';
+import {
+  copyByte,
+  incByte,
+  lcdOff,
+  lcdOn,
+  loadPointer,
+  storePointer,
+  zeroPages,
+} from '../asm/macros';
 import {
   add,
   and,
@@ -81,8 +89,7 @@ export function screenOn(): Op[] {
   return [
     ...lcdOn(SCREEN_ON_FLAGS),
     // The time spent with the screen off isn't a missed frame (see frame_wait)
-    ld('a', [MEM.FRAME_COUNT]),
-    ld([MEM.LAST_FRAME], 'a'),
+    ...copyByte(MEM.LAST_FRAME, MEM.FRAME_COUNT),
   ];
 }
 
@@ -101,9 +108,7 @@ export function buildFrameWait(): Op[] {
   return [
     label(VBLANK_HANDLER),
     push('af'),
-    ld('a', [MEM.FRAME_COUNT]),
-    inc('a'),
-    ld([MEM.FRAME_COUNT], 'a'),
+    ...incByte(MEM.FRAME_COUNT),
     pop('af'),
     reti(),
 
@@ -114,8 +119,7 @@ export function buildFrameWait(): Op[] {
     push('bc'),
     ld('a', [MEM.LAST_FRAME]),
     ld('c', 'a'),
-    ld('a', [MEM.FRAME_COUNT]),
-    ld([MEM.LAST_FRAME], 'a'),
+    ...copyByte(MEM.LAST_FRAME, MEM.FRAME_COUNT),
     sub('c'), // VBlanks since the last wait
     cp(2),
     ...ifThen('nc', [
@@ -236,8 +240,7 @@ export type Palette = Quad<number>;
 export function cgbAttributes(ops: readonly Op[]): Op[] {
   const skip = new Label();
   return [
-    ld('a', [MEM.IS_CGB]),
-    cp(0),
+    ...compare(MEM.IS_CGB, 0),
     jp('z', skip),
     ld('a', 1),
     ldh([HW.VBK], 'a'),

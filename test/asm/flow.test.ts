@@ -1,9 +1,21 @@
 /** Structured control flow, run in the emulator. */
 
 import { describe, expect, it } from 'vitest';
-import { block, doWhile, ifElse, ifThen, loop, repeat } from '@asm/flow';
-import { cp, dec, inc, jr, ld, ret } from '@asm/sm83';
-import { u16 } from '@asm/types';
+import {
+  block,
+  compare,
+  dispatch,
+  doWhile,
+  ifElse,
+  ifEquals,
+  ifNotEquals,
+  ifThen,
+  loop,
+  repeat,
+} from '@asm/flow';
+import type { ByteVar } from '@asm/ram';
+import { call, cp, dec, inc, jr, label, ld, ret } from '@asm/sm83';
+import { Label, u16 } from '@asm/types';
 import { SCRATCH, runProgram } from '../helpers/run-program';
 
 const OUT = u16(SCRATCH);
@@ -104,5 +116,95 @@ describe('loop', () => {
       ld([OUT], 'a'),
     ]);
     expect(memory[SCRATCH]).toBe(5);
+  });
+});
+
+const Light = { OFF: 0, ON: 1, BLINK: 2, BROKEN: 3 } as const;
+const Mood = { CALM: 0, CROSS: 1 } as const;
+const LIGHT = u16(SCRATCH + 8) as ByteVar<(typeof Light)[keyof typeof Light]>;
+
+describe('compare, ifEquals and ifNotEquals', () => {
+  it.each([
+    [Light.ON, 1, 0],
+    [Light.BLINK, 0, 1],
+  ])('test a variable against a value (%i)', (value, equal, notEqual) => {
+    const memory = runProgram([
+      ld('a', value),
+      ld([LIGHT], 'a'),
+      ld('b', 0),
+      ld('c', 0),
+      ...ifEquals(LIGHT, Light.ON, [inc('b')]),
+      ...ifNotEquals(LIGHT, Light.ON, [inc('c')]),
+      ld('a', 'b'),
+      ld([OUT], 'a'),
+      ld('a', 'c'),
+      ld([u16(SCRATCH + 1)], 'a'),
+    ]);
+    expect([memory[SCRATCH], memory[SCRATCH + 1]]).toEqual([equal, notEqual]);
+  });
+
+  it('only takes values of the variable’s own kind', () => {
+    // @ts-expect-error: a Mood isn't a Light
+    compare(LIGHT, Mood.CROSS + 4);
+    expect(compare(LIGHT, Light.BROKEN)).toHaveLength(2);
+  });
+});
+
+describe('dispatch', () => {
+  const ROUTINE = new Label('light_routine');
+  const blink = new Label();
+  const broken = new Label();
+  const routine = [
+    label(ROUTINE),
+    ld('b', 0xee),
+    ...dispatch(LIGHT, Light, { OFF: 'ret', ON: 'continue', BLINK: blink, BROKEN: broken }),
+    ld('b', 1),
+    ret(),
+    label(blink),
+    ld('b', 2),
+    ret(),
+    label(broken),
+    ld('b', 3),
+    ret(),
+  ];
+
+  it.each([
+    [Light.OFF, 0xee],
+    [Light.ON, 1],
+    [Light.BLINK, 2],
+    [Light.BROKEN, 3],
+  ])('takes the case for %i', (value, expected) => {
+    const memory = runProgram(
+      [ld('a', value), ld([LIGHT], 'a'), call(ROUTINE), ld('a', 'b'), ld([OUT], 'a')],
+      routine,
+    );
+    expect(memory[SCRATCH]).toBe(expected);
+  });
+
+  it('needs no test for the last case when none continues', () => {
+    const ops = dispatch(LIGHT, Light, {
+      OFF: 'ret',
+      ON: 'ret',
+      BLINK: 'ret',
+      BROKEN: new Label(),
+    });
+    expect(ops.filter((op) => op.kind === 'inst' && op.bytes[0] === 0xfe)).toHaveLength(3); // CP n
+  });
+
+  it('needs a case for every value, from the variable’s own enum', () => {
+    // @ts-expect-error: BROKEN has no case
+    expect(() => dispatch(LIGHT, Light, { OFF: 'ret', ON: 'continue', BLINK: 'ret' })).toThrow(
+      /BROKEN/,
+    );
+    // @ts-expect-error: a Mood isn't a Light
+    dispatch(LIGHT, Mood, { CALM: 'ret', CROSS: 'continue' });
+    expect(() =>
+      dispatch(LIGHT, Light, {
+        OFF: 'continue',
+        ON: 'continue',
+        BLINK: 'continue',
+        BROKEN: 'continue',
+      }),
+    ).toThrow();
   });
 });

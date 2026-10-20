@@ -5,8 +5,8 @@
  */
 
 import { MEM } from './ram';
-import { ifThen, loop } from '../asm/flow';
-import { loadPointer, storeByte, zeroBytes } from '../asm/macros';
+import { compare, ifThen, loop } from '../asm/flow';
+import { incByte, loadPointer, storeByte, zeroBytes } from '../asm/macros';
 import { add, cp, dec, inc, jp, jr, label, ld, and, ret } from '../asm/sm83';
 import type { Op } from '../asm/types';
 import { sliceArt } from './art';
@@ -123,12 +123,9 @@ export function buildNpcRoutines(): Op[] {
     // fall through to place it
 
     label(NPC_UPDATE),
-    ld('a', [MEM.NPC_CURRENT]),
-    cp(NONE),
+    ...compare(MEM.NPC_CURRENT, NONE),
     ret('z'),
-    ld('a', [MEM.NPC_TIMER]),
-    inc('a'),
-    ld([MEM.NPC_TIMER], 'a'),
+    ...incByte(MEM.NPC_TIMER),
     and(BOB_BIT),
     ld('a', [MEM.NPC_Y]), // LD leaves the flags from AND
     ...ifThen('nz', [dec('a')]),

@@ -10,16 +10,29 @@
  * any other choice is "bad" (-5 score, -1 life, conversation ends at 0 lives).
  */
 
+import { ifHeld, pressed } from './joypad';
 import { playSfx } from './sound';
-import { doWhile, ifThen, loop, repeat } from '../asm/flow';
+import {
+  compare,
+  dispatch,
+  doWhile,
+  ifEquals,
+  ifNotEquals,
+  ifThen,
+  loop,
+  repeat,
+} from '../asm/flow';
 import { HW, JOY } from '../asm/hardware';
 import { MEM } from './ram';
 import {
+  copyByte,
   countDownOrReturn,
+  incByte,
   loadPointer,
   storeByte,
   storePointer,
   switchCases,
+  tableEntry,
   zeroBytes,
 } from '../asm/macros';
 import {
@@ -186,9 +199,7 @@ function buildInitChoiceOrder(): Op[] {
     inc('a'),
     ld([MEM.DLG_ORDER.at(2)], 'a'),
 
-    ld('a', [MEM.DLG_CHOICE_CNT]),
-    cp(2),
-    ...ifThen('nz', [cp(3), jr('z', orderThree), jp(done)]),
+    ...ifNotEquals(MEM.DLG_CHOICE_CNT, 2, [cp(3), jr('z', orderThree), jp(done)]),
     ldh('a', [HW.DIV]),
     and(1),
     jr('z', done),
@@ -284,10 +295,7 @@ export function buildTextNext(base: number): Op[] {
     ...ifThen('nz', [
       dec('a'),
       ld([MEM.TEXT_SP], 'a'),
-      ld('e', 'a'),
-      ld('d', 0),
-      ld('hl', MEM.TEXT_STACK.address),
-      add('hl', 'de'),
+      ...tableEntry(MEM.TEXT_STACK.address),
       ld('a', ['hl']),
       jr(expand),
     ]),
@@ -369,23 +377,16 @@ export function buildDialogueEngine(): Op[] {
     label(DLG_UPDATE),
     call(NPC_UPDATE), // idle bob of the speaker
     call(ANIM_TICK), // animated backdrop tile
-    ld('a', [MEM.DLG_STATE]),
-    cp(DialogueState.IDLE),
-    ret('z'),
-    cp(DialogueState.PRINTING),
-    ...ifThen('nz', [
-      cp(DialogueState.WAITING),
-      jp('z', doWait),
-      cp(DialogueState.CHOOSING),
-      jp(doChoose),
-    ]),
-    ld('a', [MEM.JOYPAD_CUR]),
-    and(JOY.B),
-    ...ifThen('nz', [
+    ...dispatch(MEM.DLG_STATE, DialogueState, {
+      IDLE: 'ret',
+      PRINTING: 'continue',
+      WAITING: doWait,
+      CHOOSING: doChoose,
+    }),
+    ...ifHeld(JOY.B, [
       ...Array.from({ length: FAST_REVEAL_CHARS - 1 }, () => [
         call(DLG_PRINT_CHAR),
-        ld('a', [MEM.DLG_STATE]),
-        cp(DialogueState.PRINTING),
+        ...compare(MEM.DLG_STATE, DialogueState.PRINTING),
         ret('nz'), // the text ended
       ]).flat(),
       jr(DLG_PRINT_CHAR),
@@ -434,9 +435,7 @@ export function buildDialogueEngine(): Op[] {
     ...storePointer('hl', MEM.DLG_STR),
 
     // If 0 choices, go to wait-for-A mode
-    ld('a', [MEM.DLG_CHOICE_CNT]),
-    cp(0),
-    ...ifThen('z', [...storeByte(MEM.DLG_STATE, DialogueState.WAITING), ret()]),
+    ...ifEquals(MEM.DLG_CHOICE_CNT, 0, [...storeByte(MEM.DLG_STATE, DialogueState.WAITING), ret()]),
     ...storeByte(MEM.DLG_STATE, DialogueState.CHOOSING),
     ...buildInitChoiceOrder(),
 
@@ -471,9 +470,8 @@ export function buildDialogueEngine(): Op[] {
     // dlg_do_wait — Wait for A button press, then set idle
     // =================================================================
     label(doWait),
-    ld('a', [MEM.JOYPAD_NEW]),
-    and(JOY.A),
-    ret('z'), // not pressed
+    ...pressed(JOY.A),
+    ret('z'),
     // A pressed — close dialogue
     xor('a'),
     ld([MEM.DLG_STATE], 'a'), // state = idle
@@ -484,9 +482,7 @@ export function buildDialogueEngine(): Op[] {
     // =================================================================
     label(doChoose),
     // Bounce the cursor one pixel right every CURSOR_BOUNCE_FRAMES frames
-    ld('a', [MEM.DLG_BOUNCE]),
-    inc('a'),
-    ld([MEM.DLG_BOUNCE], 'a'),
+    ...incByte(MEM.DLG_BOUNCE),
     and(CURSOR_BOUNCE_FRAMES),
     ld('a', CURSOR_X),
     ...ifThen('nz', [inc('a')]),
@@ -517,9 +513,7 @@ export function buildDialogueEngine(): Op[] {
 
     // --- Move cursor up ---
     label(cursorUp),
-    ld('a', [MEM.DLG_CURSOR]),
-    cp(0),
-    ...ifThen('z', [ld('a', [MEM.DLG_CHOICE_CNT]), dec('a'), jr(saveCursor)]),
+    ...ifEquals(MEM.DLG_CURSOR, 0, [ld('a', [MEM.DLG_CHOICE_CNT]), dec('a'), jr(saveCursor)]),
     ld('a', [MEM.DLG_CURSOR]),
     dec('a'),
 
@@ -533,15 +527,13 @@ export function buildDialogueEngine(): Op[] {
     label(confirmChoice),
     ...playSfx('confirm'),
     ...zeroBytes(oamField(SPRITE_SLOT.cursor, 'y')), // hide the cursor
-    ld('a', [MEM.DLG_CURSOR]),
-    ld([MEM.DLG_RESULT], 'a'),
+    ...copyByte(MEM.DLG_RESULT, MEM.DLG_CURSOR),
 
     // Read next_node = table_base[logical_choice]
     ld('a', [MEM.DLG_CURSOR]),
     ...buildLoadLogicalChoiceFromCursor(),
     ld('c', 'a'), // C = logical choice
-    ld('a', [MEM.DLG_NODE_ID]),
-    ld([MEM.DLG_FROM_NODE], 'a'),
+    ...copyByte(MEM.DLG_FROM_NODE, MEM.DLG_NODE_ID),
 
     ...loadPointer('hl', MEM.DLG_META0),
     ld('b', 0),
@@ -573,8 +565,7 @@ export function buildDialogueEngine(): Op[] {
     // Good: +10 score, +1 life (capped at MAX_LIVES)
     ...buildAddScore(10),
     ...buildSetDelta(DELTA_PLUS_10),
-    ld('a', [MEM.KANA_LIVES]),
-    cp(MAX_LIVES),
+    ...compare(MEM.KANA_LIVES, MAX_LIVES),
     jr('nc', scoreDone), // already at max
     inc('a'),
     ld([MEM.KANA_LIVES], 'a'),
@@ -585,8 +576,7 @@ export function buildDialogueEngine(): Op[] {
     // Bad: -5 score, -1 life (floor at 0)
     ...buildSubScore(5),
     ...buildSetDelta(DELTA_MINUS_5),
-    ld('a', [MEM.KANA_LIVES]),
-    cp(0),
+    ...compare(MEM.KANA_LIVES, 0),
     jr('z', scoreDone), // already at 0
     dec('a'),
     ld([MEM.KANA_LIVES], 'a'),

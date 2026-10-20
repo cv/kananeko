@@ -36,7 +36,7 @@ import {
 } from '../asm/sm83';
 import { type Op, Label, routine } from '../asm/types';
 import { at } from '../asm/util';
-import { storeByte, zeroBytes } from '../asm/macros';
+import { storeByte, tableEntry, zeroBytes } from '../asm/macros';
 import { CHART_KANA } from './chart';
 import { type KanaQuestion, MAX_KANA_WORD_LENGTH, buildKanaData } from './kana';
 import { distractorsFor, phrasesOf } from './quiz';
@@ -162,11 +162,7 @@ export function buildPracticeRoutines(speedRound: Label): Op[] {
     // practice_copy: DE = entry A's question in ROM, then copy it
     label(PRACTICE_COPY),
     push('hl'),
-    add('a'),
-    ld('e', 'a'),
-    ld('d', 0),
-    ld('hl', PRACTICE_TABLE),
-    add('hl', 'de'),
+    ...tableEntry(PRACTICE_TABLE, 2),
     ld('a', ['hl+']),
     ld('e', 'a'),
     ld('d', ['hl']),

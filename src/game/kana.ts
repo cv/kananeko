@@ -20,12 +20,15 @@
  *   0x00 sentinel (word_length = 0)
  */
 
+import { ifPressed } from './joypad';
 import { playMusic, playSfx } from './sound';
-import { block, doWhile, ifThen } from '../asm/flow';
+import { compare, dispatch, doWhile, ifEquals, ifNotEquals, ifThen } from '../asm/flow';
 import { HW, JOY } from '../asm/hardware';
 import { MEM } from './ram';
 import {
   countDownOrReturn,
+  decByte,
+  incByte,
   loadPointer,
   storeByte,
   storePointer,
@@ -362,7 +365,6 @@ export function buildKanaEngine(): Op[] {
   const practiceWin = new Label('kana_practice_win');
   const redeemWin = new Label('kana_redeem_win');
   const wrongAnswer = new Label('kana_wrong');
-  const noQuit = new Label('practice_no_quit');
   const wrongFeedback = new Label('kana_wrong_fb');
   const correctFeedback = new Label('kana_correct_fb');
   const allDone = new Label('kana_all_done');
@@ -379,9 +381,7 @@ export function buildKanaEngine(): Op[] {
     // Restock 1 life so the player can attempt kana even after dying in dialogue.
     ...zeroBytes(MEM.KANA_Q_IDX, MEM.KANA_ATTEMPTS),
     ...buildClearDelta(), // don't carry a dialogue flash into the round
-    ld('a', [MEM.KANA_LIVES]),
-    cp(0),
-    ...ifThen('z', [...storeByte(MEM.KANA_LIVES, 1)]),
+    ...ifEquals(MEM.KANA_LIVES, 0, [...storeByte(MEM.KANA_LIVES, 1)]),
     ...catFace(CAT_REST, 'neutral'),
 
     jp(loadQuestion),
@@ -469,8 +469,7 @@ export function buildKanaEngine(): Op[] {
     ...storeByte(MEM.KANA_STATE, KanaState.AWAITING),
     ...storeByte(MEM.KANA_FEEDBACK_TIMER, FEEDBACK_FRAMES),
     // Speed round: start the clock
-    ld('a', [MEM.KANA_MODE]),
-    cp(KanaMode.SPEED),
+    ...compare(MEM.KANA_MODE, KanaMode.SPEED),
     ret('nz'),
     ...storeByte(MEM.KANA_CLOCK_FRAMES, FRAMES_PER_SECOND),
     ...storeByte(MEM.KANA_CLOCK_SECS, SPEED_SECONDS),
@@ -488,45 +487,28 @@ export function buildKanaEngine(): Op[] {
     // kana_update — Dispatch on state.
     // =================================================================
     label(KANA_UPDATE),
-    ld('a', [MEM.KANA_STATE]),
-    cp(KanaState.IDLE),
-    ret('z'),
-    cp(KanaState.AWAITING),
-    ...ifThen('nz', [
-      cp(KanaState.ADVANCE_FEEDBACK),
-      jp('z', correctFeedback),
-      cp(KanaState.RETRY_FEEDBACK),
-      jp('z', wrongFeedback),
-      ret(),
-    ]),
+    ...dispatch(MEM.KANA_STATE, KanaState, {
+      IDLE: 'ret',
+      AWAITING: 'continue',
+      ADVANCE_FEEDBACK: correctFeedback,
+      RETRY_FEEDBACK: wrongFeedback,
+    }),
     // Practice: B quits (see practice.ts)
-    ld('a', [MEM.KANA_MODE]),
-    cp(KanaMode.PRACTICE),
-    jr('nz', noQuit),
-    ld('a', [MEM.JOYPAD_NEW]),
-    and(JOY.B),
-    jr('z', noQuit),
-    ...storeByte(MEM.PRACTICE_QUIT, 1),
-    jp(allDone),
-    label(noQuit),
+    ...ifEquals(MEM.KANA_MODE, KanaMode.PRACTICE, [
+      ...ifPressed(JOY.B, [...storeByte(MEM.PRACTICE_QUIT, 1), jp(allDone)]),
+    ]),
     // Speed round: tick the clock; running out counts as a miss
-    ld('a', [MEM.KANA_MODE]),
-    cp(KanaMode.SPEED),
-    ...block((done) => [
-      jr('nz', done),
-      ld('a', [MEM.KANA_CLOCK_FRAMES]),
-      dec('a'),
-      ld([MEM.KANA_CLOCK_FRAMES], 'a'),
-      jr('nz', done),
-      ...storeByte(MEM.KANA_CLOCK_FRAMES, FRAMES_PER_SECOND),
-      ld('a', [MEM.KANA_CLOCK_SECS]),
-      dec('a'),
-      ld([MEM.KANA_CLOCK_SECS], 'a'),
-      ...playSfx('tick'),
-      call(KANA_DRAW_CLOCK),
-      ld('a', [MEM.KANA_CLOCK_SECS]),
-      or('a'),
-      jp('z', wrongAnswer),
+    ...ifEquals(MEM.KANA_MODE, KanaMode.SPEED, [
+      ...decByte(MEM.KANA_CLOCK_FRAMES),
+      ...ifThen('z', [
+        ...storeByte(MEM.KANA_CLOCK_FRAMES, FRAMES_PER_SECOND),
+        ...decByte(MEM.KANA_CLOCK_SECS),
+        ...playSfx('tick'),
+        call(KANA_DRAW_CLOCK),
+        ld('a', [MEM.KANA_CLOCK_SECS]),
+        or('a'),
+        jp('z', wrongAnswer),
+      ]),
     ]),
     ...readDirection(new Label('kana_got_answer')),
     ld([MEM.KANA_ANSWER], 'a'),
@@ -538,14 +520,14 @@ export function buildKanaEngine(): Op[] {
 
     // === CORRECT: a won-back life, or a score that depends on the attempt number ===
     call(CHART_SEEN),
-    ld('a', [MEM.KANA_MODE]),
-    cp(KanaMode.REDEEM),
-    jp('z', redeemWin),
-    cp(KanaMode.PRACTICE),
-    jp('z', practiceWin),
-    ld('a', [MEM.KANA_ATTEMPTS]),
-    cp(0),
-    ...ifThen('z', [
+    ...dispatch(MEM.KANA_MODE, KanaMode, {
+      NORMAL: 'continue',
+      SAY_IT: 'continue',
+      REDEEM: redeemWin,
+      SPEED: 'continue',
+      PRACTICE: practiceWin,
+    }),
+    ...ifEquals(MEM.KANA_ATTEMPTS, 0, [
       ...buildAddScore(SCORE_FIRST_TRY),
       ...buildSetDelta(DELTA_PLUS_100),
       ld('a', [MEM.KANA_STREAK]),
@@ -579,12 +561,9 @@ export function buildKanaEngine(): Op[] {
     call(CHART_MISSED),
     ...playSfx('wrong'),
     ...zeroBytes(MEM.KANA_STREAK),
-    ld('a', [MEM.KANA_MODE]),
-    cp(KanaMode.NORMAL),
+    ...compare(MEM.KANA_MODE, KanaMode.NORMAL),
     jp('nz', chanceMiss), // one-try rounds just show the answer
-    ld('a', [MEM.KANA_ATTEMPTS]),
-    cp(MAX_ATTEMPTS),
-    ...ifThen('nz', [
+    ...ifNotEquals(MEM.KANA_ATTEMPTS, MAX_ATTEMPTS, [
       inc('a'),
       ld([MEM.KANA_ATTEMPTS], 'a'),
       ...buildClearDelta(),
@@ -599,9 +578,7 @@ export function buildKanaEngine(): Op[] {
     ...showFace('sad'),
     call(KANA_REVEAL), // show the answer before moving on
 
-    ld('a', [MEM.KANA_LIVES]),
-    dec('a'),
-    ld([MEM.KANA_LIVES], 'a'),
+    ...decByte(MEM.KANA_LIVES),
     cp(0),
     jp('z', allDone), // no lives left: end the round now
 
@@ -623,8 +600,7 @@ export function buildKanaEngine(): Op[] {
 
     // === One-try rounds ===
     label(redeemWin), // the life lost to a bad answer comes back
-    ld('a', [MEM.KANA_LIVES]),
-    cp(MAX_LIVES),
+    ...compare(MEM.KANA_LIVES, MAX_LIVES),
     ...ifThen('c', [inc('a'), ld([MEM.KANA_LIVES], 'a')]),
     ...buildClearDelta(),
     jp(correctDone),
@@ -642,9 +618,7 @@ export function buildKanaEngine(): Op[] {
     // =================================================================
     label(correctFeedback),
     ...countDownOrReturn(MEM.KANA_FEEDBACK_TIMER),
-    ld('a', [MEM.KANA_Q_IDX]),
-    inc('a'),
-    ld([MEM.KANA_Q_IDX], 'a'),
+    ...incByte(MEM.KANA_Q_IDX),
     jp(loadQuestion),
 
     // =================================================================
@@ -662,9 +636,7 @@ export function buildKanaEngine(): Op[] {
     // match questions, the usual one otherwise. Safe with the LCD on.
     // =================================================================
     label(KANA_SHOW_PROMPT),
-    ld('a', [MEM.KANA_MODE]),
-    cp(KanaMode.SPEED),
-    ...ifThen('nz', [
+    ...ifNotEquals(MEM.KANA_MODE, KanaMode.SPEED, [
       ld('a', [MEM.KANA_PROMPT]),
       or('a'),
       ...ifThen('z', [...showMessage(KANA_MESSAGES.prompt), ret()]),

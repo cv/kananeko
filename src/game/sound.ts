@@ -43,7 +43,7 @@ import {
   xor,
 } from '../asm/sm83';
 import { type Op, type U16, ioReg, u16, Label, labelFamily, routine } from '../asm/types';
-import { copyBytes, storeByte } from '../asm/macros';
+import { copyBytes, storeByte, tableEntry } from '../asm/macros';
 import { SOUND_TICK, SFX_PLAY, MUSIC_PLAY } from './labels';
 import { gameModule } from '../asm/program';
 import { byte, struct } from '../asm/struct';
@@ -463,11 +463,7 @@ export function buildSoundDriver(): Op[] {
     ld(['c'], 'a'),
     inc('c'),
     ld('a', 'b'),
-    add('a'),
-    ld('e', 'a'),
-    ld('d', 0),
-    ld('hl', NOTE_PERIODS),
-    add('hl', 'de'),
+    ...tableEntry(NOTE_PERIODS, 2),
     ld('a', ['hl+']),
     ld(['c'], 'a'), // period, low byte
     inc('c'),
@@ -550,12 +546,7 @@ export function buildSoundDriver(): Op[] {
       jr('z', done),
       // HL = the song's two sequence addresses (4 bytes per song, from ID 1)
       dec('a'),
-      add('a'),
-      add('a'),
-      ld('e', 'a'),
-      ld('d', 0),
-      ld('hl', MUSIC_TABLE),
-      add('hl', 'de'),
+      ...tableEntry(MUSIC_TABLE, 4),
       ...[0, 1].flatMap((voice) => [
         ld('a', ['hl+']),
         ld('e', 'a'),

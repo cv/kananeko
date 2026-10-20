@@ -5,7 +5,7 @@
 
 import { MEM } from './ram';
 import { ifThen, repeat } from '../asm/flow';
-import { loadPointer } from '../asm/macros';
+import { incByte, loadPointer } from '../asm/macros';
 import { add, and, cp, inc, label, ld, pop, push, ret, swap, xor } from '../asm/sm83';
 import type { Op } from '../asm/types';
 import type { SceneArt } from './backdrop';
@@ -65,9 +65,7 @@ export function buildAnimRoutines(): Op[] {
     ld('b', 'a'), // B = frame count
     ld('a', ['hl+']),
     ld('c', 'a'), // C = period mask
-    ld('a', [MEM.ANIM_TIMER]),
-    inc('a'),
-    ld([MEM.ANIM_TIMER], 'a'),
+    ...incByte(MEM.ANIM_TIMER),
     and('c'),
     ret('nz'),
 

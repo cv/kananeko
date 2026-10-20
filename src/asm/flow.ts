@@ -11,8 +11,9 @@
  * The jumps they make are left to the assembler, which uses JR whenever it reaches.
  */
 
-import { dec_r, jp, jp_cc, label, ld_r_n } from './ops';
-import { type CCName, Label, type Op } from './types';
+import { cp_n, dec_r, jp, jp_cc, label, ld_a_nn, ld_r_n, ret, ret_cc } from './ops';
+import type { ByteValue } from './ram';
+import { type CCName, Label, type Op, type U16, u8 } from './types';
 import { lo } from './util';
 
 /** The condition that holds when `cc` doesn't */
@@ -82,4 +83,79 @@ export function loop(body: (again: Label, done: Label) => readonly Op[]): Op[] {
   const again = new Label();
   const done = new Label();
   return [label(again), ...body(again, done), label(done)];
+}
+
+// ---------------------------------------------------------------------------
+// Branching on a variable's value
+// ---------------------------------------------------------------------------
+
+/**
+ * A = the variable; Z set if it holds `value`. A variable declared with byteOf only
+ * compares with values of its own kind.
+ */
+export function compare<A extends U16>(variable: A, value: ByteValue<A>): Op[] {
+  return [ld_a_nn(variable), cp_n(u8(value))];
+}
+
+/** Run `body` only when the variable holds `value` (A = the variable). */
+export function ifEquals<A extends U16>(
+  variable: A,
+  value: ByteValue<A>,
+  body: readonly Op[],
+): Op[] {
+  return [...compare(variable, value), ...ifThen('z', body)];
+}
+
+/** Run `body` only when the variable doesn't hold `value` (A = the variable). */
+export function ifNotEquals<A extends U16>(
+  variable: A,
+  value: ByteValue<A>,
+  body: readonly Op[],
+): Op[] {
+  return [...compare(variable, value), ...ifThen('nz', body)];
+}
+
+/** What dispatch does with one value: jump to a label, return, or carry on after it */
+export type Case = Label | 'ret' | 'continue';
+
+/** Passes when `E` names every value the variable can hold */
+type Covers<A extends U16, E> =
+  number extends ByteValue<A>
+    ? unknown
+    : [Exclude<ByteValue<A>, E[keyof E]>] extends [never]
+      ? unknown
+      : { readonly missing: Exclude<ByteValue<A>, E[keyof E]> };
+
+/**
+ * Branch on a variable's value, with a case for every name in `values` (its enum):
+ *
+ *   ...dispatch(MEM.KANA_STATE, KanaState, {
+ *     IDLE: 'ret',
+ *     AWAITING: 'continue',
+ *     ADVANCE_FEEDBACK: correctFeedback,
+ *     RETRY_FEEDBACK: wrongFeedback,
+ *   })
+ *
+ * Leaving out a name, or passing another variable's enum, is a type error. The values
+ * are tested in the enum's order; when no case continues, the last one needs no test.
+ */
+export function dispatch<A extends U16, const E extends Readonly<Record<string, ByteValue<A>>>>(
+  variable: A,
+  values: E & Covers<A, E>,
+  cases: { readonly [K in keyof E]: Case },
+): Op[] {
+  for (const name of Object.keys(values)) {
+    if (!(name in cases)) throw new Error(`dispatch has no case for ${name}`);
+  }
+  const tested = Object.entries(values as E).filter(([name]) => cases[name] !== 'continue');
+  if (tested.length === 0) throw new Error('dispatch needs a case that returns or jumps');
+  const falls = tested.length < Object.keys(values).length;
+  return [
+    ld_a_nn(variable),
+    ...tested.flatMap(([name, value], i) => {
+      const action = cases[name] as Exclude<Case, 'continue'>;
+      if (!falls && i === tested.length - 1) return [action === 'ret' ? ret() : jp(action)];
+      return [cp_n(u8(value)), action === 'ret' ? ret_cc('z') : jp_cc('z', action)];
+    }),
+  ];
 }

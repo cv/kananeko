@@ -13,10 +13,10 @@
  *   cat_tick   once per frame: count down a reaction, blink
  */
 
-import { doWhile, ifThen, repeat } from '../asm/flow';
+import { compare, doWhile, ifThen, repeat } from '../asm/flow';
 import { HW } from '../asm/hardware';
 import { MEM } from './ram';
-import { copyBlock, storeByte, zeroBytes } from '../asm/macros';
+import { copyBlock, decByte, incByte, storeByte, zeroBytes } from '../asm/macros';
 import { add, call, cp, dec, inc, jp, jr, label, ld, ldh, db, or, ret, and } from '../asm/sm83';
 import { type Op, u16, Label, routine } from '../asm/types';
 import { hi, lo } from '../asm/util';
@@ -140,9 +140,7 @@ export function buildCatRoutines(): Op[] {
           ld('a', 'b'),
           add(8),
           ld('b', 'a'),
-          ld('a', [MEM.CAT_COL]),
-          dec('a'),
-          ld([MEM.CAT_COL], 'a'),
+          ...decByte(MEM.CAT_COL),
         ]),
         ld('a', 'c'),
         add(8),
@@ -188,12 +186,9 @@ export function buildCatRoutines(): Op[] {
       ld('a', [MEM.CAT_REST]),
       jr(setFace),
     ]),
-    ld('a', [MEM.CAT_REST]),
-    cp(FACE.neutral),
+    ...compare(MEM.CAT_REST, FACE.neutral),
     ret('nz'), // only a neutral cat blinks
-    ld('a', [MEM.CAT_BLINK]),
-    inc('a'),
-    ld([MEM.CAT_BLINK], 'a'),
+    ...incByte(MEM.CAT_BLINK),
     and(BLINK_PERIOD - 1),
     cp(BLINK_PERIOD - BLINK_FRAMES),
     ...ifThen('nz', [or('a'), ret('nz'), ld('a', FACE.neutral), jr(setFace)]),

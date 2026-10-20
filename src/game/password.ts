@@ -11,7 +11,7 @@
  * decodePassword are the reference; the game's routines do the same in assembly.
  */
 
-import { ifThen, loop, repeat } from '../asm/flow';
+import { compare, ifThen, loop, repeat } from '../asm/flow';
 import { JOY } from '../asm/hardware';
 import { MEM } from './ram';
 import {
@@ -43,7 +43,7 @@ import {
 import { HW } from '../asm/hardware';
 import { type Op, type U16, s8, u16, Label, routine } from '../asm/types';
 import { hi, lo } from '../asm/util';
-import { storeByte, zeroBytes } from '../asm/macros';
+import { copyByte, incByte, storeByte, tableEntry, zeroBytes } from '../asm/macros';
 import { requireTile, textToTiles } from './font';
 import { MAX_SCORE } from './kana-hud';
 import { playSfx } from './sound';
@@ -212,10 +212,8 @@ export function buildPasswordRoutines(sceneCount: number): Op[] {
     add('a'),
     or('b'),
     ld([acc(1)], 'a'),
-    ld('a', [MEM.KANA_SCORE.hi]),
-    ld([acc(2)], 'a'),
-    ld('a', [MEM.KANA_SCORE.lo]),
-    ld([acc(3)], 'a'),
+    ...copyByte(acc(2), MEM.KANA_SCORE.hi),
+    ...copyByte(acc(3), MEM.KANA_SCORE.lo),
     call(PASS_CHECK),
     ld([acc(0)], 'a'),
     call(PASS_XOR),
@@ -290,10 +288,8 @@ export function buildPasswordRoutines(sceneCount: number): Op[] {
     ...loop((again, done) => [dec('b'), jr('z', done), add('a'), jr(again)]),
     dec('a'),
     ld([MEM.SCENE_FLAGS], 'a'),
-    ld('a', [acc(2)]),
-    ld([MEM.KANA_SCORE.hi], 'a'),
-    ld('a', [acc(3)]),
-    ld([MEM.KANA_SCORE.lo], 'a'),
+    ...copyByte(MEM.KANA_SCORE.hi, acc(2)),
+    ...copyByte(MEM.KANA_SCORE.lo, acc(3)),
     ...zeroBytes(MEM.DELTA_TYPE, MEM.DELTA_TIMER, MEM.KANA_STREAK),
     ret(),
 
@@ -427,22 +423,15 @@ export function buildPasswordScreen(fade: Label): Op[] {
     jp(screenLoop),
 
     label(addChar),
-    ld('a', [MEM.PASS_LEN]),
-    cp(PASSWORD_LENGTH),
+    ...compare(MEM.PASS_LEN, PASSWORD_LENGTH),
     jp('nc', screenLoop), // full (and wrong): B to fix it
-    ld('e', 'a'),
-    ld('d', 0),
-    ld('hl', MEM.PASS_CHARS.address),
-    add('hl', 'de'),
+    ...tableEntry(MEM.PASS_CHARS.address),
     ld('a', [MEM.PASS_CURSOR]),
     ld(['hl'], 'a'),
-    ld('a', [MEM.PASS_LEN]),
-    inc('a'),
-    ld([MEM.PASS_LEN], 'a'),
+    ...incByte(MEM.PASS_LEN),
     ...playSfx('confirm'),
     call(PASS_DRAW_SLOTS),
-    ld('a', [MEM.PASS_LEN]),
-    cp(PASSWORD_LENGTH),
+    ...compare(MEM.PASS_LEN, PASSWORD_LENGTH),
     jp('nz', screenLoop),
     // All six in: check it
     call(PASS_DECODE),

@@ -2,21 +2,27 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  addAToHl,
   copyBlock,
+  copyByte,
   copyBytes,
+  copyWord,
+  decByte,
   copyPages,
   countDownOrReturn,
   expandOneBit,
+  incByte,
   loadPointer,
   storeByte,
   storePointer,
   switchCases,
+  tableEntry,
   zeroBytes,
   zeroBlock,
   zeroPages,
 } from '@asm/macros';
-import { add, call, cp, db, label, ld, ret } from '@asm/sm83';
-import { allocate, word } from '@asm/ram';
+import { add, call, cp, db, jr, label, ld, ret } from '@asm/sm83';
+import { type ByteVar, allocate, word } from '@asm/ram';
 import { type Op, u16, Label } from '@asm/types';
 import { SCRATCH, runProgram } from '../helpers/run-program';
 
@@ -213,5 +219,71 @@ describe('switchCases', () => {
   it('produces no done label when bodies exit on their own', () => {
     const ops = switchCases([[ret()], [ret()]], { exit: 'none' });
     expect(ops.some((o) => o.kind === 'label' && o.label.name === 'x_done')).toBe(false);
+  });
+});
+
+describe('incByte / decByte', () => {
+  it('change a byte in memory, leaving the new value in A and Z when it hits 0', () => {
+    const mem = runProgram([
+      ...storeByte(at(0), 0xff),
+      ...storeByte(at(1), 1),
+      ...incByte(at(0)),
+      ld([at(2)], 'a'),
+      ...decByte(at(1)),
+      ...ifZeroStore(at(3)),
+    ]);
+    expect([mem[SCRATCH], mem[SCRATCH + 1], mem[SCRATCH + 2], mem[SCRATCH + 3]]).toEqual([
+      0, 0, 0, 1,
+    ]);
+  });
+});
+
+/** Write 1 to `addr` if Z is set */
+function ifZeroStore(addr: ReturnType<typeof u16>): Op[] {
+  const skip = new Label();
+  return [ld('a', 1), jr('nz', skip), ld([addr], 'a'), label(skip)];
+}
+
+describe('copyByte / copyWord', () => {
+  it('copy bytes and words', () => {
+    const mem = runProgram([
+      ...storeByte(at(0), 0x34),
+      ...storeByte(at(1), 0x12),
+      ...copyWord(W2, W0),
+      ...copyByte(at(4), at(1)),
+    ]);
+    expect([mem[SCRATCH + 2], mem[SCRATCH + 3], mem[SCRATCH + 4]]).toEqual([0x34, 0x12, 0x12]);
+  });
+
+  it('only copies into a byteOf variable from one of the same kind', () => {
+    const light = at(5) as ByteVar<0 | 1>;
+    const mood = at(6) as ByteVar<0 | 1 | 2>;
+    // @ts-expect-error: a mood can be 2, which isn't a light
+    copyByte(light, mood);
+    expect(copyByte(mood, light)).toHaveLength(2);
+  });
+});
+
+describe('tableEntry / addAToHl', () => {
+  it.each([1, 2, 4] as const)('points HL at entry 3 of a table with %i-byte entries', (stride) => {
+    const TABLE = new Label('table');
+    const mem = runProgram(
+      [ld('a', 3), ...tableEntry(TABLE, stride), ld('a', ['hl']), ld([at(0)], 'a')],
+      [label(TABLE), db(Array.from({ length: 16 }, (_, i) => i))],
+    );
+    expect(mem[SCRATCH]).toBe(3 * stride);
+  });
+
+  it('adds A to HL', () => {
+    const mem = runProgram([
+      ld('hl', 0x12f0),
+      ld('a', 0x20),
+      ...addAToHl(),
+      ld('a', 'h'),
+      ld([at(0)], 'a'),
+      ld('a', 'l'),
+      ld([at(1)], 'a'),
+    ]);
+    expect([mem[SCRATCH], mem[SCRATCH + 1]]).toEqual([0x13, 0x10]);
   });
 });

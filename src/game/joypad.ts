@@ -2,15 +2,17 @@
  * Joypad input reading subroutine.
  *
  * Reads the Game Boy P1 register (two phases: d-pad, then buttons),
- * debounces, and edge-detects. Stores results in WRAM:
- *   $C000 — current frame's button state (active-high)
- *   $C001 — previous frame's button state
- *   $C002 — newly pressed this frame (rising edge)
+ * debounces, and edge-detects:
+ *   JOYPAD_CUR  — this frame's buttons (1 = held)
+ *   JOYPAD_PREV — last frame's
+ *   JOYPAD_NEW  — pressed this frame
  *
  * Bit layout (after read): DULR SsBA
  *   7=Down 6=Up 5=Left 4=Right 3=Start 2=Select 1=B 0=A
  */
 
+import { ifThen } from '../asm/flow';
+import { copyByte } from '../asm/macros';
 import type { Op } from '../asm/types';
 import { label, ld, ldh, cpl, and, or, swap, ret } from '../asm/sm83';
 import { HW } from '../asm/hardware';
@@ -18,15 +20,31 @@ import { MEM } from './ram';
 import { JOY_READ } from './labels';
 import { gameModule } from '../asm/program';
 
-// Labels placed in this module
+/** NZ if any of `buttons` (JOY flags) was pressed this frame. Clobbers A. */
+export function pressed(buttons: number): Op[] {
+  return [ld('a', [MEM.JOYPAD_NEW]), and(buttons)];
+}
+
+/** NZ if any of `buttons` is held down. Clobbers A. */
+export function held(buttons: number): Op[] {
+  return [ld('a', [MEM.JOYPAD_CUR]), and(buttons)];
+}
+
+/** Run `body` if any of `buttons` was pressed this frame. */
+export function ifPressed(buttons: number, body: readonly Op[]): Op[] {
+  return [...pressed(buttons), ...ifThen('nz', body)];
+}
+
+/** Run `body` while any of `buttons` is held down. */
+export function ifHeld(buttons: number, body: readonly Op[]): Op[] {
+  return [...held(buttons), ...ifThen('nz', body)];
+}
 
 export function buildReadJoypad(): Op[] {
   return [
     label(JOY_READ),
 
-    // Save previous state
-    ld('a', [MEM.JOYPAD_CUR]),
-    ld([MEM.JOYPAD_PREV], 'a'),
+    ...copyByte(MEM.JOYPAD_PREV, MEM.JOYPAD_CUR),
 
     // Select d-pad (write $20 to P1)
     ld('a', 0x20),

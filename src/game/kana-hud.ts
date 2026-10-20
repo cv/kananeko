@@ -14,11 +14,11 @@
  */
 
 import { playSfx } from './sound';
-import { ifThen, loop } from '../asm/flow';
+import { compare, ifNotEquals, ifThen, loop } from '../asm/flow';
 import { type Op, type TileIndex, type U16, u16, Label, routine } from '../asm/types';
 import { adc, add, call, cp, dec, inc, jp, jr, label, ld, ret, sbc, sub } from '../asm/sm83';
 import { MEM } from './ram';
-import { switchCases, zeroBytes } from '../asm/macros';
+import { copyByte, copyWord, switchCases, zeroBytes } from '../asm/macros';
 import { at, hi, lo } from '../asm/util';
 import { requireTile, requireTiles } from './font';
 import { CAT_TILES } from './font-data';
@@ -227,8 +227,7 @@ function buildHeart(n: number): Op[] {
   const empty = new Label(`hud_heart${String(n)}_empty`);
   const draw = new Label(`hud_heart${String(n)}_draw`);
   return [
-    ld('a', [MEM.KANA_LIVES]),
-    cp(n),
+    ...compare(MEM.KANA_LIVES, n),
     jr('c', empty),
     ld('a', HEART_FULL),
     jr(draw),
@@ -283,15 +282,11 @@ export function buildDrawHudOps(): Op[] {
     // === hud_update: called once per frame from the game loops ===
     // Ticks the delta flash, then redraws only if what the HUD shows changed.
     label(HUD_UPDATE),
-    ld('a', [MEM.DELTA_TIMER]),
-    cp(0),
-    ...ifThen('nz', [dec('a'), ld([MEM.DELTA_TIMER], 'a')]),
+    ...ifNotEquals(MEM.DELTA_TIMER, 0, [dec('a'), ld([MEM.DELTA_TIMER], 'a')]),
 
     // B = visible delta type (0 once the flash has expired)
     ld('b', 0),
-    ld('a', [MEM.DELTA_TIMER]),
-    cp(0),
-    ...ifThen('nz', [ld('a', [MEM.DELTA_TYPE]), ld('b', 'a')]),
+    ...ifNotEquals(MEM.DELTA_TIMER, 0, [ld('a', [MEM.DELTA_TYPE]), ld('b', 'a')]),
 
     // A heart won or lost: its sound, then the redraw (checked before the delta,
     // which usually changes on the same frame and would redraw the hearts silently)
@@ -314,17 +309,11 @@ export function buildDrawHudOps(): Op[] {
     label(HUD_REDRAW),
     label(KANA_DRAW_HUD),
     ld('b', 0),
-    ld('a', [MEM.DELTA_TIMER]),
-    cp(0),
-    ...ifThen('nz', [ld('a', [MEM.DELTA_TYPE]), ld('b', 'a')]),
+    ...ifNotEquals(MEM.DELTA_TIMER, 0, [ld('a', [MEM.DELTA_TYPE]), ld('b', 'a')]),
     ld('a', 'b'),
     ld([MEM.HUD_SHOWN_DELTA], 'a'),
-    ld('a', [MEM.KANA_LIVES]),
-    ld([MEM.HUD_SHOWN_LIVES], 'a'),
-    ld('a', [MEM.KANA_SCORE.lo]),
-    ld([MEM.HUD_SHOWN_SCORE.lo], 'a'),
-    ld('a', [MEM.KANA_SCORE.hi]),
-    ld([MEM.HUD_SHOWN_SCORE.hi], 'a'),
+    ...copyByte(MEM.HUD_SHOWN_LIVES, MEM.KANA_LIVES),
+    ...copyWord(MEM.HUD_SHOWN_SCORE, MEM.KANA_SCORE),
 
     // --- Hearts at cols 1-3 ---
     ...Array.from({ length: MAX_LIVES }, (_, i) => buildHeart(i + 1)).flat(),
@@ -334,9 +323,7 @@ export function buildDrawHudOps(): Op[] {
     ...buildDrawScoreDigits(0, SCORE_COL),
 
     // --- Delta flash at cols 15-18 (timer ticks in hud_update) ---
-    ld('a', [MEM.DELTA_TIMER]),
-    cp(0),
-    ...ifThen('nz', [
+    ...ifNotEquals(MEM.DELTA_TIMER, 0, [
       ld('a', [MEM.DELTA_TYPE]),
       ...switchCases(
         DELTA_TYPES.map((type) => [

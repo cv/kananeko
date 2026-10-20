@@ -6,7 +6,7 @@
  */
 
 import { MEM } from './ram';
-import { loadPointer, storePointer } from '../asm/macros';
+import { loadPointer, storePointer, tableEntry } from '../asm/macros';
 import { add, call, dec, dw, inc, jr, label, ld, or, pop, push, ret } from '../asm/sm83';
 import { type Op, type U16, Label, routine } from '../asm/types';
 import { at } from '../asm/util';
@@ -69,11 +69,7 @@ export function buildSceneTableRoutines(): Op[] {
   return [
     label(SCENE_DESC),
     ld('a', [MEM.SCENE_ID]),
-    add('a'),
-    ld('e', 'a'),
-    ld('d', 0),
-    ld('hl', SCENE_TABLE),
-    add('hl', 'de'),
+    ...tableEntry(SCENE_TABLE, 2),
     ld('a', ['hl+']),
     ld('h', ['hl']),
     ld('l', 'a'),

@@ -4,7 +4,7 @@
  * Flow: Title screen → Scene 0..4 (dialogue → kana) → End/loop
  */
 
-import { doWhile, ifElse, ifThen, loop } from '../asm/flow';
+import { compare, doWhile, ifElse, ifThen, loop } from '../asm/flow';
 import { type AssembleResult, type ROMHeader, assemble } from '../asm/assembler';
 import { HW, JOY } from '../asm/hardware';
 import { BUFFERS, MEM, STACK_TOP, VARIABLES } from './ram';
@@ -15,7 +15,7 @@ import { animModule } from './anim';
 import { catModule } from './cat';
 import { chartModule } from './chart';
 import { dialogueModule } from './dialogue';
-import { joypadModule } from './joypad';
+import { joypadModule, pressed } from './joypad';
 import { kanaModule } from './kana';
 import { hudModule } from './kana-hud';
 import { menuModule } from './menu';
@@ -29,11 +29,12 @@ import { videoModule } from './video';
 import {
   copyBlock,
   expandOneBit,
+  incByte,
   loadPointer,
   storeByte,
   storePointer,
-  zeroBytes,
   zeroBlock,
+  zeroBytes,
   zeroPages,
 } from '../asm/macros';
 import {
@@ -472,8 +473,7 @@ function buildResultScreen(screen: ResultScreen): Op[] {
     call(JOY_READ),
     call(TITLE_BLINK),
     call(CAT_TICK),
-    ld('a', [MEM.JOYPAD_NEW]),
-    and(JOY.START),
+    ...pressed(JOY.START),
     jr('z', loop),
     ...playSfx('confirm'),
 
@@ -499,9 +499,7 @@ function buildDrawStartBox(): Op[] {
 function buildTitleBlink(): Op[] {
   return [
     label(TITLE_BLINK),
-    ld('a', [MEM.TITLE_TIMER]),
-    inc('a'),
-    ld([MEM.TITLE_TIMER], 'a'),
+    ...incByte(MEM.TITLE_TIMER),
     ld('b', 'a'),
     and(BLINK_BIT - 1),
     ret('nz'),
@@ -589,13 +587,7 @@ function buildMain(): Op[] {
     ...placeCat(CAT_SPOTS.portrait),
 
     // Wait for all buttons to be released (debounce boot ROM START press)
-    ...doWhile('nz', [
-      ...frameWait(),
-      ...runDma(),
-      call(JOY_READ),
-      ld('a', [MEM.JOYPAD_CUR]),
-      cp(0),
-    ]),
+    ...doWhile('nz', [...frameWait(), ...runDma(), call(JOY_READ), ...compare(MEM.JOYPAD_CUR, 0)]),
 
     // The menu: はじめる starts a run, つづき takes a password
     ...doWhile('z', [
@@ -647,11 +639,9 @@ function buildMain(): Op[] {
     ...ifElse(
       'nz',
       [
-        ld('a', [MEM.KANA_LIVES]),
-        cp(0),
+        ...compare(MEM.KANA_LIVES, 0),
         jp('z', GAME_OVER_SCREEN.entry),
-        ld('a', [MEM.DLG_NODE_ID]),
-        cp(END_OF_CONVERSATION),
+        ...compare(MEM.DLG_NODE_ID, END_OF_CONVERSATION),
         jr('z', sceneComplete),
         call(SCENE_DRAW),
       ],
@@ -668,9 +658,7 @@ function buildMain(): Op[] {
     or('b'),
     ld([MEM.SCENE_FLAGS], 'a'),
 
-    ld('a', [MEM.SCENE_ID]),
-    inc('a'),
-    ld([MEM.SCENE_ID], 'a'),
+    ...incByte(MEM.SCENE_ID),
     cp(SCENES.length),
     ...ifThen('c', [ld('c', 1), call(CHART_SHOW), jp(SCENE_LOAD)]),
 

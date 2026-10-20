@@ -108,8 +108,8 @@ Game code is TypeScript that returns lists of instructions. A routine reads like
 
 ```ts
 import { ifThen } from '../asm/flow';
-import { storeByte } from '../asm/macros';
-import { cp, dec, label, ld, ret } from '../asm/sm83';
+import { decByte, storeByte } from '../asm/macros';
+import { label, ld, or, ret } from '../asm/sm83';
 import { type Op, routine } from '../asm/types';
 import { MEM } from './ram';
 import { KanaState } from './state';
@@ -121,10 +121,9 @@ function buildLoseLife(): Op[] {
   return [
     label(LOSE_LIFE),
     ld('a', [MEM.KANA_LIVES]), // brackets are memory, as in LD A,(nn)
-    cp(0),
+    or('a'),
     ret('z'),
-    dec('a'),
-    ld([MEM.KANA_LIVES], 'a'),
+    ...decByte(MEM.KANA_LIVES), // A = the lives left, Z if none
     ...ifThen('z', [...storeByte(MEM.KANA_STATE, KanaState.IDLE)]),
     ret(),
   ];
@@ -137,6 +136,8 @@ function buildLoseLife(): Op[] {
   - module constants (`KANA_DRAW_HUD`, or in `labels.ts` when another module calls them) are routines and data;
   - `const wrongAnswer = new Label('kana_wrong')` inside a builder is a branch within its routines, like a state's handler or a shared exit;
   - plain branches and loops use `src/asm/flow.ts`, which makes the labels for you: `ifThen` and `ifElse` for short branches, `block((done) => …)` to jump forward to a common exit, and `repeat`, `doWhile` and `loop((again, done) => …)` for loops. Their labels are named after the label before them in the `.sym` file (`kana_update.3`).
+- **Branching on a variable's value**: `dispatch(MEM.KANA_STATE, KanaState, { IDLE: 'ret', AWAITING: 'continue', … })` needs a case for every value of the variable's enum: a label to jump to, `'ret'`, or `'continue'`. `compare`, `ifEquals` and `ifNotEquals` only take values of the variable's own kind.
+- **Common sequences**: `incByte`, `decByte`, `copyByte`, `copyWord`, `tableEntry(table, stride)` and `addAToHl` in `src/asm/macros.ts`; `pressed`, `held`, `ifPressed` and `ifHeld` for the buttons in `src/game/joypad.ts`.
 - **Routines** are labels with a register contract: `routine('name', { out: ['a'], clobbers: ['bc'] })`. The build follows each routine through its jumps, calls and PUSH/POP pairs, and fails in these cases:
   - the routine changes a register its contract doesn't allow;
   - a caller still needs a register the routine clobbers;

@@ -7,6 +7,7 @@
  * Every kana answer counts toward its basic hiragana: カ, が and ガ all count as か.
  */
 
+import { pressed } from './joypad';
 import { block, doWhile, ifThen, loop } from '../asm/flow';
 import { JOY } from '../asm/hardware';
 import { MEM } from './ram';
@@ -32,7 +33,7 @@ import {
 } from '../asm/sm83';
 import { HW } from '../asm/hardware';
 import { type Op, Label } from '../asm/types';
-import { storeByte, zeroBytes } from '../asm/macros';
+import { addAToHl, storeByte, zeroBytes } from '../asm/macros';
 import { paletteOf } from './color';
 import { CHAR_MAP, requireTile, textToTiles } from './font';
 import { PASSWORD_LABEL, passwordLineCol } from './password';
@@ -225,9 +226,7 @@ export function buildChartRoutines(fade: Label): Op[] {
     srl('a'),
     srl('a'),
     srl('a'),
-    ld('e', 'a'),
-    ld('d', 0),
-    add('hl', 'de'),
+    ...addAToHl(),
     ld('a', 'b'),
     and(7),
     ld('b', 1),
@@ -315,8 +314,7 @@ export function buildChartRoutines(fade: Label): Op[] {
     ...frameWait(),
     ...runDma(),
     call(JOY_READ),
-    ld('a', [MEM.JOYPAD_NEW]),
-    and(JOY.A | JOY.START),
+    ...pressed(JOY.A | JOY.START),
     jr('z', CHART_WAIT),
     ...zeroBytes(MEM.CHART_WAIT),
     ...playSfx('confirm'),
